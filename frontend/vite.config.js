@@ -8,4 +8,13 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
   },
+  test: {
+    environment: "jsdom",
+    globals: true,
+  },
+  // Without this, Vite resolves Svelte's server-rendering build during
+  // `vitest run` ("mount(...) is not available on the server"), because
+  // @sveltejs/kit/vite's SSR-aware resolution wins by default outside a
+  // real server/build context.
+  resolve: process.env.VITEST ? { conditions: ["browser"] } : undefined,
 });
