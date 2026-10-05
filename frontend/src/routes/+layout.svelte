@@ -12,6 +12,7 @@
 
 <footer>
   <a href="/privacy">Privacy &amp; legal</a>
+  <a href="/health">API health</a>
 </footer>
 
 <style>
