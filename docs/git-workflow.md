@@ -1,17 +1,18 @@
 # Git Workflow
 
-Every change reaches `main` through a reviewed pull request.
+## Branch naming
 
-## Branches
+Format: `<type>/<issue>-<slug>`
 
-- Format: `<type>/<issue>-<slug>`, e.g. `feat/45-budget-model`.
-- `<type>` is one of the Conventional Commit types below; `<issue>` is the GitHub issue number; `<slug>` is a short, lowercase, hyphenated description.
-- One branch per issue. Do not bundle several issues in one branch.
-- Branch from an up-to-date `main`.
+- `<type>`: a Conventional Commits type (`feat`, `fix`, `docs`, `refactor`, `chore`, `test`, ...).
+- `<issue>`: GitHub issue number.
+- `<slug>`: short, lowercase, hyphenated description.
+- Example: `feat/45-budget-model`.
+- One branch per issue, created from an up-to-date `main`.
 
 ## Commits
 
-Commits follow [Conventional Commits](https://www.conventionalcommits.org/):
+Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
 <type>[optional scope][!]: <description>
@@ -22,25 +23,19 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org/):
 ```
 
 - Types: `feat`, `fix`, `docs`, `refactor`, `chore`, `test`, `style`, `build`, `ci`, `perf`, `revert`.
-  - `feat` adds a feature; `fix` corrects a bug.
-- Scope is optional, in parentheses right after the type, e.g. `fix(parser): ...`.
-- Description is required, short, lowercase type, imperative mood ("add", not "added").
-- Body is optional, separated from the description by a blank line.
-- Footers are optional, separated from the body by a blank line, in `Token: value` form (`-` instead of spaces in the token, except `BREAKING CHANGE`).
-- Breaking change: add `!` before the `:` or a `BREAKING CHANGE: <description>` footer.
-- One change type per commit. Mixed changes are split into several commits.
+- Description: short, imperative, required.
+- Breaking change: `!` before the `:` or a `BREAKING CHANGE:` footer.
+- One type of change per commit.
 
 ## Pull requests
 
-- Target branch: `main`.
-- The description includes `Closes #N` for the issue it resolves.
+- Target `main` and reference the issue (`Closes #N`).
 - Tests must pass before requesting review.
-- At least one member other than the author must approve before merge.
-- Never approve your own PR.
-- Delete the branch after merge.
+- At least one member other than the author must review and approve before merge.
+- Authors never approve their own PR.
 
-## Protection of `main`
+## `main` protection
 
-- Pull request required; no direct pushes.
-- Minimum 1 approving review.
-- Force pushes disabled.
+- No direct pushes: changes go through a pull request.
+- At least 1 approving review required.
+- Force pushes and branch deletion disabled.
