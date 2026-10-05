@@ -60,6 +60,6 @@ Each issue has exactly one assignee. The assignee is accountable for it, even wh
 
 Each member confirms this document by approving the pull request that introduces it.
 
-- [ ] Tom
+- [x] Tom
 - [ ] Jason
 - [ ] Clément
