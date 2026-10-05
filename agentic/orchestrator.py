@@ -42,8 +42,10 @@ from claude_agent_sdk import AgentDefinition, ClaudeAgentOptions, query
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 AGENTS_DIR = REPO_ROOT / ".github" / "agents"
-SPEC_FILE = "SPEC.md"
-REVIEW_FILE = "REVIEW.md"
+SPECS_DIR = "docs/specs"
+REVIEWS_DIR = "docs/reviews"
+
+SLUG_RE = re.compile(r"[^a-z0-9]+")
 
 # Maps the orchestrator's internal subagent key to the `.github/agents/*.md`
 # file that is the single source of truth for its prompt/scope/tools.
@@ -121,8 +123,13 @@ def resolve_cli_path(explicit: str | None) -> str | None:
     return shutil.which("claude")
 
 
+def slugify(text: str, max_words: int = 6) -> str:
+    words = SLUG_RE.sub(" ", text.lower()).split()
+    return "-".join(words[:max_words]) or "untitled"
+
+
 def build_orchestrator_options(
-    cwd: Path, max_turns: int, max_fix_rounds: int, cli_path: str | None = None
+    cwd: Path, max_turns: int, max_fix_rounds: int, spec_file: str, review_file: str, cli_path: str | None = None
 ) -> ClaudeAgentOptions:
     agents = load_agents()
 
@@ -130,22 +137,26 @@ def build_orchestrator_options(
 Understand -> Plan -> Delegate -> Verify -> Review.
 
 For every task:
-1. Ask `architect` to turn the request into a spec written to {SPEC_FILE}.
-   Do not proceed until {SPEC_FILE} exists and reads as implementable.
-2. Ask `developer` to implement {SPEC_FILE} exactly, with tests alongside
+1. Ask `architect` to turn the request into a spec written to {spec_file}.
+   Do not proceed until {spec_file} exists and reads as implementable.
+2. Ask `developer` to implement {spec_file} exactly, with tests alongside
    the code, and to run the relevant test suite itself before reporting back.
-3. Ask `qa_security` to review the implementation against {SPEC_FILE} and
-   write findings to {REVIEW_FILE}.
-4. If {REVIEW_FILE} lists blocking findings, send them back to `developer`
+3. Ask `qa_security` to review the implementation against {spec_file} and
+   write findings to {review_file}.
+4. If {review_file} lists blocking findings, send them back to `developer`
    with the specific findings to fix, then re-run `qa_security`. Repeat
    this step at most {max_fix_rounds} times.
-5. Stop and summarize: what was built, what {REVIEW_FILE} says, and
+5. Stop and summarize: what was built, what {review_file} says, and
    whether a human still needs to resolve open findings. Never claim the
    feature is "done and safe to merge" - a human review and test run is
    always required before merging, per the project's agentic workflow rules.
 
+{spec_file} and {review_file} are THIS feature's own files, named after its
+slug so they never collide with another feature's spec or review. Do not
+read or write any other file under {SPECS_DIR}/ or {REVIEWS_DIR}/.
+
 Keep every agent inside its documented scope. `architect` never writes
-application code. `developer` never edits {REVIEW_FILE} or `.github/agents/`.
+application code. `developer` never edits {review_file} or `.github/agents/`.
 `qa_security` never edits application source files."""
 
     return ClaudeAgentOptions(
@@ -159,9 +170,34 @@ application code. `developer` never edits {REVIEW_FILE} or `.github/agents/`.
     )
 
 
-async def run(task: str, cwd: Path, max_turns: int, max_fix_rounds: int, cli_path: str | None = None) -> None:
+async def run(
+    task: str, cwd: Path, max_turns: int, max_fix_rounds: int, slug: str, cli_path: str | None = None
+) -> None:
+    spec_file = f"{SPECS_DIR}/{slug}.md"
+    review_file = f"{REVIEWS_DIR}/{slug}.md"
+
+    # Subagents can write a new file into an existing directory, but the SDK
+    # gives them no tool to create a directory first - do it here, once, so
+    # `architect`'s and `qa_security`'s first Write call doesn't fail on a
+    # missing docs/specs/ or docs/reviews/.
+    (cwd / SPECS_DIR).mkdir(parents=True, exist_ok=True)
+    (cwd / REVIEWS_DIR).mkdir(parents=True, exist_ok=True)
+
+    for existing, label in ((cwd / spec_file, "spec"), (cwd / review_file, "review")):
+        if existing.exists():
+            raise FileExistsError(
+                f"{existing} already exists - this slug's {label} was already run. "
+                "Pass a different --slug, or delete/rename the existing file if you "
+                "intend to redo this feature's cycle from scratch."
+            )
+
     options = build_orchestrator_options(
-        cwd=cwd, max_turns=max_turns, max_fix_rounds=max_fix_rounds, cli_path=cli_path
+        cwd=cwd,
+        max_turns=max_turns,
+        max_fix_rounds=max_fix_rounds,
+        spec_file=spec_file,
+        review_file=review_file,
+        cli_path=cli_path,
     )
     async for message in query(prompt=task, options=options):
         print(message)
@@ -173,6 +209,15 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("task", help="Feature or change request to run through the agentic cycle.")
+    parser.add_argument(
+        "--slug",
+        default=None,
+        help="Short identifier for this feature, used to name its spec/review files as "
+        f"{SPECS_DIR}/<slug>.md and {REVIEWS_DIR}/<slug>.md so they never collide with "
+        "another feature's. Prefer the issue number, e.g. 'issue-63-privacy-page'. "
+        "Auto-derived from the first few words of `task` if omitted - check the printed "
+        "slug before a long run if you care what it's named.",
+    )
     parser.add_argument(
         "--cwd",
         default=str(REPO_ROOT),
@@ -194,7 +239,10 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    asyncio.run(run(args.task, Path(args.cwd), args.max_turns, args.max_fix_rounds, args.cli_path))
+    slug = args.slug or slugify(args.task)
+    print(f"Using slug '{slug}' -> {SPECS_DIR}/{slug}.md, {REVIEWS_DIR}/{slug}.md")
+
+    asyncio.run(run(args.task, Path(args.cwd), args.max_turns, args.max_fix_rounds, slug, args.cli_path))
 
 
 if __name__ == "__main__":

@@ -27,7 +27,8 @@ Closes: #9
 
 Reads anything in the repository. Writes only to:
 
-- `SPEC.md` (or `docs/specs/<feature-slug>.md` for a named feature)
+- `docs/specs/<feature-slug>.md` (one file per feature — never a shared
+  `SPEC.md`, which the next feature would silently overwrite)
 - `docs/decisions/*.md`
 - `docs/api-design.md`
 - diagrams or ERD files under `docs/`

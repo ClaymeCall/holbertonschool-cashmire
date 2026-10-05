@@ -13,8 +13,8 @@ Closes: #10
 
 ## Responsibilities
 
-- Implement a feature exactly as described in its spec (`SPEC.md` or
-  `docs/specs/<feature-slug>.md`), including backend routes/models/migrations
+- Implement a feature exactly as described in its spec
+  (`docs/specs/<feature-slug>.md`), including backend routes/models/migrations
   and the corresponding SvelteKit screens.
 - Write or extend automated tests alongside the feature, not as an
   afterthought — a feature without a test is not considered implemented.
@@ -38,8 +38,9 @@ May run commands via Bash, for example:
 - `npm run dev` / `npm run build` (inside `frontend/`)
 - the project's linters/formatters
 
-Does not edit `docs/`, `.github/agents/*.md`, or `REVIEW.md` — those belong
-to the Product & Architecture and QA & Security agents respectively.
+Does not edit `docs/specs/`, `docs/reviews/`, or `.github/agents/*.md` —
+those belong to the Product & Architecture and QA & Security agents
+respectively.
 
 ## Constraints
 
