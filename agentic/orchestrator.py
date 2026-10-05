@@ -40,6 +40,7 @@ from typing import Any
 import yaml
 from claude_agent_sdk import AgentDefinition, ClaudeAgentOptions, ResultMessage, query
 
+import tracing
 from tracing import AgenticTracer
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -173,7 +174,13 @@ application code. `developer` never edits {review_file} or `.github/agents/`.
 
 
 async def run(
-    task: str, cwd: Path, max_turns: int, max_fix_rounds: int, slug: str, cli_path: str | None = None
+    task: str,
+    cwd: Path,
+    max_turns: int,
+    max_fix_rounds: int,
+    slug: str,
+    cli_path: str | None = None,
+    actor: str | None = None,
 ) -> None:
     spec_file = f"{SPECS_DIR}/{slug}.md"
     review_file = f"{REVIEWS_DIR}/{slug}.md"
@@ -204,7 +211,7 @@ async def run(
 
     # No-ops without LANGFUSE_PUBLIC_KEY/LANGFUSE_SECRET_KEY set - see .env.example.
     tracer = AgenticTracer()
-    tracer.start(task, cwd=str(cwd), max_turns=max_turns, max_fix_rounds=max_fix_rounds)
+    tracer.start(task, cwd=cwd, slug=slug, max_turns=max_turns, max_fix_rounds=max_fix_rounds, actor=actor)
     result: ResultMessage | None = None
     try:
         async for message in query(prompt=task, options=options):
@@ -250,12 +257,21 @@ def main() -> None:
         "set this explicitly if the SDK reports a 'terminated process' error, which usually "
         "means PATH wasn't resolved in the environment this script is running in.",
     )
+    parser.add_argument(
+        "--actor",
+        default=None,
+        help="Who to attribute this run to in Langfuse traces (the `user_id`). Defaults to "
+        f"the {tracing.USER_ID_ENV_VAR} env var, then this repo's `git config user.email` "
+        "(or user.name) - usually nothing to configure here.",
+    )
     args = parser.parse_args()
 
     slug = args.slug or slugify(args.task)
     print(f"Using slug '{slug}' -> {SPECS_DIR}/{slug}.md, {REVIEWS_DIR}/{slug}.md")
 
-    asyncio.run(run(args.task, Path(args.cwd), args.max_turns, args.max_fix_rounds, slug, args.cli_path))
+    asyncio.run(
+        run(args.task, Path(args.cwd), args.max_turns, args.max_fix_rounds, slug, args.cli_path, args.actor)
+    )
 
 
 if __name__ == "__main__":

@@ -30,6 +30,14 @@ stream - it isn't a separate wrapper you need to configure. Leave the two
 keys unset to run without tracing; `langfuse.get_client()` no-ops in that
 case rather than erroring.
 
+Every span in the trace is tagged `cashmire-agentic` and the run's `--slug`,
+and grouped under a Langfuse session by that same slug, so re-runs of the
+same feature (e.g. across `--max-fix-rounds`) show up together. Each run is
+also attributed to a `user_id` for per-team-member cost/usage - this needs
+no setup: it's read from this repo's `git config user.email` automatically.
+Override it with `--actor <name>` or the `LANGFUSE_USER_ID` env var (e.g. in
+CI, where there's no personal git identity to read).
+
 ## Running the cycle
 
 ```bash
