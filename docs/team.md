@@ -25,6 +25,7 @@
 
 - *Un canal de discussion d'équipe unique pour les échanges quotidiens : Discord.
 - Les décisions techniques et les questions liées à du code passent par les issues et pull requests GitHub, pour garder une trace.
+- Utilisation de Github Projects
 
 ### Remontée des blocages
 
