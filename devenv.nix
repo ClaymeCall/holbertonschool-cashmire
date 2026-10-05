@@ -7,8 +7,13 @@
 }:
 
 {
-  packages = with pkgs;
-    [
-      python3
-    ];
+  languages.python = {
+    enable = true;
+    version = "3.12";
+    venv.enable = true;
+    venv.requirements = ''
+      -r ${./backend/requirements.txt}
+      -r ${./agentic/requirements.txt}
+    '';
+  };
 }
