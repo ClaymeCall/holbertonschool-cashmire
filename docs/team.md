@@ -8,7 +8,7 @@
 | Jason | `ToujoursPareil8` | Backend : socle API, base de données, auth, dépenses, correctifs sécurité |
 | Clément | `ClaymeCall` | Frontend, DevOps/Docker, accessibilité, documentation d'installation, démo |
 
-Le détail des issues par membre est dans `docs/team-assignments.md` (branche `doc/team-assignements`).
+
 
 ## Accord de travail
 
@@ -16,8 +16,9 @@ Le détail des issues par membre est dans `docs/team-assignments.md` (branche `d
 
 ### Cadence des réunions
 
-- **(proposition)** Point court d'équipe synchrone, 2 fois par semaine : avancement, blocages, priorités.
-- **(proposition)** Une réunion de revue avant chaque jalon ou présentation.
+- **(proposition)** Projet de 4 jours : un point court d'équipe synchrone (~10 min) chaque matin : avancement, blocages, priorités du jour.
+- **(proposition)** Un point de synchronisation en fin de journée, si nécessaire.
+- **(proposition)** Une revue d'équipe le dernier jour, avant la présentation.
 - Jours et horaires : **à confirmer**.
 
 ### Canal de communication
@@ -30,5 +31,5 @@ Le détail des issues par membre est dans `docs/team-assignments.md` (branche `d
 1. Dès qu'un membre est bloqué, il le signale sans attendre le prochain point, dans le canal d'équipe, en mentionnant la personne concernée (@handle GitHub).
 2. Le message indique : l'issue concernée, ce qui bloque, ce qui a déjà été essayé.
 3. Si le blocage dépend d'un autre domaine, le propriétaire du domaine (voir tableau) est sollicité en priorité.
-4. Un blocage non résolu sous **(proposition)** 24 h est traité lors du point d'équipe suivant, ou en réunion ad hoc.
+4. Un blocage non résolu sous **(proposition)** 1 h est traité immédiatement en appel ad hoc, sans attendre le point suivant.
 5. Le blocage est consigné en commentaire de l'issue concernée.
