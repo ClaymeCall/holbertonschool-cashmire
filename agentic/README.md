@@ -17,6 +17,19 @@ pip install -r agentic/requirements.txt
 export ANTHROPIC_API_KEY=sk-...   # see .env.example
 ```
 
+### Optional: Langfuse tracing
+
+Set `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` (and `LANGFUSE_HOST` if
+self-hosting; see `.env.example`) to send every run to Langfuse as one
+trace: a root span for the cycle, an `agent` span per `architect`/
+`developer`/`qa_security` delegation, and nested `tool`/`generation` spans
+for what each subagent actually did, with per-turn token usage and cost.
+`agentic/tracing.py` does this by correlating `ToolUseBlock`/
+`ToolResultBlock` pairs and `parent_tool_use_id` from the SDK's message
+stream - it isn't a separate wrapper you need to configure. Leave the two
+keys unset to run without tracing; `langfuse.get_client()` no-ops in that
+case rather than erroring.
+
 ## Running the cycle
 
 ```bash

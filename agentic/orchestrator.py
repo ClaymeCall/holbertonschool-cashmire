@@ -38,7 +38,9 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from claude_agent_sdk import AgentDefinition, ClaudeAgentOptions, query
+from claude_agent_sdk import AgentDefinition, ClaudeAgentOptions, ResultMessage, query
+
+from tracing import AgenticTracer
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 AGENTS_DIR = REPO_ROOT / ".github" / "agents"
@@ -199,8 +201,19 @@ async def run(
         review_file=review_file,
         cli_path=cli_path,
     )
-    async for message in query(prompt=task, options=options):
-        print(message)
+
+    # No-ops without LANGFUSE_PUBLIC_KEY/LANGFUSE_SECRET_KEY set - see .env.example.
+    tracer = AgenticTracer()
+    tracer.start(task, cwd=str(cwd), max_turns=max_turns, max_fix_rounds=max_fix_rounds)
+    result: ResultMessage | None = None
+    try:
+        async for message in query(prompt=task, options=options):
+            print(message)
+            tracer.handle_message(message)
+            if isinstance(message, ResultMessage):
+                result = message
+    finally:
+        tracer.finish(result)
 
 
 def main() -> None:
