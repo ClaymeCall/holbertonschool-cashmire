@@ -1,5 +1,5 @@
 <script>
-  // TODO(#63-legal): these values require a human decision - see SPEC.md section 10.
+  // TODO(#63-legal): these values require a human decision - see docs/specs/issue-63-privacy-page.md section 10.
   // Do not invent values. Do not remove this comment while any value is unresolved.
   const LEGAL = {
     entity: "[[LEGAL_ENTITY]]",

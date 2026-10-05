@@ -2,19 +2,19 @@
 // jsdom) could not be installed in the environment this file was authored in:
 // `npm` is not available at all (no node/npm binary on PATH), so
 // `npm install` was never attempted to completion. See the PR description /
-// agent report for the exact command and failure, per SPEC.md section 8.4.
+// agent report for the exact command and failure, per docs/specs/issue-63-privacy-page.md section 8.4.
 //
 // Revised after review (still unexecuted, same reason as above): T-1 and T-4
 // no longer rely on @testing-library/jest-dom matchers (toHaveAccessibleName,
 // toHaveAttribute), which were used but never installed or imported — see
-// SPEC.md section 8.2, which prefers doing without that dependency. T-3 now
+// docs/specs/issue-63-privacy-page.md section 8.2, which prefers doing without that dependency. T-3 now
 // normalizes textContent whitespace before matching the allowlist, because
 // +page.svelte wraps long sentences across source lines, which otherwise
 // left raw newlines/indentation in textContent and made every single-spaced
 // allowlist phrase fail to match (a false positive that would have flagged
 // the page as making forbidden claims it does not make).
 //
-// Covers SPEC.md section 8.3, T-1 through T-6.
+// Covers docs/specs/issue-63-privacy-page.md section 8.3, T-1 through T-6.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/svelte";
 import { createRawSnippet } from "svelte";
@@ -42,7 +42,7 @@ describe("privacy page (#63)", () => {
     expect(headings[0].textContent).toMatch(/privacy/i);
   });
 
-  it("T-2 (AC-2): every required section heading from SPEC.md section 5.1 is present, in order", () => {
+  it("T-2 (AC-2): every required section heading from docs/specs/issue-63-privacy-page.md section 5.1 is present, in order", () => {
     render(PrivacyPage);
     // Derived from the h2 headings actually implemented in +page.svelte.
     // If someone deletes a section, this fails.
@@ -68,7 +68,7 @@ describe("privacy page (#63)", () => {
     expect(renderedHeadings).toEqual(requiredHeadings);
   });
 
-  it("T-3 (AC-4): contains no forbidden claim from SPEC.md section 5.3, outside the allowlisted negated sentences", () => {
+  it("T-3 (AC-4): contains no forbidden claim from docs/specs/issue-63-privacy-page.md section 5.3, outside the allowlisted negated sentences", () => {
     const { container } = render(PrivacyPage);
     // Collapse all whitespace (including the newlines/indentation that
     // textContent preserves from sentences wrapped across source lines in
@@ -76,7 +76,7 @@ describe("privacy page (#63)", () => {
     // allowlist phrases below can actually match.
     const text = container.textContent.replace(/\s+/g, " ").toLowerCase();
 
-    // SPEC.md section 5.3 forbidden tokens. Each entry's `allow` list is the
+    // docs/specs/issue-63-privacy-page.md section 5.3 forbidden tokens. Each entry's `allow` list is the
     // exact negated/forward-looking phrase(s) this page uses. Removing a
     // phrase here without removing the matching sentence in +page.svelte (or
     // vice versa) is a deliberate, reviewable edit — see
@@ -157,7 +157,7 @@ describe("privacy page (#63)", () => {
 
   it("T-6 (AC-8): human-dependent values render as literal [[PLACEHOLDER]] tokens", () => {
     // Expected to be updated (and trimmed) once a human supplies real values
-    // per SPEC.md section 10.1 — that future edit is not someone defeating
+    // per docs/specs/issue-63-privacy-page.md section 10.1 — that future edit is not someone defeating
     // this test.
     render(PrivacyPage);
     expect(screen.getAllByText(/\[\[CONTACT_EMAIL\]\]/).length).toBeGreaterThan(0);

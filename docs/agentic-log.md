@@ -205,3 +205,53 @@ agent review did not and structurally could not catch. The project's rule
 that an agent run is not proof a feature works held up exactly as
 expected — the fix came from actually executing the suite, not from
 another round of review.
+
+## 2026-10-05 — Fixed SPEC.md/REVIEW.md naming collision (caught by human review)
+
+**Objective.** `agentic/orchestrator.py` hardcoded every run's spec and
+review to the same root-level `SPEC.md` / `REVIEW.md`. A human reviewing
+PR #79 pointed out the obvious consequence: the next feature's agentic run
+would silently overwrite or collide with this one's artifacts. This was
+already contradicted by `product-architecture.md`'s own scope section,
+which offered `docs/specs/<feature-slug>.md` as an alternative that the
+orchestrator never actually implemented.
+
+**Agent/role used.** None — a human (not an agent) found this by reading
+the code, not by running it. Noted here because the fix changes agent
+scope/behavior, not because an agent produced it.
+
+**What was delegated.** N/A — direct human-directed fix.
+
+**Main proposal.** Namespace every run: `docs/specs/<slug>.md` and
+`docs/reviews/<slug>.md`, where `<slug>` is a required-in-spirit
+`--slug` flag (auto-derived from the task text if omitted, but printed
+before the run so it's never a silent guess). The orchestrator now refuses
+to run if the slug's spec or review file already exists, instead of
+overwriting it. Kept permanently under `docs/`, the same way
+`docs/decisions/` keeps ADRs — this is a bug fix for collision risk, not a
+reason to make these files ephemeral.
+
+**How the team verified it.** Updated all three `.github/agents/*.md`
+files and `agentic/README.md` to reference the same convention, so the
+"single source of truth" promise from the first log entry actually holds.
+Renamed PR #79's own `SPEC.md`/`REVIEW.md` to
+`docs/specs/issue-63-privacy-page.md` / `docs/reviews/issue-63-privacy-page.md`
+to match, updated the handful of in-code comments that named the old path,
+and re-ran the test suite (still 6/6 passing) to confirm the rename broke
+nothing.
+
+**Accepted / modified / rejected.**
+- Accepted: namespaced-and-kept over ephemeral/gitignored, for the audit
+  trail this project is graded on.
+- Modified: `product-architecture.md`'s scope section from "`SPEC.md` (or
+  `docs/specs/<feature-slug>.md`)" to just the namespaced path — the
+  either/or phrasing was exactly how the orchestrator ended up only
+  implementing the collision-prone half.
+- Rejected: making `--slug` strictly required (hard error if omitted) in
+  favor of auto-deriving one from the task text — convenience for quick
+  runs, at the cost of a slightly less predictable filename; the run
+  prints the slug it picked so this is never silent.
+
+**Final decision.** Shipped as part of PR #79 alongside the feature it was
+found on, since the rename only makes sense together with the tooling fix
+that caused it.

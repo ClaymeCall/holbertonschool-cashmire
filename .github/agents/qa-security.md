@@ -33,7 +33,8 @@ Reads anything in the repository. Runs tests and read-only inspection
 commands via Bash (test runners, linters, `curl`/`httpie` against a local
 dev server). Writes only to:
 
-- `REVIEW.md` (or `docs/qa/<feature-slug>-review.md`)
+- `docs/reviews/<feature-slug>.md` (one file per feature — never a shared
+  `REVIEW.md`, which the next feature would silently overwrite)
 - a new entry in `docs/agentic-log.md` describing the review
 
 Never edits `backend/`, `frontend/`, migrations, or any application source
@@ -55,7 +56,7 @@ code is the Full-Stack Development agent's job.
 
 ## Expected outputs
 
-`REVIEW.md` listing, per acceptance criterion from the spec:
+`docs/reviews/<feature-slug>.md` listing, per acceptance criterion from the spec:
 
 1. Pass/fail status with evidence (test output, request/response, screenshot
    description).
