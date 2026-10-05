@@ -166,7 +166,12 @@ application code. `developer` never edits {review_file} or `.github/agents/`.
         system_prompt=system_prompt,
         agents=agents,
         allowed_tools=["Read", "Agent"],  # "Agent" spawns subagents; was "Task" in older SDK versions.
-        permission_mode="acceptEdits",
+        # "acceptEdits" only auto-approves Write/Edit - Bash calls (npm install,
+        # manage.py migrate/test, etc.) still hit the interactive approval
+        # prompt, which this headless run can never answer, so `developer`
+        # gets stuck retrying forever. Subagent scope/tool allowlists in
+        # `.github/agents/*.md` are still what constrains what gets run.
+        permission_mode="bypassPermissions",
         cwd=str(cwd),
         max_turns=max_turns,
         cli_path=resolve_cli_path(cli_path),
