@@ -1,6 +1,6 @@
 # 0001 — Introduce a minimal shared app shell (`+layout.svelte`)
 
-- **Status:** Proposed
+- **Status:** Proposed — amended by #15
 - **Date:** 2026-10-05
 - **Context issue:** #63 (privacy and legal information page)
 - **Supersedes / superseded by:** —
@@ -62,3 +62,28 @@ of "where does app-wide UI live" has to be answered now rather than later.
 - Risk: the "pages own `<main>`" rule is easy to forget and produces a page with
   no main landmark. It is cheap to catch in review and should be part of the
   checklist for any new route.
+
+## Amendment — 2026-10-05 (issue #15)
+
+**What changed:** point 2's "no header bar, no logo, no nav menu" no longer
+holds. `frontend/src/routes/+layout.svelte` now also renders a `<header>`
+containing a brand link (`Cashmire`, `/`) and a `<nav aria-label="Main">`
+with links to `Home` (`/`) and `Privacy` (`/privacy`). The active link is
+marked with `aria-current="page"`, driven off `$app/state`'s `page.url`.
+
+**Why:** the app now has two real routes (`/` and `/privacy`), and until
+this change the only way to reach `/privacy` was the footer link, with no
+way back to `/` other than the browser's back button. Issue #15 asks for a
+navigable shell now that there is more than one page to navigate between;
+deferring a two-link nav further would mean every new route re-litigates
+the same question.
+
+**What is unchanged:** points 3, 4, 5 and 6 still hold exactly as written —
+`+layout.js` and `+layout.svelte` still coexist and neither is merged into
+the other; pages still own their own `<main>` (the layout adds no `<main>`
+of its own); per-route page options are still the mechanism for per-page
+rendering differences; styling is still component-scoped in the layout's
+own `<style>` block, with no global stylesheet, CSS reset or design tokens
+introduced. Point 2's "accretion" warning stands for anything beyond these
+two links — this amendment is not a licence for a sidebar, theme switcher
+or auth menu later.
