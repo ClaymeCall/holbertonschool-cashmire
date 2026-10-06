@@ -15,6 +15,7 @@ urlpatterns = [
     path("budgets/", views.budget_create, name="budget-create"),
     path("auth/register/", views.RegisterView.as_view(), name="register"),
     path("auth/login/", views.LoginView.as_view(), name="login"),
+    path("auth/logout/", views.LogoutView.as_view(), name="logout"),
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
         "docs/",
