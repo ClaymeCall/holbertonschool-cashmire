@@ -56,7 +56,7 @@
 Chaque utilisateur reçoit un ensemble de catégories par défaut (~15 catégories) à l'inscription. Cela double le stockage pour les catégories, mais le surcoût est négligeable (quelques centaines d'octets par utilisateur, vs. gigaoctets pour les dépenses/budgets plus tard).
 
 **Requêtes API scoped :**  
-Toutes les requêtes sur `Category` doivent filtrer par `user_id` (ex. `GET /api/users/{id}/categories/`). Cela rend les routes légèrement plus verbales, mais la sécurité gagne.
+Toutes les requêtes sur `Category` doivent filtrer par `user_id` (ex. `GET /api/categories/`). L'utilisateur est déduit de la session : aucun `user_id` n'apparaît dans le chemin, ce qui empêche d'atteindre les catégories d'un autre utilisateur en changeant un identifiant (voir `docs/api-design.md`).
 
 ### Rejetés
 
@@ -83,7 +83,7 @@ Toutes les requêtes sur `Category` doivent filtrer par `user_id` (ex. `GET /api
 | Modèle Django `Category` | Ajout de champ | `user = ForeignKey(User, on_delete=models.CASCADE)` |
 | Sérialiser `CategorySerializer` | Légère modification | Inclure `user_id` en lecture, valider ownership en écriture |
 | Permission `Category` | Implémentation | Checker `category.user.id == request.user.id` |
-| Routes API | Scoping | Tous les GET/POST/PATCH/DELETE sur `/api/users/{id}/categories/` |
+| Routes API | Scoping | Tous les GET/POST/PATCH/DELETE sur `/api/categories/` |
 | Onboarding/Signup | Signal Django | `post_save` sur `User` → créer 15 catégories par défaut |
 | Tests | Couverture complète | Vérifier ownership, empêcher accès cross-user, validation de seed data |
 

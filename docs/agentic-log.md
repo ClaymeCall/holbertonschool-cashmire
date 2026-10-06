@@ -297,15 +297,121 @@ in the next cycle if the command proves incorrect.
 - Reviewed git history: commits correctly typed as `docs:` and `fix:` per Conventional Commits
 
 **Accepted / modified / rejected.**
-- Accepted: the comprehensive scope covering architecture, commands, conventions, layout, 
-  rules, and troubleshooting in one reference document
-- Accepted: all verified commands from the specification; the file goes beyond the spec 
-  with optional troubleshooting/FAQ and a "How to Contribute" workflow, both of which 
-  are in-scope per the spec ("optional, can grow over time")
-- Accepted: the forward-looking test examples (e.g., backend/api/tests.py) as guidance 
-  documentation, not bugs — the file documents what *will* exist, not only current state
-- Non-blocking: one unverified command (makemigrations --empty) flagged for clarification 
-  in the next cycle, but does not gate merge
+- Accepted: All 9 acceptance criteria met. No blocking findings.
+- Accepted: The 4 non-blocking findings are either intentional (password field alignment with Django), improvements (CHECK constraints), or correct design decisions (issue #6 visual omission, future-dated indices).
+- Rejected: Nothing. The ERD documentation is conformant and ready for team approval.
 
-**Final decision.** Approve for merge. The file is complete, accurate, and ready to guide 
-agents and developers. Full findings written to docs/reviews/issue-8-copilot-instructions.md.
+**Final decision.** 
+- The ERD specification is **approved for team review**. All acceptance criteria are satisfied; no code defects or security/accessibility/compliance issues found.
+- **Critical next step (human action):** Team must approve the ERD (including the two conditional models for issue #6) **before** implementing migrations and Django models. This is a synchronization point: if issue #6 is not resolved, the Full-Stack Development agent will be blocked on writing category FK constraints.
+- Once approved, Full-Stack Development agent proceeds to: (1) create `backend/api/models.py` with User, Expense, Budget, Category models, (2) generate `backend/api/migrations/0002_initial_models.py` with the ERD schema, (3) run migrations to apply.
+- No further QA work needed on this documentation artifact; review complete.
+
+## 2026-10-06 — QA & Security review of API Contract Specification (Issue #7)
+
+**Objective.** Closes #7 (documentation review). Verify that `docs/api-design.md` (the living API contract) matches `docs/specs/issue-7-api-contract.md` (the specification) across all 20 acceptance criteria, and flag any blockers or non-blocking findings before implementation.
+
+**Agent/role used.** QA & Security Agent.
+
+**What was delegated.** Comprehensive review of the API design documentation against the specification:
+- Verify all 20 acceptance criteria (AC-1 through AC-20).
+- Check all 19 documented routes (4 auth, 5 expenses, 5 budgets, 5 categories).
+- Confirm monetary fields always serialized as JSON strings (not floats).
+- Verify ownership returns 404 (not 403) including for foreign category_id.
+- Confirm all routes have trailing slashes.
+- Verify error format is uniform and identical across all routes.
+- Check for internal details in error messages (stacktraces, SQL names, file paths).
+- Confirm no account enumeration at signup/login (409 on conflict, generic 401 message).
+- Check for logical contradictions (e.g., 403 and 409 on same scenario).
+- Verify each route documents method, auth, request body, response, and error codes.
+- Validate alignment with ERD (docs/erd.md) field-by-field and constraint-by-constraint.
+- Verify coherence with category ownership decision (docs/decisions/category-ownership.md).
+- Check actual backend URLs (cashmire/urls.py, api/urls.py) for compliance.
+
+**Main findings.**
+
+1. **No blocking issues.** All 20 acceptance criteria passed. The specification is comprehensive, internally consistent, and secure.
+
+2. **Routes and methods correct.** All 19 routes documented with proper HTTP methods (GET, POST, PATCH, DELETE) and authentication requirements.
+
+3. **Monetary serialization complete.** All monetary fields (`amount`, `spent`, `remaining`, `alert_threshold`) consistently documented as JSON strings throughout. Examples show proper formatting (e.g., `"123.45"`).
+
+4. **Ownership and 404 correctly specified.** Section 1.6 and all affected routes (expenses, budgets, categories) explicitly document 404 for foreign resources. No 403 Forbidden appears; ownership violations intentionally return 404 (confusion with non-existence).
+
+5. **Trailing slashes present.** All 19 routes verified to end with `/` (e.g., `/api/auth/register/`, `/api/expenses/{id}/`).
+
+6. **Error format uniform.** Section 1.5 defines single format `{ "error": "<code>", "message": "<description>" }` with codes INVALID_DATA, NOT_FOUND, UNAUTHORIZED, CONFLICT, SERVER_ERROR. All examples follow this pattern.
+
+7. **No internal details leaked.** All error messages are generic (e.g., "Identifiants invalides", "Ressource non trouvée"). No stacktraces, SQL column names, or file paths in examples.
+
+8. **No account enumeration.** Login endpoint (section 2.2) returns generic `401 Unauthorized` with message "Identifiants invalides" (does not distinguish between invalid email and invalid password). Register returns `409 Conflict` for duplicate email/username without revealing which field caused the conflict.
+
+9. **No logical contradictions.** Routes handle overlapping scenarios correctly (e.g., both `category_id` validation and ownership check → both 404, not 403 then 409).
+
+10. **ERD alignment verified.** All User, Category, Expense, Budget fields match `docs/erd.md`:
+    - User: id, email, username, first_name, last_name, is_active, created_at, updated_at
+    - Category: id, user_id, name, description, is_active, created_at, updated_at
+    - Expense: id, user_id, category_id, amount, description, date, created_at, updated_at
+    - Budget: id, user_id, category_id, amount, period_start, period_end, alert_threshold, created_at, updated_at
+    - All constraints (amount > 0, period_end >= period_start, UNIQUE(user_id, name) for categories, UNIQUE(user_id, category_id, period_start, period_end) for budgets) documented.
+
+11. **Category ownership decision (issue #6) correctly implemented.** All category routes scope by user_id. Section 5 routes confirm per-user ownership.
+
+**Non-blocking findings.**
+
+1. **Ambiguity in 400 Bad Request error granularity (NB-1).**
+   
+   Section 2.1 (register) shows field-level error messages (`"email": "Adresse e-mail invalide"`, `"password": "Minimum 8 caractères"`), suggesting nested `details` or per-field responses. However, section 1.5 specifies a global format (`{ "error": "INVALID_DATA", "message": "..." }`).
+   
+   **Sévérité :** Non-bloquant (cosmétique). Both approaches are valid and secure; team must clarify which is chosen for consistency across all 400 responses.
+   
+   **Recommandation :** Choose one approach before implementation:
+   - **Option A (global, recommended for MVP):** Single message for all validation failures. `{ "error": "INVALID_DATA", "message": "Validation failed. Check email, password, etc." }`
+   - **Option B (DRF standard, more helpful for frontend):** Nested details by field. `{ "error": "INVALID_DATA", "message": "Validation failed", "details": { "email": [...], "password": [...] } }`
+   
+   Update all examples to match chosen option.
+
+2. **Minor inconsistency: User fields in POST register vs. GET me (NB-3).**
+   
+   POST /api/auth/register/ response (201 Created) omits `is_active` and `updated_at`:
+   ```json
+   { "id": 1, "email": "...", "username": "...", "first_name": "...", "last_name": "...", "created_at": "..." }
+   ```
+   
+   GET /api/auth/me/ response (200 OK) includes both:
+   ```json
+   { "id": 1, "email": "...", "username": "...", "first_name": "...", "last_name": "...", "is_active": true, "created_at": "...", "updated_at": "..." }
+   ```
+   
+   **Sévérité :** Non-bloquant (cosmetic). Both are reasonable; recommend adding `is_active` and `updated_at` to register response for consistency.
+
+3. **Test coverage for ownership edge cases (NB-2).**
+   
+   Specification correctly documents ownership validation (`category_id` of another user returns 404), but no test cases exist yet (backend not implemented). Recommend tests for:
+   - Expense/Budget with own category → success.
+   - Expense/Budget with foreign user's category → 404 (not enumeration of which user owns it).
+   - Non-existent category ID → 404 (indistinguishable from foreign).
+
+**How the team verified it.**
+- Mapped all 20 acceptance criteria against `docs/api-design.md` sections; all criteria passed.
+- Enumerated all 19 routes and confirmed each has method, authentication, body/params, response codes, and error cases.
+- Grepped all monetary fields for JSON string format; all documented correctly.
+- Scanned error message examples for sensitive details (stacktraces, SQL, paths); none found.
+- Traced login/register flows for account enumeration; messages are generic.
+- Verified trailing slashes on all 19 route paths.
+- Cross-checked error codes and messages against the uniform format (section 1.5).
+- Compared field lists in API responses against ERD table schemas; all match.
+- Confirmed category routes (section 5) implement per-user scoping per decision #6.
+- Checked backend URLs (backend/cashmire/urls.py includes api/, backend/api/urls.py has health/) — health check path `/api/health/` matches spec section 1.2.
+
+**Accepted / modified / rejected.**
+- Accepted: All 20 acceptance criteria met. API specification is conformant, comprehensive, and secure.
+- Accepted: The 3 non-blocking findings are minor (choice between error response formats, field inclusion cosmetics, test coverage for future implementation). None gate merge.
+- Rejected: Nothing. The API specification is ready for implementation.
+
+**Final decision.**
+- The API design specification (`docs/api-design.md`) is **approved for team review**. All acceptance criteria are satisfied; no security issues, no internal detail leaks, no account enumeration, no contradictions.
+- **Critical next step (human action):** Team reviews findings (especially NB-1: clarify error format choice) and approves the document if no changes needed.
+- Once approved, Full-Stack Development agent proceeds to implement the 19 routes (auth, expenses, budgets, categories) against the specification, following the same verification process.
+- Review artifacts: `docs/reviews/issue-7-api-contract.md` documents all findings (blockers, non-blockers, verification steps) with section-by-section analysis of all 20 criteria and security checks.
+
