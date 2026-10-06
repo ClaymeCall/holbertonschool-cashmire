@@ -3,7 +3,7 @@
 - **Dernière mise à jour :** 2026-10-06
 - **Auteur :** Spécification issue #7 (contrat API initial)
 - **Public cible :** Développeurs frontend (SvelteKit), clients API externes
-- **Statut du document :** Documenté et approuvé. Source de vérité pour les routes API.
+- **Statut du document :** Proposé, à relire par un autre membre de l'équipe. Source de vérité pour les routes API une fois approuvé.
 
 ---
 
