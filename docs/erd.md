@@ -31,7 +31,7 @@ erDiagram
         bigint id PK
         string name
         text description
-        bigint "user_id (optionnel)"
+        bigint user_id FK "optionnel, voir issue 6"
         boolean is_active
         timestamp created_at
         timestamp updated_at
