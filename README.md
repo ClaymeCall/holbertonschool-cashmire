@@ -29,9 +29,60 @@ alternative.
 
 ## Back-end
 
-Django + DRF, run via `docker compose up db api` from the repo root (or see
-`backend/` for a standalone setup). Not documented further here — this is
-outside the scope of the front-end skeleton issue that created this file.
+The API uses Django 5.1 with Django REST Framework (DRF). Django provides the
+Python web framework, project settings, ORM, and built-in versioned migrations;
+DRF provides the REST API views and responses. This keeps the backend on the
+project's PostgreSQL stack without adding a separate migration tool.
+
+Run it via `docker compose up db api` from the repo root (or the full stack
+with the quick start above). The API is available at
+`http://127.0.0.1:8000/`; its health endpoint is
+`http://127.0.0.1:8000/api/health/`.
+
+### Run the API locally (without the `api` container)
+
+Install Python 3.12 and Docker Compose. Copy `.env.example` to `.env` (in
+PowerShell, use `Copy-Item .env.example .env`; on macOS/Linux, use
+`cp .env.example .env`) — the same `.env` is used in both cases, see
+[Local PostgreSQL](#local-postgresql) below.
+
+From the repository root, create a virtual environment and install the API
+dependencies:
+
+```bash
+python -m venv .venv
+```
+
+On Windows PowerShell:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+```
+
+On macOS/Linux:
+
+```bash
+.venv/bin/python -m pip install -r backend/requirements.txt
+```
+
+Start PostgreSQL, apply migrations, and run the API. Use the matching Python
+path from above for the last two commands:
+
+```bash
+docker compose up -d db
+```
+
+```powershell
+# Windows PowerShell
+.\.venv\Scripts\python.exe backend\manage.py migrate
+.\.venv\Scripts\python.exe backend\manage.py runserver
+```
+
+```bash
+# macOS/Linux
+.venv/bin/python backend/manage.py migrate
+.venv/bin/python backend/manage.py runserver
+```
 
 ## Docs
 
@@ -44,20 +95,19 @@ outside the scope of the front-end skeleton issue that created this file.
 The development database runs in the `db` service using PostgreSQL 16. Copy
 `.env.example` to `.env` before starting the service. Use
 `Copy-Item .env.example .env` in PowerShell or `cp .env.example .env` on
-macOS/Linux. The same settings file is loaded by Django when running the API
-directly on your machine.
+macOS/Linux. The same `.env` is loaded by Django whether the API runs in the
+`api` container or directly on your machine — leave `POSTGRES_HOST` unset
+and Django picks the right one: the Compose hostname `db` when it's
+reachable, otherwise `localhost`.
 
 ```bash
 docker compose up -d db
 docker compose exec db pg_isready -U cashmire -d cashmire
 ```
 
-The example publishes PostgreSQL on `localhost:5432`, so a locally running API
-connects to `localhost`. The API container uses the Compose service hostname
-`db` and PostgreSQL's internal port `5432`. Set `POSTGRES_DB`,
+The example publishes PostgreSQL on `localhost:5432`. Set `POSTGRES_DB`,
 `POSTGRES_USER`, and `POSTGRES_PASSWORD` in `.env` to configure the database;
 set `POSTGRES_PORT` to change the port published on the host.
-
 
 ## Database migrations
 
@@ -84,4 +134,4 @@ docker compose exec api python manage.py migrate
 
 To run these commands outside Docker, execute them from `backend/` with the
 Python dependencies installed and PostgreSQL available using the settings in
-`.env`.
+`.env` (see [Run the API locally](#run-the-api-locally-without-the-api-container)).
