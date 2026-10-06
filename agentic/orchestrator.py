@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 import re
 import shutil
 from dataclasses import dataclass
@@ -136,6 +137,21 @@ def build_orchestrator_options(
 ) -> ClaudeAgentOptions:
     agents = load_agents()
 
+    # This script exists specifically to run headless, billed to this
+    # project's own Anthropic API key - never to a logged-in Claude Code
+    # session's subscription. Without ANTHROPIC_API_KEY explicitly present
+    # (and `--bare` below), the spawned `claude` CLI subprocess can silently
+    # fall back to whatever account happens to be logged in on this machine,
+    # which is exactly the failure this refuses to risk.
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise RuntimeError(
+            "ANTHROPIC_API_KEY is not set in this process's environment. "
+            "export it (see .env.example) before running the orchestrator - "
+            "this script refuses to silently fall back to a locally logged-in "
+            "Claude Code session's own credentials."
+        )
+
     system_prompt = f"""You are the orchestrator for the Cashmire agentic development cycle:
 Understand -> Plan -> Delegate -> Verify -> Review.
 
@@ -172,6 +188,14 @@ application code. `developer` never edits {review_file} or `.github/agents/`.
         # gets stuck retrying forever. Subagent scope/tool allowlists in
         # `.github/agents/*.md` are still what constrains what gets run.
         permission_mode="bypassPermissions",
+        # `env` always overrides the inherited process environment (per the
+        # SDK), so this is the actual key used regardless of what else is
+        # set. `--bare` makes auth "strictly ANTHROPIC_API_KEY ... OAuth and
+        # keychain are never read" (`claude --help`) - without it, a normal
+        # CLI invocation may still read a locally logged-in session's stored
+        # credentials instead of (or alongside) this key.
+        env={"ANTHROPIC_API_KEY": api_key},
+        extra_args={"bare": None},
         cwd=str(cwd),
         max_turns=max_turns,
         cli_path=resolve_cli_path(cli_path),
