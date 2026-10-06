@@ -23,7 +23,9 @@ services:
     env_file:
       - .env
     environment:
-      POSTGRES_HOST: db
+      # Internal container-to-container port; POSTGRES_PORT in .env is the
+      # host-published port and may differ. POSTGRES_HOST is left unset —
+      # settings.py auto-detects the `db` service hostname.
       POSTGRES_PORT: "5432"
     depends_on:
       db:

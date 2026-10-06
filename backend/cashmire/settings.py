@@ -1,4 +1,5 @@
 import os
+import socket
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -6,6 +7,23 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(BASE_DIR.parent / ".env")
+
+
+def _resolve_postgres_host(default_port: str) -> str:
+    # No explicit POSTGRES_HOST: probe the Compose hostname `db` (only
+    # resolvable inside the `api` container) and fall back to `localhost`,
+    # so the same .env works unmodified in Compose and in a local venv run.
+    configured_host = os.environ.get("POSTGRES_HOST")
+    if configured_host:
+        return configured_host
+
+    port = int(os.environ.get("POSTGRES_PORT", default_port))
+    try:
+        with socket.create_connection(("db", port), timeout=0.5):
+            return "db"
+    except OSError:
+        return "localhost"
+
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-insecure-secret-key")
 
@@ -62,7 +80,7 @@ DATABASES = {
         "NAME": os.environ.get("POSTGRES_DB", "cashmire"),
         "USER": os.environ.get("POSTGRES_USER", "cashmire"),
         "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "cashmire"),
-        "HOST": os.environ.get("POSTGRES_HOST", "db"),
+        "HOST": _resolve_postgres_host(default_port="5432"),
         "PORT": os.environ.get("POSTGRES_PORT", "5432"),
     }
 }
