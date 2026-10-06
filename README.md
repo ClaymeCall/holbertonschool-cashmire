@@ -1,5 +1,64 @@
 # Cashmire
 
+Cashmire is a budgeting/expense-tracking app built with Django + Django
+REST Framework and PostgreSQL on the backend, and a SvelteKit (Svelte 5)
+single-page app on the front-end, running together via Docker Compose.
+
+## Quick start (Docker Compose)
+
+```
+cp .env.example .env
+docker compose up --build
+```
+
+- Front-end: <http://localhost:5173>
+- API: <http://localhost:8000/api/health/>
+
+## Front-end
+
+```
+cd frontend
+npm install
+npm run dev
+```
+
+Open <http://localhost:5173/>. You should see the heading **Cashmire** and
+an `API status` line — see `frontend/README.md` for the full reference,
+including configuration, other npm scripts, and the Docker Compose
+alternative.
+
+## Back-end
+
+Django + DRF, run via `docker compose up db api` from the repo root (or see
+`backend/` for a standalone setup). Not documented further here — this is
+outside the scope of the front-end skeleton issue that created this file.
+
+## Docs
+
+- [`docs/specs/`](docs/specs/) — feature specs.
+- [`docs/decisions/`](docs/decisions/) — architecture decision records.
+- [`docs/reviews/`](docs/reviews/) — QA & security review notes.
+
+## Local PostgreSQL
+
+The development database runs in the `db` service using PostgreSQL 16. Copy
+`.env.example` to `.env` before starting the service. Use
+`Copy-Item .env.example .env` in PowerShell or `cp .env.example .env` on
+macOS/Linux. The same settings file is loaded by Django when running the API
+directly on your machine.
+
+```bash
+docker compose up -d db
+docker compose exec db pg_isready -U cashmire -d cashmire
+```
+
+The example publishes PostgreSQL on `localhost:5432`, so a locally running API
+connects to `localhost`. The API container uses the Compose service hostname
+`db` and PostgreSQL's internal port `5432`. Set `POSTGRES_DB`,
+`POSTGRES_USER`, and `POSTGRES_PASSWORD` in `.env` to configure the database;
+set `POSTGRES_PORT` to change the port published on the host.
+
+
 ## Database migrations
 
 Cashmire uses Django's built-in migration framework for PostgreSQL schema
@@ -8,7 +67,8 @@ it has no schema operations because the app does not define models yet.
 Versioned migration files belong in `backend/api/migrations/` and should be
 committed with the model changes they represent.
 
-Start the database and API services, then apply all pending migrations:
+Start the database and API services, then apply all pending migrations. The API
+waits for PostgreSQL's healthcheck before starting:
 
 ```bash
 docker compose up -d --build

@@ -16,7 +16,7 @@
 //
 // Covers docs/specs/issue-63-privacy-page.md section 8.3, T-1 through T-6.
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/svelte";
+import { render, screen, within } from "@testing-library/svelte";
 import { createRawSnippet } from "svelte";
 
 import PrivacyPage from "./+page.svelte";
@@ -103,6 +103,8 @@ describe("privacy page (#63)", () => {
         allow: [
           "no password",
           "it does not say that passwords are hashed (there are no passwords to hash)",
+          // Added for #28/#29: the login/register forms now exist in the UI.
+          "will accept an email address and a password if you type them in",
         ],
       },
       { token: "bank", allow: ["no bank connection", "no bank aggregator"] },
@@ -135,8 +137,13 @@ describe("privacy page (#63)", () => {
   });
 
   it("T-4 (AC-5): the shared layout footer links to /privacy with a self-describing name", () => {
-    render(Layout, { props: { children: emptyChildrenSnippet } });
-    const link = screen.getByRole("link", { name: /privacy/i });
+    const { container } = render(Layout, { props: { children: emptyChildrenSnippet } });
+    // Scoped to the footer specifically: issue #15 added a "Privacy" nav
+    // link alongside this footer's "Privacy & legal" link, so an
+    // unscoped `screen.getByRole` now matches both and throws. This test
+    // is about the footer link (AC-5), not navigation, so scope to it.
+    const footer = container.querySelector("footer");
+    const link = within(footer).getByRole("link", { name: /privacy/i });
     // Plain DOM assertion in place of the jest-dom `toHaveAttribute` matcher,
     // which is not installed (see header comment).
     expect(link.getAttribute("href")).toBe("/privacy");
