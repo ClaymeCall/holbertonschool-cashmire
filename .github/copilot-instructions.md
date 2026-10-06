@@ -10,7 +10,7 @@ Cashmire uses a modern, layered architecture optimized for local development and
   - Why: Robust ORM, built-in admin, well-tested migration system, and DRF's serializers reduce boilerplate for REST APIs.
   
 - **Frontend:** SvelteKit + Vite on port 5173
-  - Why: Lightweight server-side kit with an excellent dev experience, fast HMR, and minimal bundle size. Client-side rendering by default (per [decision 0001](../../docs/decisions/0001-shared-app-shell-layout.md)).
+  - Why: Lightweight server-side kit with an excellent dev experience, fast HMR, and minimal bundle size. Client-side rendering by default (per [decision 0001](../docs/decisions/0001-shared-app-shell-layout.md)).
 
 - **Database:** PostgreSQL 16 on port 5432
   - Why: ACID guarantees, jsonb support for future expansion, and proven reliability for production data.
@@ -315,7 +315,7 @@ Before committing, run `git status` to ensure `.env` is untracked (not staged). 
 
 ### Branch Naming & Commit Messages
 
-Follow Conventional Commits as documented in [docs/git-workflow.md](../../docs/git-workflow.md):
+Follow Conventional Commits as documented in [docs/git-workflow.md](../docs/git-workflow.md):
 
 - **Branch name:** `<type>/<issue>-<slug>` (e.g., `feat/42-budget-warning`, `fix/15-login-redirect`)
   - Types: `feat`, `fix`, `docs`, `refactor`, `chore`, `test`, `style`, `build`, `ci`, `perf`, `revert`
@@ -379,7 +379,7 @@ describe("Privacy page", () => {
 
 Agents can propose changes and pass automated tests, but a human must decide whether to merge. The agentic workflow automates delegation, not accountability. An agent test pass is evidence, not proof — the team runs the full suite before merge.
 
-See [docs/git-workflow.md](../../docs/git-workflow.md) for the full PR and review process.
+See [docs/git-workflow.md](../docs/git-workflow.md) for the full PR and review process.
 
 ### All Tests Must Pass Locally
 
@@ -421,7 +421,7 @@ To run a feature through the full cycle:
 python agentic/orchestrator.py "Add a monthly budget warning banner" --slug issue-42-budget-warning
 ```
 
-Every meaningful agent-assisted work is logged in `docs/agentic-log.md`. See `agentic/README.md` (at the repo root) for full orchestrator documentation.
+Every meaningful agent-assisted work is logged in `docs/agentic-log.md`. See [agentic/README.md](../agentic/README.md) for full orchestrator documentation.
 
 ### Breaking Changes
 
@@ -443,7 +443,7 @@ feat(api)!: rename /api/transactions to /api/expenses
 
 1. **Start with a spec:** Read the relevant spec in `docs/specs/issue-<number>-<slug>.md` before writing code. If no spec exists, file a GitHub issue describing the feature; the Product & Architecture agent will create one.
 
-2. **Create a branch:** Follow `docs/git-workflow.md` (at the repo root):
+2. **Create a branch:** Follow [docs/git-workflow.md](../docs/git-workflow.md):
    ```bash
    git switch main
    git pull
@@ -592,9 +592,9 @@ The Product & Architecture agent reads issues and turns them into specs.
 
 ## Reference Links
 
-- **Git & PR Workflow:** [docs/git-workflow.md](../../docs/git-workflow.md) — Branch naming, Conventional Commits, PR requirements
-- **Agentic Log:** [docs/agentic-log.md](../../docs/agentic-log.md) — Record of agent runs, decisions, and outcomes
-- **Architecture Decisions:** [docs/decisions/](../../docs/decisions/) — Design rationale for key choices (e.g., rendering, privacy)
+- **Git & PR Workflow:** [docs/git-workflow.md](../docs/git-workflow.md) — Branch naming, Conventional Commits, PR requirements
+- **Agentic Log:** [docs/agentic-log.md](../docs/agentic-log.md) — Record of agent runs, decisions, and outcomes
+- **Architecture Decisions:** [docs/decisions/](../docs/decisions/) — Design rationale for key choices (e.g., rendering, privacy)
 - **Agent Definitions:** [.github/agents/](./agents/) — Full prompt and scope for each agent
-- **Orchestrator Guide:** [agentic/README.md](../../agentic/README.md) — How to run the agentic workflow
-- **Quick Start:** [README.md](../../README.md) — Minimal setup and migration quick-start
+- **Orchestrator Guide:** [agentic/README.md](../agentic/README.md) — How to run the agentic workflow
+- **Quick Start:** [README.md](../README.md) — Minimal setup and migration quick-start
