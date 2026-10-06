@@ -326,3 +326,29 @@ that caused it.
 - Once approved, Full-Stack Development agent proceeds to: (1) create `backend/api/models.py` with User, Expense, Budget, Category models, (2) generate `backend/api/migrations/0002_initial_models.py` with the ERD schema, (3) run migrations to apply.
 - No further QA work needed on this documentation artifact; review complete.
 
+## 2026-10-06 — Login and registration forms (issues #28, #29), built directly rather than via the orchestrator
+
+**Objective.** Closes #28, #29. Three attempts to run `agentic/orchestrator.py` for this feature (and for #40/#41, #52/#53) crashed mid-run on the same workspace-wide Anthropic API usage limit (resets 2026-11-01). Rather than wait, the team had Claude implement #28/#29 directly in this session — no architect/developer/qa_security delegation, no `docs/specs/` or `docs/reviews/` file for this feature.
+
+**Agent/role used.** Claude (direct implementation, not the three-agent pipeline), at the human's explicit request ("don't use agentic stuff, just finish the job up to a PR yourself").
+
+**What was delegated.** Nothing — a single session read the two issues' acceptance criteria, `docs/mvp-scope.md` §3.1 for the documented auth contract (`POST /api/auth/register/`, `POST /api/auth/login/`, session-based, no explicit token), and the existing `/health` screen (#18) and `$lib/api.js` (#15) for established conventions, then wrote the login and registration screens, their tests, the nav links, and the required privacy-page update directly.
+
+**Main proposal.**
+- `frontend/src/routes/login/+page.svelte` and `frontend/src/routes/register/+page.svelte`, using the shared `apiFetch`/`ApiError` from `$lib/api.js` (passing `credentials: "include"` per call, since there is still no token to store — the API "establishes a session" per the spec).
+- Backend auth routes (`#22`–`#24`) do not exist yet, so both forms currently fail against a live backend; they are built to the documented contract so no frontend change is needed once those routes ship (same situation #92 tracks for the rest of the app's mocked APIs).
+- Per `docs/decisions/0002`, adding authentication forms obligates a privacy-page update in the same PR: `/privacy` now discloses that the login/register forms exist and accept an email/password, while being explicit that nothing is stored because the backend doesn't implement the routes yet.
+- Added `/login` and `/register` to the shared header nav (`+layout.svelte`).
+
+**How the team verified it.**
+- `npm test` in `frontend/`: all new tests pass (6 for login, 7 for register, plus the extended nav and privacy-page assertions).
+- Confirmed, by stashing these changes and re-running the suite against `main`, that one pre-existing failure (`health/page.test.js` T-11, an ambiguous `/privacy` text query that now matches both the nav and footer links) predates this work and is not caused by it. Left unfixed here — it belongs to issue #18's test file, not #28/#29.
+- A human still needs to read the diff and click through both forms once the backend (#22–#24) exists; per the project rule, this PR is not proof the feature works end-to-end, only that the frontend behaves correctly against the documented contract with the backend mocked out.
+
+**Accepted / modified / rejected.**
+- Accepted: session-cookie approach (`credentials: "include"`, nothing stored client-side) over inventing a token-storage scheme, since issue #25 (session/token strategy write-up) is still open and unresolved — this is the one interpretation that matches what `docs/mvp-scope.md` already commits to.
+- Accepted: reusing `$lib/api.js`'s `apiFetch`/`ApiError` rather than duplicating raw-`fetch` handling the way `health/+page.svelte` does — that duplication looked like a one-off from #18, not a pattern worth repeating.
+- Rejected: building a global auth/session store or changing the nav based on login state — that is issue #30's scope, not #28/#29's.
+
+**Final decision.** Shipped as a normal PR for human review. The three stalled orchestrator worktrees for #28/#29, #40/#41 and #52/#53 are unaffected by this change (different branches) and remain blocked on the API usage limit until it resets.
+

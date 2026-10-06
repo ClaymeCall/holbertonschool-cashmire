@@ -35,10 +35,12 @@
 
   <h2>The short version</h2>
   <p>
-    Cashmire does not currently ask you for any personal information, and it
-    stores none. It is an early-stage project — the features that would
-    eventually handle financial data are not built yet. The sections below
-    explain this in detail.
+    Cashmire's login and registration forms will accept an email address
+    and a password if you type them in, but nothing is stored: the backend
+    does not implement the account routes those forms call yet, so
+    submitting either one fails with an error. No other feature on this
+    site asks you for personal information, and none of them store it
+    either. The sections below explain this in detail.
   </p>
 
   <h2>What personal data we store</h2>
@@ -53,8 +55,14 @@
     <li>No bank connection</li>
   </ul>
   <p>
-    There is no form on this site to enter any of that. The one other page on
-    this site simply shows whether the project's own API is responding.
+    A registration form (<code>/register</code>) and a login form
+    (<code>/login</code>) do exist in the UI, and will accept an email
+    address and a password if you type them in — but neither form is wired
+    to a working account system: the backend does not implement the
+    <code>/api/auth/register/</code> or <code>/api/auth/login/</code> routes
+    yet (tracked in issues #22–#24), so submitting either one fails with an
+    error instead of creating an account or a session. Nothing you type into
+    either form reaches a database.
   </p>
 
   <h2>Why we store it</h2>
@@ -163,10 +171,12 @@
 
   <h2>What is planned, and not yet built</h2>
   <p>
-    User accounts, expense tracking, budgets, and categories are planned and
-    do not exist in the software today. When they ship, they will involve
-    storing personal and financial data, and this page will be updated at
-    that time.
+    User accounts do not exist on the backend yet — the API routes that
+    would create or verify them are tracked in issues #22–#24 and are not
+    implemented. Expense tracking, budgets, and categories are likewise
+    planned and do not exist in the software today. When any of these ship
+    for real, they will involve storing personal and financial data, and
+    this page will be updated at that time.
   </p>
 
   <h2>Who operates Cashmire</h2>

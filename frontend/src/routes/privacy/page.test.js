@@ -103,6 +103,8 @@ describe("privacy page (#63)", () => {
         allow: [
           "no password",
           "it does not say that passwords are hashed (there are no passwords to hash)",
+          // Added for #28/#29: the login/register forms now exist in the UI.
+          "will accept an email address and a password if you type them in",
         ],
       },
       { token: "bank", allow: ["no bank connection", "no bank aggregator"] },
