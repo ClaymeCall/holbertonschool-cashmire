@@ -178,7 +178,7 @@ docker compose exec api python manage.py makemigrations api
 Create a migration without model changes (empty, for data or schema tasks):
 
 ```bash
-docker compose exec api python manage.py makemigrations api --empty <app_name> --name <description>
+docker compose exec api python manage.py makemigrations <app_name> --empty --name <description>
 ```
 
 Run the backend test suite:

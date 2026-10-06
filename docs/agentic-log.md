@@ -255,3 +255,57 @@ nothing.
 **Final decision.** Shipped as part of PR #79 alongside the feature it was
 found on, since the rename only makes sense together with the tooling fix
 that caused it.
+
+## 2026-10-06 — QA & Security review of `.github/copilot-instructions.md` (Issue #8)
+
+**Objective.** Closes #8. Review the consolidated `.github/copilot-instructions.md` 
+file against its specification (docs/specs/issue-8-copilot-instructions.md) to verify 
+it meets all seven acceptance criteria: architecture with rationale, verified commands 
+and paths, coding conventions, repository layout, development rules, language/style 
+consistency, and file scope.
+
+**Agent/role used.** QA & Security agent (read-only review, no source code edits).
+
+**What was delegated.** Verify `.github/copilot-instructions.md` against the specification:
+- Check all commands are verified against the actual repository (docker-compose.yml, 
+  backend/, frontend/package.json, .env.example, agentic/README.md)
+- Verify relative paths resolve correctly from `.github/` directory
+- Audit for invented claims, broken links, or secrets
+- Check language consistency with `.github/agents/*.md` files (English, technical tone)
+- Compare against all seven acceptance criteria; flag any deviation
+
+**Main proposal.** The implementation fully satisfies all acceptance criteria. The file 
+is comprehensive, well-structured, and provides clear guidance to both agents and 
+developers. All commands listed are verified against the specification's 
+"Verified Commands and Paths" section (except one non-blocking addition). All relative 
+links resolve correctly. No secrets are leaked. Language matches the agent files 
+(English, technical). One non-blocking finding: the `makemigrations --empty` command 
+on line 181 does not appear in the specification's verified list and its syntax appears 
+ambiguous (app name specified twice). This does not block merge; recommend verification 
+in the next cycle if the command proves incorrect.
+
+**How the team verified it.** 
+- Checked all acceptance criteria line-by-line against the implementation
+- Verified every command listed against: docker-compose.yml services/ports, 
+  backend/requirements.txt, frontend/package.json, .env.example, agentic/README.md
+- Tested all relative links: ../docs/*, ../agentic/*, ./agents/ (all resolve correctly)
+- Audited for secrets: confirmed .env is in .gitignore, .env.example contains only 
+  placeholder values, no credentials in the markdown file itself
+- Checked language: file is in English, matching .github/agents/product-architecture.md, 
+  .github/agents/fullstack-development.md, .github/agents/qa-security.md
+- Verified file location: `.github/copilot-instructions.md` only, no other files modified
+- Reviewed git history: commits correctly typed as `docs:` and `fix:` per Conventional Commits
+
+**Accepted / modified / rejected.**
+- Accepted: the comprehensive scope covering architecture, commands, conventions, layout, 
+  rules, and troubleshooting in one reference document
+- Accepted: all verified commands from the specification; the file goes beyond the spec 
+  with optional troubleshooting/FAQ and a "How to Contribute" workflow, both of which 
+  are in-scope per the spec ("optional, can grow over time")
+- Accepted: the forward-looking test examples (e.g., backend/api/tests.py) as guidance 
+  documentation, not bugs — the file documents what *will* exist, not only current state
+- Non-blocking: one unverified command (makemigrations --empty) flagged for clarification 
+  in the next cycle, but does not gate merge
+
+**Final decision.** Approve for merge. The file is complete, accurate, and ready to guide 
+agents and developers. Full findings written to docs/reviews/issue-8-copilot-instructions.md.
