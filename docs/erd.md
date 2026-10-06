@@ -2,7 +2,7 @@
 
 > **PROPOSITION EN ATTENTE D'APPROBATION**
 > 
-> Ce document décrit l'ERD proposée pour Cashmire. Il **ne constitue pas** une décision finale. Avant la rédaction des migrations Django et la création des modèles, cette proposition doit être approuvée par l'équipe. Voir `docs/specs/issue-5-erd.md` pour le détail complet.
+> Ce document décrit l'ERD proposée pour Cashmire après résolution de l'issue #6 (propriété des catégories). Il **ne constitue pas** une décision finale. Avant la rédaction des migrations Django et la création des modèles, cette proposition doit être approuvée par l'équipe. Voir `docs/specs/issue-5-erd.md` pour le détail complet de l'ERD, et `docs/specs/issue-6-category-ownership.md` pour la justification de la décision sur les catégories.
 
 ---
 
@@ -12,6 +12,7 @@
 erDiagram
     USER ||--o{ EXPENSE : creates
     USER ||--o{ BUDGET : creates
+    USER ||--o{ CATEGORY : owns
     CATEGORY ||--o{ EXPENSE : categorizes
     CATEGORY ||--o{ BUDGET : constrains
 
@@ -29,9 +30,9 @@ erDiagram
 
     CATEGORY {
         bigint id PK
+        bigint user_id FK
         string name
         text description
-        bigint user_id FK "optionnel, voir issue 6"
         boolean is_active
         timestamp created_at
         timestamp updated_at
@@ -97,17 +98,22 @@ erDiagram
 | Champ | Type | Contraintes | Description |
 |-------|------|-----------|------------|
 | `id` | `BIGSERIAL` | PRIMARY KEY | Clé primaire auto-incrémentée. |
+| `user_id` | `BIGINT` | FK → USER.id, NOT NULL | Propriétaire de la catégorie. Chaque catégorie appartient à exactement un utilisateur. Suppression en cascade (ON DELETE CASCADE). Voir decision `docs/decisions/category-ownership.md` (issue #6). |
 | `name` | `VARCHAR(100)` | NOT NULL | Nom de la catégorie (ex. « Alimentation », « Transport »). |
 | `description` | `TEXT` | NULL | Description optionnelle pour la catégorie. |
-| `user_id` | `BIGINT` | FK → USER.id (optionnel) | **POINT OUVERT (issue #6) :** Structure flexible pour supporter deux modèles possibles. Voir section « Modèles conditionnels » ci-dessous. |
 | `is_active` | `BOOLEAN` | NOT NULL, DEFAULT true | Indicateur de catégorie active. |
 | `created_at` | `TIMESTAMP` | NOT NULL, DEFAULT now() | Horodatage de création. |
 | `updated_at` | `TIMESTAMP` | NOT NULL, DEFAULT now() | Horodatage de dernière modification. |
 
+**Contraintes composées :**
+```sql
+UNIQUE (user_id, name)
+```
+Un utilisateur ne peut pas avoir deux catégories portant le même nom.
+
 **Indices suggérés :**
-- Index sur `name` (requêtes de recherche)
-- Index sur `user_id` si catégories scoped (voir section « Modèles conditionnels »)
-- Index unique sur `(user_id, name)` ou simple index sur `name` selon le modèle choisi
+- Index sur `user_id` (requêtes « lister les catégories d'un utilisateur »)
+- Index sur `(user_id, name)` (requêtes « chercher une catégorie par nom pour un utilisateur »)
 
 ---
 
@@ -117,7 +123,7 @@ erDiagram
 |-------|------|-----------|------------|
 | `id` | `BIGSERIAL` | PRIMARY KEY | Clé primaire auto-incrémentée. |
 | `user_id` | `BIGINT` | FK → USER.id, NOT NULL | Propriétaire de la dépense. Chaque dépense appartient à un utilisateur. |
-| `category_id` | `BIGINT` | FK → CATEGORY.id, NOT NULL | Catégorie de la dépense. Chaque dépense a exactement une catégorie. |
+| `category_id` | `BIGINT` | FK → CATEGORY.id, NOT NULL | Catégorie de la dépense. Chaque dépense a exactement une catégorie. **Important :** L'API doit valider que `category.user_id == expense.user_id` (la catégorie appartient à l'utilisateur de la dépense). |
 | `amount` | `NUMERIC(10, 2)` | NOT NULL, CHECK(amount > 0) | Montant de la dépense. **Obligatoirement NUMERIC, jamais float ou double.** Peut stocker jusqu'à 99999999.99. Contrainte : montant strictement positif. |
 | `description` | `TEXT` | NULL | Description optionnelle de la dépense. |
 | `date` | `DATE` | NOT NULL | Date de la dépense (peut différer de `created_at` pour enregistrement rétroactif). |
@@ -133,6 +139,7 @@ erDiagram
 - `amount > 0` (via CHECK SQL, appliqué à la base de données)
 - FK `user_id` → `USER(id)` avec CASCADE on DELETE (si un utilisateur est supprimé, ses dépenses le sont aussi)
 - FK `category_id` → `CATEGORY(id)` (avec RESTRICT ou SET NULL selon la politique de suppression de catégories)
+- **Validation applicative :** S'assurer que `category.user_id == user_id` avant d'enregistrer une dépense.
 
 ---
 
@@ -142,7 +149,7 @@ erDiagram
 |-------|------|-----------|------------|
 | `id` | `BIGSERIAL` | PRIMARY KEY | Clé primaire auto-incrémentée. |
 | `user_id` | `BIGINT` | FK → USER.id, NOT NULL | Propriétaire du budget. Chaque budget appartient à un utilisateur. |
-| `category_id` | `BIGINT` | FK → CATEGORY.id, NOT NULL | Catégorie couverte par le budget. Chaque budget s'applique à une catégorie. |
+| `category_id` | `BIGINT` | FK → CATEGORY.id, NOT NULL | Catégorie couverte par le budget. Chaque budget s'applique à une catégorie. **Important :** L'API doit valider que `category.user_id == budget.user_id` (la catégorie appartient à l'utilisateur du budget). |
 | `amount` | `NUMERIC(10, 2)` | NOT NULL, CHECK(amount > 0) | Montant budgété (limite). **Obligatoirement NUMERIC, jamais float.** Contrainte : montant strictement positif. |
 | `period_start` | `DATE` | NOT NULL | Début de la période budgétaire (ex. 2026-01-01). |
 | `period_end` | `DATE` | NOT NULL, CHECK(period_end >= period_start) | Fin de la période budgétaire (ex. 2026-01-31). Contrainte : la fin doit être >= au début. |
@@ -168,6 +175,7 @@ Un seul budget par (utilisateur, catégorie, période). Empêche les budgets en 
 - `alert_threshold` entre 0 et 100 (via CHECK SQL si non NULL)
 - FK `user_id` → `USER(id)` avec CASCADE on DELETE
 - FK `category_id` → `CATEGORY(id)` avec RESTRICT (ne pas supprimer une catégorie tant qu'elle a des budgets actifs)
+- **Validation applicative :** S'assurer que `category.user_id == user_id` avant d'enregistrer un budget.
 
 ---
 
@@ -177,88 +185,37 @@ Un seul budget par (utilisateur, catégorie, période). Empêche les budgets en 
 |----------|-------------|------|------------|
 | `USER` → `EXPENSE` | 1:N | Un utilisateur crée plusieurs dépenses (zéro ou plus). Une dépense appartient à exactement un utilisateur. | Join: `EXPENSE.user_id = USER.id` |
 | `USER` → `BUDGET` | 1:N | Un utilisateur crée plusieurs budgets (zéro ou plus). Un budget appartient à exactement un utilisateur. | Join: `BUDGET.user_id = USER.id` |
-| `USER` ↔ `CATEGORY` | **À définir (issue #6)** | Voir section « Modèles conditionnels » ci-dessous. | Deux scénarios possibles. |
+| `USER` → `CATEGORY` | 1:N | Un utilisateur possède plusieurs catégories (zéro ou plus). Une catégorie appartient à exactement un utilisateur. | Join: `CATEGORY.user_id = USER.id` ; Décision : issue #6 ✓ |
 | `CATEGORY` → `EXPENSE` | 1:N | Une catégorie peut avoir plusieurs dépenses (zéro ou plus). Une dépense appartient à exactement une catégorie. | Join: `EXPENSE.category_id = CATEGORY.id` |
 | `CATEGORY` → `BUDGET` | 1:N | Une catégorie peut avoir plusieurs budgets (ex. un par mois). Un budget s'applique à exactement une catégorie. | Join: `BUDGET.category_id = CATEGORY.id` |
 
 ---
 
-## Modèles conditionnels — Issue #6 (Ownership des catégories)
+## Décision de conception — Issue #6
 
-### Le point ouvert
+### Propriété des catégories : Catégories scoped par utilisateur
 
-La relation entre `USER` et `CATEGORY` **n'est pas tranchée dans cette spécification**. Deux approches sont possibles ; l'équipe doit choisir l'une avant la rédaction des migrations.
+**Décision :** Chaque utilisateur dispose de sa propre liste de catégories. Les catégories sont scoped par `user_id` (Scénario B dans l'issue #6).
 
-### Scénario A : Catégories partagées
+**Justification brève :**
+- Flexibilité : chaque utilisateur peut personnaliser sa nomenclature.
+- Confidentialité : les catégories d'un utilisateur ne révèlent pas les habitudes des autres.
+- Contrôles d'accès simples : une catégorie appartient clairement à un utilisateur.
+- Faible surcoût pour le MVP : un seul champ `user_id` + deux indices.
+- Extensibilité : permet d'ajouter des catégories partagées (famille, groupes) plus tard sans refonte.
 
-Une seule liste de catégories globale, commune à tous les utilisateurs.
+**Documentation complète :**
+- Spec : `docs/specs/issue-6-category-ownership.md` (analyse des scénarios, recommandations, impacts API/seed data).
+- Décision : `docs/decisions/category-ownership.md` (raisonnement formel, compromis, implications).
 
-**Structure `CATEGORY` :**
-```sql
-CREATE TABLE category (
-    id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    description TEXT,
-    -- user_id absent ou NULL
-    is_active BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMP NOT NULL DEFAULT now(),
-    updated_at TIMESTAMP NOT NULL DEFAULT now(),
-    UNIQUE (name)
-);
-```
+**Structure confirmée :**
+- Table `CATEGORY` : `user_id BIGINT NOT NULL FK → USER.id`
+- Contrainte : `UNIQUE(user_id, name)`
+- Indices : `(user_id)`, `(user_id, name)`
+- Suppression : CASCADE on DELETE USER
 
-**Avantages :**
-- Moins de données en base.
-- Plus simple pour les requêtes globales.
-- Tous les utilisateurs partagent une nomenclature unique.
-
-**Inconvénients :**
-- Moins flexible : les utilisateurs ne peuvent pas personnaliser leurs catégories.
-- Scalabilité : gestion centralisée des catégories peut devenir compliquée.
-
-**API correspondante :**
-- GET `/api/categories/` : liste les catégories globales
-- POST `/api/categories/` : admin crée une catégorie globale
-
-### Scénario B : Catégories scoped par utilisateur
-
-Chaque utilisateur dispose de sa propre liste de catégories.
-
-**Structure `CATEGORY` :**
-```sql
-CREATE TABLE category (
-    id BIGSERIAL PRIMARY KEY,
-    user_id BIGINT NOT NULL,
-    name VARCHAR(100) NOT NULL,
-    description TEXT,
-    is_active BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMP NOT NULL DEFAULT now(),
-    updated_at TIMESTAMP NOT NULL DEFAULT now(),
-    FOREIGN KEY (user_id) REFERENCES "user" (id) ON DELETE CASCADE,
-    UNIQUE (user_id, name)
-);
-
-CREATE INDEX idx_category_user_id ON category(user_id);
-```
-
-**Avantages :**
-- Plus flexible : chaque utilisateur personnalise ses catégories.
-- Meilleure séparation des données par utilisateur.
-
-**Inconvénients :**
-- Plus de données en base.
-- Requêtes plus complexes (besoin de filtres `WHERE user_id = ?`).
-- Permissions à gérer : un utilisateur ne peut voir que ses propres catégories.
-
-**API correspondante :**
-- GET `/api/users/{user_id}/categories/` : liste les catégories d'un utilisateur
-- POST `/api/users/{user_id}/categories/` : l'utilisateur crée ses catégories
-
-### Implémentation actuelle (provisoire)
-
-Le diagramme Mermaid ci-dessus **n'inclut pas** la relation `USER` ↔ `CATEGORY` pour refléter cette ambiguïté ouverte.
-
-Dans le tableau `CATEGORY`, la colonne `user_id` est marquée comme **(optionnel)**, ce qui indique que sa présence ou absence dépend de la décision sur issue #6.
+**Seed data :**
+À l'inscription (issue future), créer ~15 catégories par défaut pour chaque utilisateur (ex. « Alimentation », « Transport », « Logement », etc.). Implémentation via signal Django `post_save` sur `User`.
 
 ---
 
@@ -352,22 +309,23 @@ Les indices suggérés ci-dessus sont des recommandations pour les requêtes cou
 
 ## Prochaines étapes
 
-1. **Approbation de cette proposition :** Équipe lit et approuve (ou amende) l'ERD.
-2. **Résolution de l'issue #6 :** Trancher sur l'ownership des catégories (voir section « Modèles conditionnels »).
-3. **Rédaction des décisions :** Documenter le choix effectué pour issue #6 dans `docs/decisions/`.
-4. **Création des modèles Django :** `backend/api/models.py` implémente la structure validée.
-5. **Migrations initiales :** `backend/api/migrations/0002_initial_models.py` ou équivalent.
-6. **Spécifications API :** Issues futures pour les routes CRUD.
+1. **Approbation de cette proposition :** Équipe lit et approuve (ou amende) l'ERD et la décision issue #6.
+2. **Création des modèles Django :** `backend/api/models.py` implémente la structure validée.
+3. **Migrations initiales :** `backend/api/migrations/0002_initial_models.py` ou équivalent.
+4. **Implémentation de la seed data :** Signal ou command Django pour créer les catégories par défaut.
+5. **Spécifications API :** Issues futures pour les routes CRUD (GET, POST, PATCH, DELETE).
 
 ---
 
 ## Références
 
-- **Spec complète :** `docs/specs/issue-5-erd.md`
+- **Spec issue #5 (ERD):** `docs/specs/issue-5-erd.md`
+- **Spec issue #6 (Category Ownership):** `docs/specs/issue-6-category-ownership.md`
+- **Décision issue #6:** `docs/decisions/category-ownership.md`
 - **Configuration Django :** `backend/cashmire/settings.py` (`DEFAULT_AUTO_FIELD`, `DATABASES`)
 - **Migration initiale :** `backend/api/migrations/0001_initial.py` (actuellement vide)
 - **Workflow :** `docs/git-workflow.md`, `docs/agentic-log.md`
 
 ---
 
-*Dernière mise à jour : 2026-10-06. Document proposé par Product & Architecture. En attente d'approbation.*
+*Dernière mise à jour : 2026-10-06. Document proposé par Product & Architecture. Issue #6 tranchée. En attente d'approbation avant migrations.*
