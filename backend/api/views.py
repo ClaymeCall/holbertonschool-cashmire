@@ -1,8 +1,9 @@
 from decimal import Decimal
 
+from django.contrib.auth import login
 from django.db import IntegrityError, transaction
 from drf_spectacular.utils import extend_schema
-from rest_framework import serializers, status
+from rest_framework import generics, permissions, serializers, status
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import (
     api_view,
@@ -13,8 +14,8 @@ from rest_framework.exceptions import NotFound
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .models import Category, Expense
-from .models import Budget, Category
+from .models import Budget, Category, Expense
+from .serializers import RegisterSerializer
 
 
 @api_view(["GET"])
@@ -250,6 +251,8 @@ def expense_detail_mutation(request, expense_id):
     serializer.is_valid(raise_exception=True)
     updated_expense = serializer.save()
     return Response(ExpenseSerializer(updated_expense).data)
+
+
 class BudgetSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(read_only=True)
     category_id = serializers.IntegerField()
@@ -374,3 +377,21 @@ def budget_create(request):
     return Response(
         BudgetSerializer(budget).data, status=status.HTTP_201_CREATED
     )
+
+
+class RegisterView(generics.CreateAPIView):
+    """POST /api/auth/register/ — docs/api-design.md §2.1, issue #22.
+
+    Unauthenticated (anyone may register). On success also establishes a
+    session via `login()`, per docs/mvp-scope.md §3.1 ("inscription
+    immédiate") and decision 0003 (session-cookie auth, no token issued) —
+    matching what register/+page.svelte already assumes: it redirects to
+    `/` on a successful response with nothing to store itself.
+    """
+
+    serializer_class = RegisterSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def perform_create(self, serializer):
+        user = serializer.save()
+        login(self.request, user)
