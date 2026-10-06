@@ -5,6 +5,12 @@
 - **Public cible :** Développeurs frontend (SvelteKit), clients API externes
 - **Statut du document :** Proposé, à relire par un autre membre de l'équipe. Source de vérité pour les routes API une fois approuvé.
 
+> **Référence vivante :** une fois les routes ci-dessous implémentées côté
+> backend, le schéma OpenAPI généré automatiquement et son interface
+> Swagger (`/api/docs/`, schéma brut sur `/api/schema/`) deviennent la
+> référence à jour sur l'état réel de l'API. Ce document garde sa valeur
+> de contrat de conception, mais en cas d'écart, Swagger UI fait foi.
+
 ---
 
 ## 1. Vue d'ensemble
