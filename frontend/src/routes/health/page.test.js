@@ -15,7 +15,7 @@ const SUCCESS_MARKER = "API is reachable"; // §5.3
 const ERROR_MARKER = "API check failed"; // §5.4
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/svelte";
+import { render, screen, within } from "@testing-library/svelte";
 import { createRawSnippet } from "svelte";
 
 import HealthPage from "./+page.svelte";
@@ -224,10 +224,15 @@ describe("health page (#18)", () => {
   it("T-11 (AC-10): the shared layout footer links to /health and still links to /privacy", () => {
     render(Layout, { props: { children: emptyChildrenSnippet } });
 
-    const healthLink = screen.getByRole("link", { name: /health/i });
+    // Scoped to the contentinfo landmark: the header nav also has a
+    // "Privacy" link to the same destination, so an unscoped query would
+    // match both (see layout.test.js T-3 for the same precedent).
+    const footer = screen.getByRole("contentinfo");
+
+    const healthLink = within(footer).getByRole("link", { name: /health/i });
     expect(healthLink.getAttribute("href")).toBe("/health");
 
-    const privacyLink = screen.getByRole("link", { name: /privacy/i });
+    const privacyLink = within(footer).getByRole("link", { name: /privacy/i });
     expect(privacyLink.getAttribute("href")).toBe("/privacy");
   });
 });
