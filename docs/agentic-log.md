@@ -255,3 +255,74 @@ nothing.
 **Final decision.** Shipped as part of PR #79 alongside the feature it was
 found on, since the rename only makes sense together with the tooling fix
 that caused it.
+## 2026-10-06 — QA & Security review of ERD specification (Issue #5)
+
+**Objective.** Closes #5 (documentation review). Verify that `docs/erd.md` (the implementation) matches `docs/specs/issue-5-erd.md` (the specification) across all acceptance criteria, and flag any blockers or non-blocking findings before team approval and migration implementation.
+
+**Agent/role used.** QA & Security Agent.
+
+**What was delegated.** Comprehensive review of the ERD documentation against the spec:
+- Verify all 9 acceptance criteria (AC-1 through AC-9).
+- Check Mermaid erDiagram syntactic validity.
+- Confirm 4 entities + relations/cardinalities present.
+- Verify all monetary amounts typed as NUMERIC, never float.
+- Confirm UNIQUE constraint on Budget (user_id, category_id, period).
+- Verify Expense → User/Category relationships documented.
+- Verify issue #6 (category ownership) marked as open, non-resolved.
+- Check for team approval banner before migrations.
+- Verify coherence with backend code (models, settings, AUTH_USER_MODEL).
+- Confirm no application code was modified (git diff of commit 8d8f05a).
+
+**Main findings.**
+
+1. **No blocking issues.** All 9 acceptance criteria passed.
+
+2. **Mermaid erDiagram syntax valid.** 4 entities (USER, CATEGORY, EXPENSE, BUDGET) with 4 relations using correct cardinalities (`||--o{` for 1:N).
+
+3. **Monetary fields correctly typed.** EXPENSE.amount and BUDGET.amount both `NUMERIC(10, 2)`, with CHECK constraints ensuring values > 0.
+
+4. **Budget UNIQUE constraint correctly specified.** Composite unique on (user_id, category_id, period_start, period_end).
+
+5. **Category ownership (issue #6) properly marked as open.** Section "Modèles conditionnels" presents both scenarios (shared vs. scoped) neutrally, without imposing a choice.
+
+6. **Team approval banner present.** Visible in header (lines 3-5) and footer (line 373).
+
+7. **Backend coherence verified:**
+   - `DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"` in settings.py ✓
+   - `ENGINE = "django.db.backends.postgresql"` configured ✓
+   - No override of AUTH_USER_MODEL ✓
+   - No pre-existing models.py in backend/api/ ✓
+   - Migration 0001_initial.py confirmed empty ✓
+
+8. **No application code modified.** Commit 8d8f05a only touches docs/erd.md (373 insertions, 0 deletions). No backend/, frontend/, or migration files changed.
+
+**Non-blocking findings.**
+
+1. **Intentional divergence: `password` vs. `password_hash`.** Spec uses `password_hash`, but ERD uses `password` (aligned with Django User model defaults). Justified and correct.
+
+2. **Enhanced CHECK constraints beyond spec.** ERD adds database-level CHECK constraints (e.g., `PERIOD_END >= PERIOD_START`, `AMOUNT > 0`) that spec deferred to application layer. This is defensive coding and improves data integrity.
+
+3. **Absence of USER→CATEGORY relation in Mermaid diagram.** Intentional omission to visualize unresolved issue #6. Documented in accompanying "Modèles conditionnels" section.
+
+4. **Indices suggested but not yet implemented.** ERD recommends indices (e.g., on user_id, (user_id, date)) for future optimization. Not part of migrations today; documented as future recommendations.
+
+**How the team verified it.**
+- Read and mapped each AC against the ERD document; verified all pass.
+- Ran `grep` on settings.py to confirm DEFAULT_AUTO_FIELD and DATABASES["default"]["ENGINE"].
+- Confirmed backend/api/ contains no models.py and migration 0001_initial.py is empty.
+- Traced git commit 8d8f05a (docs: finalize ERD with issue #6 open-point isolation) to confirm only docs/erd.md was added; no code files modified.
+- Verified Mermaid erDiagram syntax by visual inspection of block structure.
+- Checked monetary field types in EXPENSE and BUDGET tables against "NUMERIC(10, 2)" specification.
+- Confirmed UNIQUE constraint text matches specification exactly.
+
+**Accepted / modified / rejected.**
+- Accepted: All 9 acceptance criteria met. No blocking findings.
+- Accepted: The 4 non-blocking findings are either intentional (password field alignment with Django), improvements (CHECK constraints), or correct design decisions (issue #6 visual omission, future-dated indices).
+- Rejected: Nothing. The ERD documentation is conformant and ready for team approval.
+
+**Final decision.** 
+- The ERD specification is **approved for team review**. All acceptance criteria are satisfied; no code defects or security/accessibility/compliance issues found.
+- **Critical next step (human action):** Team must approve the ERD (including the two conditional models for issue #6) **before** implementing migrations and Django models. This is a synchronization point: if issue #6 is not resolved, the Full-Stack Development agent will be blocked on writing category FK constraints.
+- Once approved, Full-Stack Development agent proceeds to: (1) create `backend/api/models.py` with User, Expense, Budget, Category models, (2) generate `backend/api/migrations/0002_initial_models.py` with the ERD schema, (3) run migrations to apply.
+- No further QA work needed on this documentation artifact; review complete.
+
