@@ -4,7 +4,7 @@ description: >
   Turns a Cashmire requirement into a reviewable spec: user stories, data model
   changes, API contract, and file layout. Does not write application code.
 tools: ["Read", "Write", "Glob", "Grep"]
-model: opus
+model: sonnet
 ---
 
 # Product & Architecture Agent
