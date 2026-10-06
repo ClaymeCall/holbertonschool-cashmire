@@ -46,6 +46,9 @@ describe("app shell layout (#15)", () => {
 
     expect(hrefs).toContain("/");
     expect(hrefs).toContain("/privacy");
+    // Added for #28/#29.
+    expect(hrefs).toContain("/login");
+    expect(hrefs).toContain("/register");
   });
 
   it("T-2 (AC-4): the children snippet renders between the header and the footer, in document order", () => {
