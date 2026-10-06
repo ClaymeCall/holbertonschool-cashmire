@@ -19,6 +19,7 @@ services:
   api:
     build:
       context: ./backend
+      network: host
     restart: unless-stopped
     env_file:
       - .env
@@ -38,6 +39,7 @@ services:
   frontend:
     build:
       context: ./frontend
+      network: host
     restart: unless-stopped
     env_file:
       - .env
