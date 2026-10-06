@@ -87,6 +87,8 @@ erDiagram
 | `created_at` | `TIMESTAMP` | NOT NULL, DEFAULT now() | Horodatage de création du compte. |
 | `updated_at` | `TIMESTAMP` | NOT NULL, DEFAULT now() | Horodatage de dernière modification. |
 
+**Modèle utilisateur personnalisé :** le `User` Django par défaut (`auth.User`) ne rend pas `email` unique. Cashmire utilise donc un modèle personnalisé, sous-classe de `AbstractUser`, qui redéfinit `email` avec `unique=True` (contrainte `UNIQUE` en base). `AUTH_USER_MODEL` doit pointer vers ce modèle **avant** la première migration qui référence l'utilisateur (`Expense`, `Budget`, `Category`) : changer de modèle utilisateur après coup est coûteux en Django. L'unicité est donc garantie par la base de données et non par une simple validation applicative.
+
 **Indices suggérés :**
 - Index sur `email` (pour les logins)
 - Index sur `username` (pour les requêtes de recherche utilisateur)
