@@ -44,6 +44,8 @@ respectively.
 
 ## Constraints
 
+- Read and follow `.github/copilot-instructions.md` (architecture, conventions,
+  commands and development rules) before implementing anything.
 - Never implement behavior beyond what the spec describes. If the spec is
   ambiguous or incomplete, stop and flag it rather than guessing.
 - Never weaken or bypass authentication/ownership checks to make a test
