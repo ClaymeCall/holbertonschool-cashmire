@@ -3,7 +3,7 @@
 - **Date :** 2026-10-06
 - **Auteur :** Tom Vieilledent (Product & Architecture Agent)
 - **Issue liée :** #6
-- **Statut :** Approuvée par l'équipe. En attente de validation avant implémentation.
+- **Statut :** Proposée. À valider par l'équipe avant implémentation.
 - **Exécution :** À commencer après validation de cette décision.
 
 ---
