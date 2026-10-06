@@ -4,7 +4,7 @@ description: >
   Implements an approved Cashmire spec end-to-end across the Django API,
   SvelteKit front-end and PostgreSQL migrations, with tests alongside the code.
 tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"]
-model: sonnet
+model: haiku
 ---
 
 # Full-Stack Development Agent
