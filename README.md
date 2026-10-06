@@ -1,6 +1,19 @@
 # Cashmire
 
-## Backend
+## Front-end
+
+```
+cd frontend
+npm install
+npm run dev
+```
+
+Open <http://localhost:5173/>. You should see the heading **Cashmire** and
+an `API status` line — see `frontend/README.md` for the full reference,
+including configuration, other npm scripts, and the Docker Compose
+alternative.
+
+## Back-end
 
 The API uses Django 5.1 with Django REST Framework (DRF). Django provides the
 Python web framework, project settings, ORM, and built-in versioned migrations;
@@ -55,6 +68,13 @@ docker compose up -d db
 
 The API is available at `http://127.0.0.1:8000/`; its health endpoint is
 `http://127.0.0.1:8000/api/health/`.
+
+## Docs
+
+- [`docs/specs/`](docs/specs/) — feature specs.
+- [`docs/decisions/`](docs/decisions/) — architecture decision records.
+- [`docs/reviews/`](docs/reviews/) — QA & security review notes.
+
 
 ## Database migrations
 
