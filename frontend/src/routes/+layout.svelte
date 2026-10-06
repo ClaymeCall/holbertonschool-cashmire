@@ -26,9 +26,12 @@
   let { children } = $props();
 
   // Exactly the routes that exist today — no placeholder links to unbuilt
-  // pages (see docs/specs/issue-15-svelte-skeleton.md §4.2.1).
+  // pages (see docs/specs/issue-15-svelte-skeleton.md §4.2.1). Login/Register
+  // added for #28/#29.
   const navLinks = [
     { href: "/", label: "Home" },
+    { href: "/login", label: "Log in" },
+    { href: "/register", label: "Register" },
     { href: "/privacy", label: "Privacy" },
   ];
 </script>
