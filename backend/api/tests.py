@@ -1,4 +1,5 @@
-from datetime import date
+from calendar import monthrange
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -2328,3 +2329,543 @@ class BudgetConsumptionServiceTests(TestCase):
 
         # Verify they're different
         self.assertNotEqual(consumption1.spent, consumption2.spent)
+
+
+class BudgetListTests(TestCase):
+    """Tests for GET /api/budgets/ endpoint."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="budget-owner",
+            email="budget@example.com",
+            password="test-password",
+        )
+        self.other_user = User.objects.create_user(
+            username="other-budget-owner",
+            email="other@example.com",
+            password="test-password",
+        )
+        self.client = APIClient()
+        self.category = self.user.categories.first()
+        self.other_category = self.user.categories.all()[1]
+
+    def test_budget_list_requires_session_authentication(self):
+        """Test that GET /api/budgets/ requires authentication."""
+        response = self.client.get("/api/budgets/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_budget_list_empty(self):
+        """Test that empty budget list returns 200 OK with empty budgets array."""
+        self.client.force_login(self.user)
+        response = self.client.get("/api/budgets/")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("budgets", data)
+        self.assertEqual(data["budgets"], [])
+
+    def test_budget_list_returns_all_budgets_for_user(self):
+        """Test that list returns all budgets for authenticated user."""
+        self.client.force_login(self.user)
+
+        # Create 3 budgets for user
+        budget1 = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("500.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        budget2 = Budget.objects.create(
+            user=self.user,
+            category=self.other_category,
+            amount=Decimal("200.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        budget3 = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("300.00"),
+            period_start=date(2026, 11, 1),
+            period_end=date(2026, 11, 30),
+        )
+
+        response = self.client.get("/api/budgets/")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data["budgets"]), 3)
+        # Check all budgets are present
+        budget_ids = {b["id"] for b in data["budgets"]}
+        self.assertEqual(budget_ids, {budget1.id, budget2.id, budget3.id})
+
+    def test_budget_list_includes_consumption_data(self):
+        """Test that budget list includes spent, remaining, and percentage."""
+        self.client.force_login(self.user)
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("500.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("234.50"),
+            date=date(2026, 10, 15),
+        )
+
+        response = self.client.get("/api/budgets/")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data["budgets"]), 1)
+
+        budget_data = data["budgets"][0]
+        self.assertIn("spent", budget_data)
+        self.assertIn("remaining", budget_data)
+        self.assertIn("percentage", budget_data)
+        self.assertEqual(budget_data["spent"], "234.50")
+        self.assertEqual(budget_data["remaining"], "265.50")
+        self.assertEqual(budget_data["percentage"], "46.90")
+
+    def test_budget_list_monetary_fields_are_strings(self):
+        """Test that monetary fields are serialized as decimal strings."""
+        self.client.force_login(self.user)
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("500.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+            alert_threshold=Decimal("80.00"),
+        )
+
+        response = self.client.get("/api/budgets/")
+
+        data = response.json()
+        budget_data = data["budgets"][0]
+        # All monetary fields should be strings
+        self.assertIsInstance(budget_data["amount"], str)
+        self.assertIsInstance(budget_data["alert_threshold"], str)
+        self.assertIsInstance(budget_data["spent"], str)
+        self.assertIsInstance(budget_data["remaining"], str)
+        self.assertIsInstance(budget_data["percentage"], str)
+        self.assertEqual(budget_data["amount"], "500.00")
+        self.assertEqual(budget_data["alert_threshold"], "80.00")
+
+    def test_budget_list_all_fields_present(self):
+        """Test that all required fields are present in response."""
+        self.client.force_login(self.user)
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("500.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+
+        response = self.client.get("/api/budgets/")
+
+        data = response.json()
+        budget_data = data["budgets"][0]
+        required_fields = {
+            "id",
+            "user_id",
+            "category_id",
+            "amount",
+            "period_start",
+            "period_end",
+            "alert_threshold",
+            "spent",
+            "remaining",
+            "percentage",
+            "created_at",
+            "updated_at",
+        }
+        self.assertEqual(set(budget_data.keys()), required_fields)
+
+    def test_budget_list_filter_by_category(self):
+        """Test filtering budgets by category_id."""
+        self.client.force_login(self.user)
+
+        category1 = self.category
+        category2 = self.other_category
+
+        budget1 = Budget.objects.create(
+            user=self.user,
+            category=category1,
+            amount=Decimal("500.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        budget2 = Budget.objects.create(
+            user=self.user,
+            category=category1,
+            amount=Decimal("300.00"),
+            period_start=date(2026, 11, 1),
+            period_end=date(2026, 11, 30),
+        )
+        budget3 = Budget.objects.create(
+            user=self.user,
+            category=category2,
+            amount=Decimal("200.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+
+        # Filter by category1
+        response = self.client.get(f"/api/budgets/?category_id={category1.id}")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data["budgets"]), 2)
+        budget_ids = {b["id"] for b in data["budgets"]}
+        self.assertEqual(budget_ids, {budget1.id, budget2.id})
+
+    def test_budget_list_filter_by_nonexistent_category(self):
+        """Test filtering by nonexistent category returns empty list."""
+        self.client.force_login(self.user)
+
+        Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("500.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+
+        response = self.client.get("/api/budgets/?category_id=999")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["budgets"], [])
+
+    def test_budget_list_filter_by_overlapping_month(self):
+        """Test filtering budgets by month (overlapping period)."""
+        self.client.force_login(self.user)
+
+        # Budget 1: overlaps October
+        budget1 = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("500.00"),
+            period_start=date(2026, 10, 15),
+            period_end=date(2026, 10, 31),
+        )
+        # Budget 2: contained within October
+        budget2 = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("300.00"),
+            period_start=date(2026, 10, 5),
+            period_end=date(2026, 10, 10),
+        )
+        # Budget 3: completely before October (September)
+        budget3 = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("200.00"),
+            period_start=date(2026, 9, 1),
+            period_end=date(2026, 9, 30),
+        )
+        # Budget 4: partially overlaps (Sept 15 to Oct 15)
+        budget4 = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("400.00"),
+            period_start=date(2026, 9, 15),
+            period_end=date(2026, 10, 15),
+        )
+
+        response = self.client.get("/api/budgets/?month=10&year=2026")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data["budgets"]), 3)
+        budget_ids = {b["id"] for b in data["budgets"]}
+        # Should include 1, 2, 4 but not 3
+        self.assertEqual(budget_ids, {budget1.id, budget2.id, budget4.id})
+
+    def test_budget_list_filter_by_month_exact_month_match(self):
+        """Test filtering with exact month match."""
+        self.client.force_login(self.user)
+
+        # Exact October budget
+        budget1 = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("500.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+
+        response = self.client.get("/api/budgets/?month=10&year=2026")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data["budgets"]), 1)
+        self.assertEqual(data["budgets"][0]["id"], budget1.id)
+
+    def test_budget_list_filter_by_month_without_year(self):
+        """Test that month without year returns 400 Bad Request."""
+        self.client.force_login(self.user)
+
+        response = self.client.get("/api/budgets/?month=10")
+
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertIn("error", data)
+        self.assertEqual(data["error"], "INVALID_DATA")
+        self.assertIn("month et year doivent tous les deux être fournis", data["message"])
+
+    def test_budget_list_filter_by_year_without_month(self):
+        """Test that year without month returns 400 Bad Request."""
+        self.client.force_login(self.user)
+
+        response = self.client.get("/api/budgets/?year=2026")
+
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertIn("error", data)
+        self.assertEqual(data["error"], "INVALID_DATA")
+
+    def test_budget_list_invalid_month_too_high(self):
+        """Test that month > 12 returns 400 Bad Request."""
+        self.client.force_login(self.user)
+
+        response = self.client.get("/api/budgets/?month=13&year=2026")
+
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertEqual(data["error"], "INVALID_DATA")
+        self.assertIn("month doit être entre 1 et 12", data["message"])
+
+    def test_budget_list_invalid_month_too_low(self):
+        """Test that month < 1 returns 400 Bad Request."""
+        self.client.force_login(self.user)
+
+        response = self.client.get("/api/budgets/?month=0&year=2026")
+
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertEqual(data["error"], "INVALID_DATA")
+        self.assertIn("month doit être entre 1 et 12", data["message"])
+
+    def test_budget_list_invalid_year(self):
+        """Test that non-numeric year returns 400 Bad Request."""
+        self.client.force_login(self.user)
+
+        response = self.client.get("/api/budgets/?month=10&year=abc")
+
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertEqual(data["error"], "INVALID_DATA")
+        self.assertIn("year doit être un entier valide", data["message"])
+
+    def test_budget_list_invalid_category_id(self):
+        """Test that non-numeric category_id returns 400 Bad Request."""
+        self.client.force_login(self.user)
+
+        response = self.client.get("/api/budgets/?category_id=abc")
+
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertEqual(data["error"], "INVALID_DATA")
+        self.assertIn("category_id doit être un entier valide", data["message"])
+
+    def test_budget_list_deterministic_order(self):
+        """Test that budgets are returned in deterministic order (by ID)."""
+        self.client.force_login(self.user)
+
+        # Create budgets out of order (with different periods to avoid unique constraint)
+        category3 = self.user.categories.all()[2]
+        category1 = self.category
+        category2 = self.other_category
+
+        budget3 = Budget.objects.create(
+            user=self.user,
+            category=category3,
+            amount=Decimal("300.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        budget1 = Budget.objects.create(
+            user=self.user,
+            category=category1,
+            amount=Decimal("100.00"),
+            period_start=date(2026, 11, 1),
+            period_end=date(2026, 11, 30),
+        )
+        budget2 = Budget.objects.create(
+            user=self.user,
+            category=category2,
+            amount=Decimal("200.00"),
+            period_start=date(2026, 12, 1),
+            period_end=date(2026, 12, 31),
+        )
+
+        response = self.client.get("/api/budgets/")
+
+        data = response.json()
+        returned_ids = [b["id"] for b in data["budgets"]]
+        expected_ids = sorted([budget1.id, budget2.id, budget3.id])
+        self.assertEqual(returned_ids, expected_ids)
+
+    def test_budget_list_only_shows_user_budgets(self):
+        """Test that user only sees their own budgets (ownership)."""
+        self.client.force_login(self.user)
+
+        # Create budgets for both users
+        user_budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("500.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        other_category = self.other_user.categories.first()
+        other_budget = Budget.objects.create(
+            user=self.other_user,
+            category=other_category,
+            amount=Decimal("200.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+
+        response = self.client.get("/api/budgets/")
+
+        data = response.json()
+        self.assertEqual(len(data["budgets"]), 1)
+        self.assertEqual(data["budgets"][0]["id"], user_budget.id)
+        self.assertEqual(data["budgets"][0]["user_id"], self.user.id)
+
+    def test_budget_list_combined_filters(self):
+        """Test combining category and month filters."""
+        self.client.force_login(self.user)
+
+        category1 = self.category
+        category2 = self.other_category
+
+        # Oct, category1
+        budget1 = Budget.objects.create(
+            user=self.user,
+            category=category1,
+            amount=Decimal("500.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        # Oct, category2
+        budget2 = Budget.objects.create(
+            user=self.user,
+            category=category2,
+            amount=Decimal("200.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        # Sept, category1
+        budget3 = Budget.objects.create(
+            user=self.user,
+            category=category1,
+            amount=Decimal("300.00"),
+            period_start=date(2026, 9, 1),
+            period_end=date(2026, 9, 30),
+        )
+
+        response = self.client.get(
+            f"/api/budgets/?category_id={category1.id}&month=10&year=2026"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data["budgets"]), 1)
+        self.assertEqual(data["budgets"][0]["id"], budget1.id)
+
+    def test_budget_list_timestamps_iso8601(self):
+        """Test that timestamps are in ISO 8601 format."""
+        self.client.force_login(self.user)
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("500.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+
+        response = self.client.get("/api/budgets/")
+
+        data = response.json()
+        budget_data = data["budgets"][0]
+        # Check ISO 8601 format (should end with Z for UTC)
+        self.assertIn("T", budget_data["created_at"])
+        self.assertIn("Z", budget_data["created_at"])
+        self.assertIn("T", budget_data["updated_at"])
+        self.assertIn("Z", budget_data["updated_at"])
+
+    def test_budget_list_percentage_over_100(self):
+        """Test that percentage can exceed 100% for over-budget."""
+        self.client.force_login(self.user)
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("100.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("150.00"),
+            date=date(2026, 10, 15),
+        )
+
+        response = self.client.get("/api/budgets/")
+
+        data = response.json()
+        budget_data = data["budgets"][0]
+        self.assertEqual(budget_data["spent"], "150.00")
+        self.assertEqual(budget_data["remaining"], "-50.00")
+        self.assertEqual(budget_data["percentage"], "150.00")
+
+    def test_budget_list_consumption_batch_efficiency(self):
+        """Test that consumption is calculated in batch (no N+1)."""
+        self.client.force_login(self.user)
+
+        # Create 3 budgets with expenses (different periods to avoid unique constraint)
+        categories = [self.category, self.other_category] + list(self.user.categories.all()[2:])
+        months = [(10, 2026), (11, 2026), (12, 2026)]
+
+        for i, (month, year) in enumerate(months):
+            month_start = date(year, month, 1)
+            month_end = date(year, month, monthrange(year, month)[1])
+
+            budget = Budget.objects.create(
+                user=self.user,
+                category=categories[i],
+                amount=Decimal("100.00"),
+                period_start=month_start,
+                period_end=month_end,
+            )
+            Expense.objects.create(
+                user=self.user,
+                category=categories[i],
+                amount=Decimal("25.00"),
+                date=month_start + timedelta(days=14),
+            )
+
+        # Make request
+        response = self.client.get("/api/budgets/")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data["budgets"]), 3)
+        # Each budget should have consumption values
+        for budget_data in data["budgets"]:
+            self.assertEqual(budget_data["spent"], "25.00")
