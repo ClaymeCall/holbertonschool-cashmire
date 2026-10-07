@@ -678,3 +678,51 @@ the review in `docs/reviews/issue-39-expense-ownership.md`.
 **Final decision.** The implemented expense endpoints enforce ownership
 before accessing expense rows. Regression coverage and the reviewed control
 are documented for issue #39.
+
+## 2026-10-07 — Build the expense list and create/edit screens (Issues #40, #41)
+
+**Objective.** Give the front-end its first expense screens: a list of the
+current user's expenses and a form to create or edit one, against the
+expense/category endpoints already merged into `main` (#34–#39).
+
+**Agent/role used.** Claude Code-assisted frontend implementation. No
+specialized agent run (`agentic/orchestrator.py`) is claimed.
+
+**What was delegated.** Nothing — implemented directly in this session,
+driven interactively.
+
+**Main proposal.** Add `frontend/src/lib/api/{expenses,categories}.js` as
+thin `apiFetch` wrappers over the documented routes (`docs/api-design.md`
+§3, §5.1) — real calls, not a mock layer, following the same "built against
+the contract" pattern login/register used before their own backend existed.
+Add `/expenses` (list), `/expenses/new` (create) and `/expenses/[id]/edit`
+(edit) routes, each self-contained like `login`/`register` rather than
+sharing one form component. Amounts stay decimal strings end to end;
+`money.js`'s `isValidDecimalString`/`compareDecimal` do the one client-side
+check this form needs (amount > 0) without ever coercing to a float.
+
+**How the change was verified.**
+- `npm test` in `frontend/`: 103/103 passing, including 17 new tests across
+  the two API wrappers and the three new screens.
+- Manually traced the edit screen's data flow: since
+  `backend/api/urls.py` has no `GET /api/expenses/{id}/` (only list+create
+  combined, and PATCH/PUT/DELETE on the detail route), the edit screen reads
+  its initial values out of the already-fetched, unpaginated list rather
+  than fetching the single resource — the one call the backend actually
+  supports.
+
+**Accepted / modified / rejected.**
+- Accepted: no shared `ExpenseForm` component between the create and edit
+  screens, matching how `login`/`register` stayed separate before #104's
+  design-system slice touched them — duplication here is deliberate, not
+  an oversight.
+- Accepted: deleting an expense is left entirely to issue #42 (confirmation
+  flow); the list screen only links to "Edit".
+- Rejected: wiring these routes into the shared nav (`+layout.svelte`) —
+  decision `0001`'s issue-#104 amendment explicitly defers nav/dashboard
+  expansion to that issue, which depends on this one landing first.
+
+**Final decision.** Issues #40 and #41 are implemented on
+`feat/40-41-expense-screens`, built directly against the real (already
+merged) expense/category API, with no mock layer and no premature shared
+form component.
