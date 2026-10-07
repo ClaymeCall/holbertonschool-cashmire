@@ -415,3 +415,46 @@ in the next cycle if the command proves incorrect.
 - Once approved, Full-Stack Development agent proceeds to implement the 19 routes (auth, expenses, budgets, categories) against the specification, following the same verification process.
 - Review artifacts: `docs/reviews/issue-7-api-contract.md` documents all findings (blockers, non-blockers, verification steps) with section-by-section analysis of all 20 criteria and security checks.
 
+## 2026-10-07 — Complete the authentication strategy documentation (Issue #25)
+
+**Objective.** Close the documentation gap in #25: the session-cookie decision
+already exists in ADR 0003, but the issue requires a strategy document at the
+exact path `docs/decisions/auth-strategy.md` and explicit confirmation from
+every team member.
+
+**Agent/role used.** Copilot-assisted manual documentation update. The
+orchestrator was not run; this was a bounded documentation follow-up to an
+existing decision, and no agent-run spec or QA review is claimed.
+
+**What was delegated.** Nothing.
+
+**Main proposal.** Keep ADR 0003 as the numbered rationale and make
+`auth-strategy.md` the operational guide. The guide states the intended
+session-cookie lifecycle, storage, CSRF/CORS and deployment requirements,
+known trade-offs, implementation guardrails, and a named human sign-off
+checklist. It distinguishes the chosen strategy from what is implemented on
+`main`.
+
+**How the change was verified.**
+- Compared the guide with `backend/cashmire/settings.py`,
+  `backend/api/urls.py`, and `backend/cashmire/urls.py` on `main`.
+- Confirmed session, authentication, and CSRF middleware are enabled,
+  credentialed CORS is configured, and the current API URL configuration does
+  not yet expose register, login, logout, or current-user routes.
+- Cross-checked the team names against `docs/team.md` and recorded Tom's
+  approval of PR #107 as evidence; Jason's and Clément's explicit confirmations
+  remain pending.
+- This change is documentation-only; no automated test suite was run.
+
+**Accepted / modified / rejected.**
+- Accepted: Add the exact path requested by #25 without duplicating the full
+  decision; retain the existing numbered ADR and link it to the operational
+  guide.
+- Modified: Replace the former PR-only sign-off reminder with a named
+  checklist in the requested document.
+- Rejected: Marking the issue complete, because not every team member's
+  understanding has been explicitly confirmed.
+
+**Final decision.** The requested strategy guide and checklist are present.
+Issue #25 must remain open until Jason and Clément explicitly confirm their
+understanding; implementation of the auth endpoints remains future work.
