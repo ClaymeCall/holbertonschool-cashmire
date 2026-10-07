@@ -25,24 +25,21 @@ Pas de versioning initial (v1, v2, etc.). Si besoin futur, ajouter `/api/v1/` et
 
 ### 1.2 Authentification
 
-**Mécanisme :** Token JWT (JSON Web Token) ou session Django.
-
-**Fourniture du token :**
-- En header : `Authorization: Bearer <token>`
-- Ou en cookie (si session Django configurée)
+**Mécanisme :** session Django transportée par le cookie `sessionid`.
+Le navigateur gère le cookie et l'envoie avec les requêtes authentifiées ;
+le client ne stocke ni ne transmet de token dans un header.
 
 **Routes non authentifiées (accès public) :**
 - `POST /api/auth/register/` — création de compte
 - `POST /api/auth/login/` — connexion
 - `GET /api/health/` — health check serveur
 
-**Routes authentifiées (token requis) :**
+**Routes authentifiées (session requise) :**
 - Toutes les autres (expenses, budgets, catégories, logout, me)
 
 **Réponse 401 Unauthorized :**
-Retournée si le token est absent, expiré ou invalide. Inclure un header `WWW-Authenticate: Bearer` dans la réponse.
-
-**À confirmer :** Détails du mécanisme JWT (durée du token, refresh tokens, etc.) — à spécifier dans une issue dédiée.
+Retournée si la session est absente, expirée ou invalide. Les vues protégées
+utilisent le challenge `WWW-Authenticate: Session`.
 
 ### 1.3 Sérialisation des montants (Decimal)
 
@@ -226,7 +223,8 @@ Pas de corps. Code 204.
 
 **Authentification :** Requise
 
-**Description :** Récupérer les données de l'utilisateur courant (celui du token).
+**Description :** Récupérer les données de l'utilisateur courant, résolu à
+partir de sa session Django.
 
 **Corps de requête :** Aucun
 
@@ -251,8 +249,8 @@ Pas de corps. Code 204.
 - `created_at`, `updated_at` (strings ISO 8601).
 
 **Erreurs possibles :**
-- `401 Unauthorized` — Token absent ou invalide
-  - Message : `"error": "UNAUTHORIZED", "message": "Token invalide ou expiré"`
+- `401 Unauthorized` — Session absente ou invalide
+  - Message : `{ "detail": "Authentication credentials were not provided." }`
 
 ---
 

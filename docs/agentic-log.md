@@ -813,3 +813,46 @@ a one-setting fix plus the regression test that was missing for it.
 **Final decision.** `CSRF_TRUSTED_ORIGINS` is set on `fix/130-csrf-trusted-origins`,
 closing #130, with regression coverage proving both the failure mode and
 the fix.
+
+## 2026-10-07 — Add reusable session authentication and current-user endpoint (Issue #26)
+
+**Objective.** Provide a shared DRF session-authentication guard that resolves
+the user from Django's session, returns 401 for anonymous requests, and can be
+reused by function- and class-based protected views.
+
+**Agent/role used.** Copilot-assisted implementation on the authentication
+stack from issue #24. No specialized agent run is claimed.
+
+**What was delegated.** Nothing.
+
+**Main proposal.** Add a common `SessionAuthenticatedAPIView` base class and
+`session_authenticated_api_view` decorator, backed by one session
+authentication class and `IsAuthenticated` permission. Use them for the
+logout and current-user views, and expose `GET /api/auth/me/` using the
+existing read-only `UserSerializer`.
+
+**How the change was verified.**
+- Ran `docker compose -p cashmire-issue26-test run --rm api python manage.py
+  test api`: all 27 API tests pass, including anonymous 401, authenticated
+  session user serialization, Basic authentication rejection, and logout
+  CSRF/session behavior.
+- Ran `docker compose -p cashmire-issue26-test run --rm api python manage.py
+  check`: no system-check issues.
+- Called `GET /api/auth/me/` with `curl` and no session; received 401,
+  `WWW-Authenticate: Session`, and the expected JSON error.
+- Generated the OpenAPI schema; the custom session cookie authenticator is
+  described as a cookie security scheme. Existing health/logout serializer
+  generation errors remain outside this issue.
+- Removed only the isolated Compose verification volumes and networks.
+
+**Accepted / modified / rejected.**
+- Accepted: Use Django sessions, not Basic or JWT, per decision 0003.
+- Modified: Provide both a function-view decorator and a class-view base so
+  future expense and budget endpoints can share the guard without repeating
+  authentication configuration.
+- Rejected: Duplicating user fields or exposing password data; the existing
+  `UserSerializer` defines the response shape.
+
+**Final decision.** Protected endpoints now share one session-authentication
+implementation, anonymous access returns 401, and `GET /api/auth/me/` returns
+only the authenticated user's public fields.
