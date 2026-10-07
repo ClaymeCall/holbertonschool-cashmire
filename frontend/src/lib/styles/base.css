@@ -1,0 +1,74 @@
+/*
+ * Cashmire design system — document-wide defaults (issue #104).
+ *
+ * This further amends docs/decisions/0001-shared-app-shell-layout.md point
+ * 6 ("styling stays component-scoped"): adopting one typeface per role
+ * (Fraunces headings, DM Sans body, IBM Plex Mono data) and one warm
+ * background across every screen would mean repeating the same
+ * font-family/background/color declarations in each component's own
+ * <style> block — exactly the duplication point 6 warns a global
+ * stylesheet should exist to avoid. This file is kept to true
+ * document-wide defaults only (html/body background and font, heading
+ * font/color, link color, code/pre font, a focus-visible fallback); it
+ * defines no component-specific class, so per-component <style> blocks
+ * remain the place for anything beyond these defaults.
+ *
+ * Plain element selectors here are not scoped by Svelte (this file is a
+ * plain .css import, not a component <style> block), so importing it once
+ * from the root layout applies it to every route.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-body);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  color: var(--color-heading);
+  line-height: 1.25;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+a {
+  color: var(--color-primary);
+  transition: color var(--motion-duration) var(--motion-ease);
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

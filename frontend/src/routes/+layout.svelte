@@ -23,6 +23,8 @@
   // privacy/page.test.js does without mocking `$app/stores` at all.
   import { page } from "$app/stores";
   import "$lib/styles/tokens.css";
+  import "$lib/styles/fonts.css";
+  import "$lib/styles/base.css";
 
   let { children } = $props();
 
@@ -67,13 +69,23 @@
 <style>
   header {
     padding: var(--space-lg) var(--space-xl);
-    border-bottom: 1px solid var(--color-border-subtle);
+    border-bottom: 1px dashed var(--color-border-subtle);
+    background-color: var(--color-surface);
+    background-image: var(--texture-weave);
   }
 
   .brand {
     display: inline-block;
     margin-bottom: var(--space-sm);
-    font-weight: 700;
+    font-family: var(--font-heading);
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--color-heading);
+    transition: color var(--motion-duration) var(--motion-ease);
+  }
+
+  .brand:hover {
+    color: var(--color-camel-deep);
   }
 
   nav ul {
@@ -89,28 +101,36 @@
     color: var(--color-primary);
   }
 
-  header a:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring-color);
-    outline-offset: 2px;
+  nav a {
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-full);
+    text-decoration: none;
+    transition: background-color var(--motion-duration) var(--motion-ease),
+      color var(--motion-duration) var(--motion-ease);
+  }
+
+  nav a:hover {
+    background-color: var(--color-oatmeal);
   }
 
   nav a[aria-current="page"] {
     font-weight: 700;
-    text-decoration: underline;
+    background-color: var(--color-camel);
+    color: var(--color-ivory);
   }
 
   footer {
     padding: var(--space-lg) var(--space-xl);
-    border-top: 1px solid var(--color-border-subtle);
+    border-top: 1px dashed var(--color-border-subtle);
+    background-color: var(--color-surface);
+    background-image: var(--texture-weave);
+    font-family: var(--font-mono);
     font-size: var(--font-size-sm);
+    letter-spacing: var(--tracking-mono-label);
+    text-transform: uppercase;
   }
 
   footer a {
     color: var(--color-primary);
-  }
-
-  footer a:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring-color);
-    outline-offset: 2px;
   }
 </style>

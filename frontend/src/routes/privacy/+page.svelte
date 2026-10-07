@@ -227,7 +227,7 @@
     background: var(--color-warning-bg);
     color: var(--color-warning-text);
     padding: var(--space-md) var(--space-lg);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
   }
 
   a {

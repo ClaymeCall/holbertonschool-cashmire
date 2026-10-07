@@ -28,7 +28,7 @@
     background: var(--color-error-bg);
     border-left: 4px solid var(--color-error-border);
     padding: var(--space-sm) var(--space-md);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     margin-bottom: var(--space-lg);
   }
 
