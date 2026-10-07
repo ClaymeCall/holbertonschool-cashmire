@@ -2,6 +2,22 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 
 
+DEFAULT_CATEGORIES = (
+    ("Alimentation", "Courses, nourriture et boissons."),
+    ("Transport", "Transports en commun, carburant et déplacements."),
+    ("Logement", "Loyer, charges et entretien du logement."),
+    ("Loisirs", "Activités de loisirs et sorties."),
+    ("Santé", "Soins médicaux et dépenses de santé."),
+    ("Vêtements", "Vêtements et accessoires."),
+    ("Éducation", "Formation, livres et fournitures scolaires."),
+    ("Divertissement", "Films, musique, jeux et abonnements."),
+    ("Services", "Téléphone, internet et services du quotidien."),
+    ("Épargne", "Épargne et placements de précaution."),
+    ("Investissements", "Investissements et placements financiers."),
+    ("Autres", "Dépenses ne correspondant à aucune autre catégorie."),
+)
+
+
 class User(AbstractUser):
     """Cashmire's user account — docs/erd.md USER entity (issue #20).
 
@@ -34,3 +50,28 @@ class User(AbstractUser):
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["username"]
+
+
+class Category(models.Model):
+    user = models.ForeignKey(
+        "api.User",
+        on_delete=models.CASCADE,
+        related_name="categories",
+    )
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "name"],
+                name="unique_category_name_per_user",
+            )
+        ]
+
+    def __str__(self):
+        return self.name

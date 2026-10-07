@@ -672,6 +672,8 @@ Pas de corps. Code 204.
 
 **Description :** Lister toutes les catégories de l'utilisateur courant. Inclut les catégories par défaut créées à l'inscription.
 
+**Implémentation :** Cette route de lecture seule est disponible depuis l'issue #33. Les routes de création, modification et suppression restent prévues pour des issues ultérieures. Avec `SessionAuthentication` de DRF, une requête sans session authentifiée reçoit HTTP `403 Forbidden`.
+
 **Query parameters :** Aucun (MVP sans filtrage avancé).
 
 **Réponse 200 OK :**
@@ -703,8 +705,7 @@ Pas de corps. Code 204.
 **Note :** Retourne uniquement les catégories de l'utilisateur courant (scoped par user_id).
 
 **Erreurs possibles :**
-- `401 Unauthorized` — Token absent ou invalide
-  - Message : `"error": "UNAUTHORIZED", "message": "Token invalide ou expiré"`
+- `403 Forbidden` — Session absente ou utilisateur non authentifié
 
 ---
 
