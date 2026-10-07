@@ -22,19 +22,50 @@
   // component is rendered standalone in a test harness, as
   // privacy/page.test.js does without mocking `$app/stores` at all.
   import { page } from "$app/stores";
+  import { goto } from "$app/navigation";
+  import { currentUser, logout } from "$lib/stores/auth";
   import "$lib/styles/tokens.css";
 
   let { children } = $props();
 
-  // Exactly the routes that exist today — no placeholder links to unbuilt
-  // pages (see docs/specs/issue-15-svelte-skeleton.md §4.2.1). Login/Register
-  // added for #28/#29.
-  const navLinks = [
-    { href: "/", label: "Home" },
-    { href: "/login", label: "Log in" },
-    { href: "/register", label: "Register" },
-    { href: "/privacy", label: "Privacy" },
-  ];
+  // Issue #104's amendment to decision 0001: the nav now reflects auth
+  // state rather than listing every route unconditionally. `$currentUser`
+  // is only ever set by login/register's own success handlers (see
+  // lib/stores/auth.js) — reading it here is a plain reactive read, not a
+  // fetch, so this still satisfies layout.test.js's T-4b ("rendering the
+  // layout issues zero fetch calls").
+  const navLinks = $derived(
+    $currentUser
+      ? [
+          { href: "/", label: "Dashboard" },
+          { href: "/expenses", label: "Expenses" },
+          { href: "/budgets", label: "Budgets" },
+          { href: "/privacy", label: "Privacy" },
+        ]
+      : [
+          { href: "/", label: "Home" },
+          { href: "/login", label: "Log in" },
+          { href: "/register", label: "Register" },
+          { href: "/privacy", label: "Privacy" },
+        ],
+  );
+
+  let loggingOut = $state(false);
+
+  async function handleLogout() {
+    if (loggingOut) return;
+    loggingOut = true;
+    try {
+      await logout();
+      await goto("/");
+    } catch (err) {
+      // Leaves the nav in its logged-in state (lib/stores/auth.js's
+      // `logout` only clears the store on success) — the user can retry.
+      console.error("Logout failed:", err);
+    } finally {
+      loggingOut = false;
+    }
+  }
 </script>
 
 <header>
@@ -51,6 +82,13 @@
           </a>
         </li>
       {/each}
+      {#if $currentUser}
+        <li>
+          <button type="button" onclick={handleLogout} disabled={loggingOut}>
+            {loggingOut ? "Logging out…" : "Log out"}
+          </button>
+        </li>
+      {/if}
     </ul>
   </nav>
 </header>
@@ -97,6 +135,25 @@
   nav a[aria-current="page"] {
     font-weight: 700;
     text-decoration: underline;
+  }
+
+  nav button {
+    font: inherit;
+    color: var(--color-primary);
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  nav button:disabled {
+    cursor: default;
+    opacity: 0.65;
+  }
+
+  nav button:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: 2px;
   }
 
   footer {
