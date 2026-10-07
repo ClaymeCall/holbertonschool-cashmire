@@ -37,24 +37,43 @@
     { href: "/register", label: "Register" },
     { href: "/privacy", label: "Privacy" },
   ];
+
+  // Mobile nav collapse (issue #104 navbar follow-up). Closed by default so
+  // the links don't flash open on small screens before CSS hides them.
+  let menuOpen = $state(false);
 </script>
 
 <header>
-  <a class="brand" href="/">Cashmire</a>
-  <nav aria-label="Main">
-    <ul>
-      {#each navLinks as link (link.href)}
-        <li>
-          <a
-            href={link.href}
-            aria-current={$page?.url?.pathname === link.href ? "page" : undefined}
-          >
-            {link.label}
-          </a>
-        </li>
-      {/each}
-    </ul>
-  </nav>
+  <div class="header-row">
+    <a class="brand" href="/">Cashmire</a>
+    <button
+      type="button"
+      class="menu-toggle"
+      aria-expanded={menuOpen}
+      aria-controls="main-nav"
+      aria-label={menuOpen ? "Close menu" : "Open menu"}
+      onclick={() => (menuOpen = !menuOpen)}
+    >
+      <span class="menu-toggle-bar"></span>
+      <span class="menu-toggle-bar"></span>
+      <span class="menu-toggle-bar"></span>
+    </button>
+    <nav aria-label="Main" id="main-nav" class:open={menuOpen}>
+      <ul>
+        {#each navLinks as link (link.href)}
+          <li>
+            <a
+              href={link.href}
+              aria-current={$page?.url?.pathname === link.href ? "page" : undefined}
+              onclick={() => (menuOpen = false)}
+            >
+              {link.label}
+            </a>
+          </li>
+        {/each}
+      </ul>
+    </nav>
+  </div>
 </header>
 
 {#if children}
@@ -74,9 +93,15 @@
     background-image: var(--texture-weave);
   }
 
+  .header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-lg);
+  }
+
   .brand {
     display: inline-block;
-    margin-bottom: var(--space-sm);
     font-family: var(--font-heading);
     font-size: 1.3rem;
     font-weight: 600;
@@ -86,6 +111,33 @@
 
   .brand:hover {
     color: var(--color-camel-deep);
+  }
+
+  .menu-toggle {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 5px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    cursor: pointer;
+    transition: background-color var(--motion-duration) var(--motion-ease);
+  }
+
+  .menu-toggle:hover {
+    background-color: var(--color-oatmeal);
+  }
+
+  .menu-toggle-bar {
+    display: block;
+    width: 100%;
+    height: 2px;
+    border-radius: var(--radius-full);
+    background-color: var(--color-primary);
   }
 
   nav ul {
@@ -132,5 +184,32 @@
 
   footer a {
     color: var(--color-primary);
+  }
+
+  @media (max-width: 640px) {
+    .header-row {
+      flex-wrap: wrap;
+    }
+
+    .menu-toggle {
+      display: flex;
+    }
+
+    nav {
+      order: 3;
+      width: 100%;
+    }
+
+    nav ul {
+      display: none;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-xs);
+      margin-top: var(--space-md);
+    }
+
+    nav.open ul {
+      display: flex;
+    }
   }
 </style>
