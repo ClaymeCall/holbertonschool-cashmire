@@ -642,3 +642,39 @@ the current user.
 
 **Final decision.** Issues #37 and #38 are implemented on the expense feature
 branch, with update and delete operations restricted to the current user.
+
+## 2026-10-07 — Verify expense ownership controls (Issue #39)
+
+**Objective.** Verify and document that every implemented expense endpoint
+scopes access to the authenticated user, with cross-user access concealed as
+not found.
+
+**Agent/role used.** Copilot-assisted implementation and security-control
+review. No specialized agent run is claimed.
+
+**What was delegated.** Nothing.
+
+**Main proposal.** Retain query-level owner scoping for list and detail
+operations, set the creator from the authenticated session rather than the
+request body, and ensure category references are also owner-scoped. Record
+the review in `docs/reviews/issue-39-expense-ownership.md`.
+
+**How the change was verified.**
+- Existing API tests assert expense listing excludes other users' records,
+  creation ignores a client-supplied `user_id`, and update/delete return 404
+  for foreign expense IDs.
+- Added explicit `PUT` cross-user coverage alongside `PATCH`, comparing both
+  responses to the missing-resource 404.
+- Reviewed the ORM access paths for GET/POST collection and PATCH/PUT/DELETE
+  detail operations.
+
+**Accepted / modified / rejected.**
+- Accepted: All expense reads and mutations must use user-scoped database
+  lookups; writes derive ownership from the authenticated session.
+- Modified: None.
+- Rejected: Returning a different result for foreign and missing IDs, which
+  could disclose whether another user's expense exists.
+
+**Final decision.** The implemented expense endpoints enforce ownership
+before accessing expense rows. Regression coverage and the reviewed control
+are documented for issue #39.

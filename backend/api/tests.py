@@ -585,6 +585,15 @@ class ExpenseDetailMutationTests(TestCase):
             {"amount": "30.00"},
             format="json",
         )
+        foreign_put_response = self.client.put(
+            self.detail_url(self.other_expense.pk),
+            {
+                "category_id": self.category.pk,
+                "amount": "30.00",
+                "date": "2026-10-08",
+            },
+            format="json",
+        )
         missing_response = self.client.patch(
             self.detail_url(99999999),
             {"amount": "30.00"},
@@ -592,8 +601,10 @@ class ExpenseDetailMutationTests(TestCase):
         )
 
         self.assertEqual(foreign_response.status_code, 404)
+        self.assertEqual(foreign_put_response.status_code, 404)
         self.assertEqual(missing_response.status_code, 404)
         self.assertEqual(foreign_response.json(), missing_response.json())
+        self.assertEqual(foreign_put_response.json(), missing_response.json())
         self.other_expense.refresh_from_db()
         self.assertEqual(self.other_expense.amount, Decimal("80.00"))
 
