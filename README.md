@@ -112,17 +112,34 @@ set `POSTGRES_PORT` to change the port published on the host.
 ## Database migrations
 
 Cashmire uses Django's built-in migration framework for PostgreSQL schema
-changes. The `api` app's initial migration establishes its migration history;
-it has no schema operations because the app does not define models yet.
-Versioned migration files belong in `backend/api/migrations/` and should be
-committed with the model changes they represent.
+changes. The versioned migrations in `backend/api/migrations/` create the
+project's database schema; no manual SQL setup is required. Commit each
+migration with the model changes it represents.
 
-Start the database and API services, then apply all pending migrations. The API
-waits for PostgreSQL's healthcheck before starting:
+### Rebuild the development database from an empty PostgreSQL instance
+
+The following commands discard the Compose database volume and **permanently
+delete all data in that local development database**. Do not run them if you
+need to keep its data. Run them from the repository root after creating `.env`
+from `.env.example` as described in [Local PostgreSQL](#local-postgresql):
 
 ```bash
-docker compose up -d --build
+docker compose down --volumes --remove-orphans
+docker compose up -d --build db
+docker compose up -d --build api
 docker compose exec api python manage.py migrate
+```
+
+The first command removes the existing database volume; PostgreSQL creates a
+new empty database when the `db` service starts. The API waits for PostgreSQL's
+healthcheck, and Django applies every committed migration in order. The
+migration command is safe to run again; Django skips migrations already
+recorded as applied.
+
+To start the full application after the migrations have completed:
+
+```bash
+docker compose up -d frontend
 ```
 
 After changing models, create a migration and apply it:
