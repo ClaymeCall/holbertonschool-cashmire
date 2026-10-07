@@ -83,6 +83,53 @@ describe("app shell layout (#15, auth-aware nav follow-up)", () => {
     expect(hrefs).toContain("/register");
   });
 
+  it("Expenses and Budgets links are always present, logged in or not", () => {
+    const { unmount } = render(Layout, {
+      props: { children: childrenSnippet("<div></div>") },
+    });
+
+    let nav = screen.getByRole("navigation", { name: /main/i });
+    let hrefs = within(nav)
+      .getAllByRole("link")
+      .map((link) => link.getAttribute("href"));
+    expect(hrefs).toContain("/expenses");
+    expect(hrefs).toContain("/budgets");
+    unmount();
+
+    setCurrentUser({ id: 1, email: "demo@example.com" });
+    render(Layout, { props: { children: childrenSnippet("<div></div>") } });
+
+    nav = screen.getByRole("navigation", { name: /main/i });
+    hrefs = within(nav)
+      .getAllByRole("link")
+      .map((link) => link.getAttribute("href"));
+    expect(hrefs).toContain("/expenses");
+    expect(hrefs).toContain("/budgets");
+  });
+
+  it("clicking Expenses or Budgets while anonymous redirects to /login instead of navigating there", () => {
+    render(Layout, { props: { children: childrenSnippet("<div></div>") } });
+
+    const nav = screen.getByRole("navigation", { name: /main/i });
+    within(nav).getByRole("link", { name: "Expenses" }).click();
+    expect(gotoMock).toHaveBeenCalledWith("/login");
+
+    gotoMock.mockClear();
+    within(nav).getByRole("link", { name: "Budgets" }).click();
+    expect(gotoMock).toHaveBeenCalledWith("/login");
+  });
+
+  it("clicking Expenses or Budgets while logged in navigates normally, not to /login", () => {
+    setCurrentUser({ id: 1, email: "demo@example.com" });
+    render(Layout, { props: { children: childrenSnippet("<div></div>") } });
+
+    const nav = screen.getByRole("navigation", { name: /main/i });
+    within(nav).getByRole("link", { name: "Expenses" }).click();
+    within(nav).getByRole("link", { name: "Budgets" }).click();
+
+    expect(gotoMock).not.toHaveBeenCalledWith("/login");
+  });
+
   it("T-2 (AC-4): the children snippet renders between the header and the footer, in document order", () => {
     const { container } = render(Layout, {
       props: {

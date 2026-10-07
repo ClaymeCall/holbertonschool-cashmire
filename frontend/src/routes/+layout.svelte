@@ -34,22 +34,41 @@
   let { children } = $props();
 
   // Exactly the routes that exist today — no placeholder links to unbuilt
-  // pages (see docs/specs/issue-15-svelte-skeleton.md §4.2.1). Login/Register
-  // only make sense to show when nobody is logged in — otherwise they're
-  // replaced by the "Log out" action further down.
-  const navLinks = $derived(
-    authState.status === "authenticated"
-      ? [
-          { href: "/", label: "Home" },
-          { href: "/privacy", label: "Privacy" },
-        ]
+  // pages (see docs/specs/issue-15-svelte-skeleton.md §4.2.1). Expenses and
+  // Budgets are `protected: true`: always shown, regardless of auth state
+  // (issue #104 navbar follow-up), but intercepted on click for an
+  // anonymous visitor — see `handleNavClick` below — rather than letting
+  // them land on a page that can only show its own generic 401 error.
+  // Login/Register only make sense to show when nobody is logged in —
+  // otherwise they're replaced by the "Log out" action further down.
+  const navLinks = $derived([
+    { href: "/", label: "Home" },
+    { href: "/expenses", label: "Expenses", protected: true },
+    { href: "/budgets", label: "Budgets", protected: true },
+    ...(authState.status === "authenticated"
+      ? []
       : [
-          { href: "/", label: "Home" },
           { href: "/login", label: "Log in" },
           { href: "/register", label: "Register" },
-          { href: "/privacy", label: "Privacy" },
-        ],
-  );
+        ]),
+    { href: "/privacy", label: "Privacy" },
+  ]);
+
+  /**
+   * @param {MouseEvent} event
+   * @param {{ href: string, protected?: boolean }} link
+   */
+  function handleNavClick(event, link) {
+    menuOpen = false;
+    // `authState.status` is "loading" for the brief window before the
+    // mount-time /api/auth/me/ check resolves (see `refreshCurrentUser`) —
+    // treated the same as "anonymous" here, consistently with how the nav
+    // itself already defaults to the anonymous link set during that window.
+    if (link.protected && authState.status !== "authenticated") {
+      event.preventDefault();
+      goto("/login");
+    }
+  }
 
   // Resolved once per full page load — the layout itself doesn't remount
   // on client-side navigation, so login/register set the state directly
@@ -108,7 +127,7 @@
             <a
               href={link.href}
               aria-current={$page?.url?.pathname === link.href ? "page" : undefined}
-              onclick={() => (menuOpen = false)}
+              onclick={(event) => handleNavClick(event, link)}
             >
               {link.label}
             </a>
