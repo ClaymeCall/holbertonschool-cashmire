@@ -3337,3 +3337,172 @@ class BudgetUpdateEndpointTests(TestCase):
         self.assertIsInstance(data["remaining"], str)
         self.assertIsInstance(data["percentage"], str)
         self.assertEqual(data["amount"], "123.45")
+
+
+class BudgetDeleteTests(TestCase):
+    def setUp(self):
+        """Create users, categories, and budgets for testing."""
+        self.user = User.objects.create_user(
+            username="budget-owner",
+            email="budget-owner@example.com",
+            password="test-password",
+        )
+        self.other_user = User.objects.create_user(
+            username="other-budget-owner",
+            email="other-budget-owner@example.com",
+            password="test-password",
+        )
+        self.client = APIClient()
+
+        # Create categories for both users
+        self.category = self.user.categories.first()
+        self.other_user_category = self.other_user.categories.first()
+
+        # Create budgets for both users
+        self.budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("500.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+
+        self.other_user_budget = Budget.objects.create(
+            user=self.other_user,
+            category=self.other_user_category,
+            amount=Decimal("300.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+
+    def test_budget_delete_success_returns_204_no_content(self):
+        """Test that deleting an owned budget returns 204 No Content."""
+        self.client.force_login(self.user)
+        response = self.client.delete(f"/api/budgets/{self.budget.id}/")
+
+        self.assertEqual(response.status_code, 204)
+        # Response should have no content
+        self.assertEqual(response.content, b"")
+
+    def test_budget_delete_removes_from_database(self):
+        """Test that budget is actually deleted from database after DELETE."""
+        self.client.force_login(self.user)
+        budget_id = self.budget.id
+
+        # Verify budget exists before delete
+        self.assertTrue(Budget.objects.filter(id=budget_id).exists())
+
+        # Delete the budget
+        response = self.client.delete(f"/api/budgets/{budget_id}/")
+        self.assertEqual(response.status_code, 204)
+
+        # Verify budget is gone from database
+        self.assertFalse(Budget.objects.filter(id=budget_id).exists())
+
+    def test_budget_delete_idempotence_second_delete_returns_404(self):
+        """Test that second DELETE on same budget returns 404 (idempotent)."""
+        self.client.force_login(self.user)
+
+        # First delete should succeed
+        response = self.client.delete(f"/api/budgets/{self.budget.id}/")
+        self.assertEqual(response.status_code, 204)
+
+        # Second delete should return 404
+        response = self.client.delete(f"/api/budgets/{self.budget.id}/")
+        self.assertEqual(response.status_code, 404)
+        data = response.json()
+        self.assertEqual(data["error"], "NOT_FOUND")
+        self.assertEqual(data["message"], "Budget non trouvé")
+
+    def test_budget_delete_ownership_check_other_user_cannot_delete(self):
+        """Test that user cannot delete another user's budget."""
+        self.client.force_login(self.other_user)
+
+        # Try to delete the first user's budget
+        response = self.client.delete(f"/api/budgets/{self.budget.id}/")
+
+        self.assertEqual(response.status_code, 404)
+        data = response.json()
+        self.assertEqual(data["error"], "NOT_FOUND")
+        self.assertEqual(data["message"], "Budget non trouvé")
+
+        # Verify budget still exists in database
+        self.assertTrue(Budget.objects.filter(id=self.budget.id).exists())
+
+    def test_budget_delete_budget_not_found(self):
+        """Test that DELETE on inexistent budget returns 404."""
+        self.client.force_login(self.user)
+
+        response = self.client.delete("/api/budgets/999999/")
+
+        self.assertEqual(response.status_code, 404)
+        data = response.json()
+        self.assertEqual(data["error"], "NOT_FOUND")
+        self.assertEqual(data["message"], "Budget non trouvé")
+
+    def test_budget_delete_no_effect_on_expenses(self):
+        """Test that deleting a budget does not delete associated expenses."""
+        self.client.force_login(self.user)
+
+        # Create an expense in the same category
+        expense = Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("25.50"),
+            date=date(2026, 10, 15),
+        )
+        expense_id = expense.id
+
+        # Delete the budget
+        response = self.client.delete(f"/api/budgets/{self.budget.id}/")
+        self.assertEqual(response.status_code, 204)
+
+        # Verify budget is deleted
+        self.assertFalse(Budget.objects.filter(id=self.budget.id).exists())
+
+        # Verify expense still exists
+        self.assertTrue(Expense.objects.filter(id=expense_id).exists())
+        expense.refresh_from_db()
+        self.assertEqual(expense.amount, Decimal("25.50"))
+
+    def test_budget_delete_no_effect_on_categories(self):
+        """Test that deleting a budget does not delete associated categories."""
+        self.client.force_login(self.user)
+
+        category_id = self.category.id
+
+        # Verify category exists before delete
+        self.assertTrue(Category.objects.filter(id=category_id).exists())
+
+        # Delete the budget
+        response = self.client.delete(f"/api/budgets/{self.budget.id}/")
+        self.assertEqual(response.status_code, 204)
+
+        # Verify budget is deleted
+        self.assertFalse(Budget.objects.filter(id=self.budget.id).exists())
+
+        # Verify category still exists
+        self.assertTrue(Category.objects.filter(id=category_id).exists())
+
+    def test_budget_delete_requires_authentication(self):
+        """Test that DELETE without authentication returns 403."""
+        response = self.client.delete(f"/api/budgets/{self.budget.id}/")
+
+        self.assertEqual(response.status_code, 403)
+        # Should not delete the budget
+        self.assertTrue(Budget.objects.filter(id=self.budget.id).exists())
+
+    def test_budget_delete_does_not_affect_other_users_budget(self):
+        """Test that deleting one user's budget does not affect another user's budget."""
+        self.client.force_login(self.user)
+        other_budget_id = self.other_user_budget.id
+
+        # Delete the first user's budget
+        response = self.client.delete(f"/api/budgets/{self.budget.id}/")
+        self.assertEqual(response.status_code, 204)
+
+        # Verify first user's budget is deleted
+        self.assertFalse(Budget.objects.filter(id=self.budget.id).exists())
+
+        # Verify second user's budget is still there
+        self.assertTrue(Budget.objects.filter(id=other_budget_id).exists())
