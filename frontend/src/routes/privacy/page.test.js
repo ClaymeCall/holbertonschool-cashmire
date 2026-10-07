@@ -136,6 +136,33 @@ describe("privacy page (#63)", () => {
     }
   });
 
+  it("accurately discloses expense creation and its storage conditions", () => {
+    const { container } = render(PrivacyPage);
+    const text = container.textContent.replace(/\s+/g, " ");
+
+    expect(text).toContain(
+      "The API accepts expense records at POST /api/expenses/",
+    );
+    expect(text).toContain(
+      "It can store an amount, date, optional description, category, and the owning user in PostgreSQL",
+    );
+    expect(text).toContain(
+      "The endpoint requires an authenticated Django session",
+    );
+    expect(text).toContain(
+      "The authenticated API lets the owner create, list, edit, and delete expense records",
+    );
+    expect(text).toContain(
+      "No retention period or automatic deletion schedule for expense records is defined",
+    );
+    expect(text).toContain(
+      "An authenticated owner can delete an individual expense through the API",
+    );
+    expect(text).not.toContain("Nothing is kept");
+    expect(text).not.toContain("listing, editing, and deleting expenses are not implemented yet");
+    expect(text).not.toContain("The API has no expense deletion endpoint");
+  });
+
   it("T-4 (AC-5): the shared layout footer links to /privacy with a self-describing name", () => {
     const { container } = render(Layout, { props: { children: emptyChildrenSnippet } });
     // Scoped to the footer specifically: issue #15 added a "Privacy" nav

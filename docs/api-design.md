@@ -260,7 +260,7 @@ Pas de corps. Code 204.
 
 ### 3.1 `GET /api/expenses/`
 
-**Authentification :** Requise
+**Authentification :** Requise par session Django (`sessionid`).
 
 **Description :** Lister toutes les dépenses de l'utilisateur courant, avec filtrage optionnel.
 
@@ -300,10 +300,9 @@ Pas de corps. Code 204.
 **Note :** MVP sans pagination. Retourne toutes les dépenses de l'utilisateur courant (filtrées selon les query params si présents).
 
 **Erreurs possibles :**
-- `401 Unauthorized` — Token absent ou invalide
-  - Message : `"error": "UNAUTHORIZED", "message": "Token invalide ou expiré"`
+- `403 Forbidden` — Session absente ou invalide (comportement actuel de `SessionAuthentication`).
 - `400 Bad Request` — Paramètres invalides
-  - Message : `"error": "INVALID_DATA", "message": "Format date invalide (YYYY-MM-DD attendu)"`
+  - Message : erreur de validation au niveau du paramètre, notamment pour une date invalide, un identifiant de catégorie non positif ou `date_from` postérieure à `date_to`.
 
 ---
 
@@ -389,16 +388,16 @@ Pas de corps. Code 204.
 
 ---
 
-### 3.4 `PATCH /api/expenses/{id}/`
+### 3.4 `PATCH` / `PUT /api/expenses/{id}/`
 
 **Authentification :** Requise
 
-**Description :** Modifier une dépense existante. Tous les champs sont optionnels.
+**Description :** Modifier une dépense existante. `PATCH` met à jour uniquement les champs fournis. `PUT` remplace les valeurs de la dépense et requiert les champs obligatoires de création.
 
 **Paramètres de chemin :**
 - `id` (integer) : Identifiant de la dépense.
 
-**Corps de requête (application/json, tous les champs optionnels) :**
+**Corps de requête `PATCH` (application/json, tous les champs optionnels) :**
 ```json
 {
   "category_id": 6,
@@ -408,10 +407,21 @@ Pas de corps. Code 204.
 }
 ```
 
-**Champs de requête (optionnels) :**
+**Corps de requête `PUT` (application/json) :**
+```json
+{
+  "category_id": 6,
+  "amount": "26.50",
+  "date": "2026-10-07"
+}
+```
+
+Pour `PUT`, `category_id`, `amount` et `date` sont requis. `description` est optionnel et devient `null` s'il est omis.
+
+**Champs de requête :**
 - `category_id` (integer) : Nouvelle catégorie (doit appartenir à l'utilisateur courant).
 - `amount` (string) : Nouveau montant (doit être > 0).
-- `description` (string) : Nouvelle description.
+- `description` (string ou null) : Nouvelle description.
 - `date` (date) : Nouvelle date (YYYY-MM-DD).
 
 **Réponse 200 OK :**
@@ -431,10 +441,9 @@ Pas de corps. Code 204.
 **Erreurs possibles :**
 - `400 Bad Request` — Validation échouée
   - Message : `"amount": "Doit être > 0"` ou `"date": "Format invalide"`
-- `401 Unauthorized` — Token absent ou invalide
-  - Message : `"error": "UNAUTHORIZED", "message": "Token invalide ou expiré"`
+- `403 Forbidden` — Session absente
 - `404 Not Found` — Expense n'existe pas ou appartient à un autre utilisateur, ou category n'existe pas
-  - Message : `"error": "NOT_FOUND", "message": "Dépense non trouvée"` ou `"Catégorie non trouvée"`
+  - Message : `"error": "NOT_FOUND", "message": "Dépense non trouvée"` ou `"error": "NOT_FOUND", "message": "Catégorie non trouvée"`
 
 ---
 
@@ -451,8 +460,7 @@ Pas de corps. Code 204.
 Pas de corps. Code 204.
 
 **Erreurs possibles :**
-- `401 Unauthorized` — Token absent ou invalide
-  - Message : `"error": "UNAUTHORIZED", "message": "Token invalide ou expiré"`
+- `403 Forbidden` — Session absente
 - `404 Not Found` — Expense n'existe pas ou appartient à un autre utilisateur
   - Message : `"error": "NOT_FOUND", "message": "Dépense non trouvée"`
 
@@ -672,6 +680,8 @@ Pas de corps. Code 204.
 
 **Description :** Lister toutes les catégories de l'utilisateur courant. Inclut les catégories par défaut créées à l'inscription.
 
+**Implémentation :** Cette route de lecture seule est disponible depuis l'issue #33. Les routes de création, modification et suppression restent prévues pour des issues ultérieures. Avec `SessionAuthentication` de DRF, une requête sans session authentifiée reçoit HTTP `403 Forbidden`.
+
 **Query parameters :** Aucun (MVP sans filtrage avancé).
 
 **Réponse 200 OK :**
@@ -703,8 +713,7 @@ Pas de corps. Code 204.
 **Note :** Retourne uniquement les catégories de l'utilisateur courant (scoped par user_id).
 
 **Erreurs possibles :**
-- `401 Unauthorized` — Token absent ou invalide
-  - Message : `"error": "UNAUTHORIZED", "message": "Token invalide ou expiré"`
+- `403 Forbidden` — Session absente ou utilisateur non authentifié
 
 ---
 

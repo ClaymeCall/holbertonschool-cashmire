@@ -1,0 +1,49 @@
+/*
+ * Shared design tokens — introduced by issue #104 (see the amendment to
+ * docs/decisions/0001-shared-app-shell-layout.md).
+ *
+ * These are the values already in use across +layout.svelte, login, and
+ * register, pulled out under names so every screen references the same
+ * token instead of re-typing the same hex codes. No new colors or spacing
+ * values are introduced here — this file only names what already existed.
+ *
+ * :root custom properties are not scoped by Svelte's per-component style
+ * isolation, so importing this file from any component makes these
+ * variables available document-wide.
+ */
+
+:root {
+  /* Color */
+  --color-primary: #0b3d91;
+  --color-border: #8a8a8a;
+  --color-border-subtle: #c8c8c8;
+  --color-muted-text: #3a3a3a;
+
+  --color-error-text: #7a0a0a;
+  --color-error-bg: #fdeaea;
+  --color-error-border: #b00020;
+
+  --color-warning-text: #3b2200;
+  --color-warning-bg: #fff6e5;
+  --color-warning-border: #7a4b00;
+
+  /* Spacing */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 0.75rem;
+  --space-lg: 1rem;
+  --space-xl: 1.25rem;
+  --space-2xl: 1.5rem;
+  --space-3xl: 3rem;
+
+  /* Shape */
+  --radius-sm: 4px;
+
+  /* Typography */
+  --font-size-base: 1rem;
+  --font-size-sm: 0.95rem;
+
+  /* Focus ring, per decision 0001's accessibility intent */
+  --focus-ring-width: 3px;
+  --focus-ring-color: var(--color-primary);
+}

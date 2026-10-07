@@ -16,6 +16,9 @@
   // server-side validation errors once the backend exists.
   import { goto } from "$app/navigation";
   import { apiFetch, ApiError } from "$lib/api";
+  import Button from "$lib/components/Button.svelte";
+  import TextField from "$lib/components/TextField.svelte";
+  import FormError from "$lib/components/FormError.svelte";
 
   const MIN_PASSWORD_LENGTH = 8;
   const TIMEOUT_MS = 8000;
@@ -123,64 +126,48 @@
   <h1>Register</h1>
 
   <form onsubmit={handleSubmit} novalidate>
-    <div class="field">
-      <label for="register-email">Email</label>
-      <input
-        id="register-email"
-        name="email"
-        type="email"
-        autocomplete="email"
-        bind:value={email}
-        disabled={formState === "submitting"}
-        required
-      />
-    </div>
+    <TextField
+      id="register-email"
+      name="email"
+      label="Email"
+      type="email"
+      autocomplete="email"
+      bind:value={email}
+      disabled={formState === "submitting"}
+      required
+    />
 
-    <div class="field">
-      <label for="register-password">Password</label>
-      <input
-        id="register-password"
-        name="password"
-        type="password"
-        autocomplete="new-password"
-        minlength={MIN_PASSWORD_LENGTH}
-        bind:value={password}
-        disabled={formState === "submitting"}
-        required
-      />
-      <p class="hint">At least {MIN_PASSWORD_LENGTH} characters.</p>
-    </div>
+    <TextField
+      id="register-password"
+      name="password"
+      label="Password"
+      type="password"
+      autocomplete="new-password"
+      minlength={MIN_PASSWORD_LENGTH}
+      bind:value={password}
+      disabled={formState === "submitting"}
+      required
+      hint={`At least ${MIN_PASSWORD_LENGTH} characters.`}
+    />
 
-    <div class="field">
-      <label for="register-password-confirm">Confirm password</label>
-      <input
-        id="register-password-confirm"
-        name="password_confirm"
-        type="password"
-        autocomplete="new-password"
-        bind:value={passwordConfirm}
-        disabled={formState === "submitting"}
-        required
-      />
-    </div>
+    <TextField
+      id="register-password-confirm"
+      name="password_confirm"
+      label="Confirm password"
+      type="password"
+      autocomplete="new-password"
+      bind:value={passwordConfirm}
+      disabled={formState === "submitting"}
+      required
+    />
 
-    {#if formState === "error" && errorMessages.length > 0}
-      <div class="error" role="alert">
-        {#if errorMessages.length === 1}
-          <p>{errorMessages[0]}</p>
-        {:else}
-          <ul>
-            {#each errorMessages as message}
-              <li>{message}</li>
-            {/each}
-          </ul>
-        {/if}
-      </div>
+    {#if formState === "error"}
+      <FormError messages={errorMessages} />
     {/if}
 
-    <button type="submit" disabled={formState === "submitting"}>
+    <Button type="submit" disabled={formState === "submitting"}>
       {formState === "submitting" ? "Creating account…" : "Create account"}
-    </button>
+    </Button>
   </form>
 
   <p><a href="/login">Already have an account? Log in</a></p>
@@ -191,65 +178,16 @@
   main {
     max-width: 40ch;
     margin: 0 auto;
-    padding: 1.5rem 1.25rem 3rem;
+    padding: var(--space-2xl) var(--space-xl) var(--space-3xl);
     line-height: 1.5;
   }
 
-  .field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    margin-bottom: 1rem;
-  }
-
-  label {
-    font-weight: 600;
-  }
-
-  input {
-    font-size: 1rem;
-    padding: 0.5rem 0.6rem;
-    border: 1px solid #8a8a8a;
-    border-radius: 4px;
-  }
-
-  input:focus-visible {
-    outline: 3px solid #0b3d91;
-    outline-offset: 1px;
-  }
-
-  .hint {
-    margin: 0;
-    font-size: 0.85em;
-    color: #3a3a3a;
-  }
-
-  .error {
-    color: #7a0a0a;
-    background: #fdeaea;
-    border-left: 4px solid #b00020;
-    padding: 0.5rem 0.75rem;
-    border-radius: 4px;
-  }
-
-  .error ul {
-    margin: 0;
-    padding-left: 1.25rem;
-  }
-
-  button {
-    font-size: 1rem;
-    padding: 0.5rem 1rem;
-    cursor: pointer;
-  }
-
-  button:focus-visible,
   a:focus-visible {
-    outline: 3px solid #0b3d91;
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
     outline-offset: 2px;
   }
 
   a {
-    color: #0b3d91;
+    color: var(--color-primary);
   }
 </style>

@@ -8,6 +8,13 @@ urlpatterns = [
     path("auth/register/", views.RegisterView.as_view(), name="register"),
     path("auth/login/", views.LoginView.as_view(), name="login"),
     path("auth/logout/", views.LogoutView.as_view(), name="logout"),
+    path("categories/", views.category_list, name="category-list"),
+    path("expenses/", views.expenses, name="expense-list-create"),
+    path(
+        "expenses/<int:expense_id>/",
+        views.expense_detail_mutation,
+        name="expense-detail-mutation",
+    ),
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
         "docs/",

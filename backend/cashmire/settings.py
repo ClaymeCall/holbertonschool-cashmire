@@ -41,7 +41,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "drf_spectacular",
     "corsheaders",
-    "api",
+    "api.apps.ApiConfig",
 ]
 
 MIDDLEWARE = [
@@ -116,6 +116,14 @@ AUTH_USER_MODEL = "api.User"
 CORS_ALLOWED_ORIGINS = os.environ.get(
     "DJANGO_CORS_ALLOWED_ORIGINS", "http://localhost:5173"
 ).split(",")
+
+# Required for the session-cookie auth strategy (see
+# docs/decisions/0003-session-cookie-auth-strategy.md): the frontend's
+# `apiFetch` calls already send `credentials: "include"` on login/register,
+# which only works if the browser is told the response may be read for a
+# credentialed cross-origin request. django-cors-headers defaults this to
+# False; without it the browser discards any `Set-Cookie` from the API.
+CORS_ALLOW_CREDENTIALS = True
 
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [
