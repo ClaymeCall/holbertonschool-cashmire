@@ -785,3 +785,69 @@ specialized agent run (`agentic/orchestrator.py`) is claimed.
 since both reuse `lib/api/categories.js`), built against the documented
 but not-yet-merged budget API, with one shared create/edit form as the
 issue explicitly requires.
+
+## 2026-10-07 — Unify the front-end into one navigable site (Issue #104)
+
+**Objective.** Stitch #40/#41 (expense screens) and #52/#53 (budget
+screens) into one coherent site: an auth-aware nav, and a home page that
+shows the real budgets/expenses summary instead of the original
+health-check placeholder — entirely against the mocked/not-yet-merged
+APIs, per #104's explicit scope.
+
+**Agent/role used.** Claude Code-assisted frontend implementation. No
+specialized agent run (`agentic/orchestrator.py`) is claimed.
+
+**What was delegated.** Nothing — implemented directly in this session.
+
+**Main proposal.**
+- `frontend/src/lib/stores/auth.js`: an in-memory-only auth-state store,
+  populated by `login`/`register`'s own success handlers and cleared by a
+  new `logout()` (calling `POST /api/auth/logout/`). Deliberately does
+  **not** probe `GET /api/auth/me/` on layout mount — `routes/layout.test.js`'s
+  existing T-4b asserts the shared layout issues zero fetch calls on
+  render, and this keeps that true. Accepted consequence: a hard reload
+  reverts the nav to logged-out until the next login/register.
+- `+layout.svelte`'s nav now renders one of two link sets based on that
+  store (logged-out: Home/Log in/Register/Privacy; logged-in: Dashboard/
+  Expenses/Budgets/Privacy + a `Log out` button), with zero changes to
+  `login`/`register`'s own existing, already-tested submit logic beyond
+  one line each recording that their request succeeded.
+- `routes/+page.svelte` (home) now shows a public landing when logged out,
+  and the real dashboard — each budget's status via a new, shared
+  `BudgetCard` component, plus recent expenses — when logged in, per
+  `docs/mvp-scope.md`'s central journey step 3.
+- `BudgetCard.svelte` factors the budget-card rendering out of
+  `routes/budgets/+page.svelte` (#52) so the home dashboard doesn't
+  duplicate it — the second consumer `docs/decisions/0001`'s design-system
+  amendment said to wait for before introducing a `Card` style.
+- Amended `docs/decisions/0001-shared-app-shell-layout.md` as #104's
+  acceptance criteria require.
+
+**How the change was verified.**
+- `npm test` in `frontend/`: 134/134 passing. Critically, this includes
+  running the **existing, unmodified** `login`/`register`/`layout` test
+  files and confirming zero regressions — in particular that
+  `layout.test.js`'s T-4b (zero fetch calls on render) and the login
+  test's exact-one-fetch-call assertion both still hold after wiring in
+  the auth store.
+- New coverage: nav rendering for both auth states and the logout flow
+  (`layout.test.js`), the home dashboard's logged-out/loading/ready/error/
+  empty states (`routes/page.test.js`), and that `routes/budgets/+page.svelte`'s
+  existing tests still pass unchanged after the `BudgetCard` extraction
+  (same markup, just factored out).
+
+**Accepted / modified / rejected.**
+- Accepted: the reload-resets-to-logged-out limitation, rather than adding
+  a `/api/auth/me/` check that would break the layout's existing
+  zero-fetch-on-render guarantee — flagged in the decision amendment for
+  the team to revisit against #26/#27, not silently worked around.
+- Rejected: wrapping the "Add budget"/"Create an account" calls-to-action
+  in a `<Button>` component — `<Button>` renders a native `<button>`, and
+  a `<button>` nested in an `<a>` (or vice versa) is invalid HTML; kept
+  these as plain anchors styled to match.
+
+**Final decision.** Issue #104's nav/dashboard slice is implemented on
+`feat/104-unify-frontend` (stacked on `feat/52-53-budget-screens`), with
+every MVP screen reachable from the shared nav and the home page replaced
+by the real summary, while explicitly leaving the mock-to-real API swap
+(#92) and the a11y/responsive passes (#64/#65) untouched.

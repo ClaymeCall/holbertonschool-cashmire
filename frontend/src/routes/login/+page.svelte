@@ -16,6 +16,7 @@
   // to change.
   import { goto } from "$app/navigation";
   import { apiFetch, ApiError } from "$lib/api";
+  import { setCurrentUser } from "$lib/stores/auth";
   import Button from "$lib/components/Button.svelte";
   import TextField from "$lib/components/TextField.svelte";
   import FormError from "$lib/components/FormError.svelte";
@@ -53,14 +54,17 @@
     errorMessage = null;
 
     try {
-      await apiFetch("/api/auth/login/", {
+      const data = await apiFetch("/api/auth/login/", {
         method: "POST",
         body: { email: email.trim(), password },
         credentials: "include",
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
-      // Successful login: the server has set a session cookie. Nothing to
-      // store client-side — redirect into the app shell (AC-3).
+      // Successful login: the server has set a session cookie. #104's nav
+      // needs to know a session now exists; `setCurrentUser` only records
+      // that in memory (no new request) — see lib/stores/auth.js for why
+      // this isn't a `/api/auth/me/` fetch.
+      setCurrentUser(data);
       await goto("/");
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {

@@ -16,9 +16,9 @@
   import { onMount } from "svelte";
   import { listBudgets } from "$lib/api/budgets";
   import { listCategories } from "$lib/api/categories";
-  import { formatAmount, percentOf, compareDecimal } from "$lib/money";
   import Button from "$lib/components/Button.svelte";
   import FormError from "$lib/components/FormError.svelte";
+  import BudgetCard from "$lib/components/BudgetCard.svelte";
 
   /** @typedef {"loading" | "ready" | "error"} ViewState */
 
@@ -30,31 +30,6 @@
   let categoryNames = $state(new Map());
   /** @type {string | null} */
   let errorMessage = $state(null);
-
-  const STATUS_META = {
-    ok: { label: "On track", className: "status-ok" },
-    warning: { label: "Approaching limit", className: "status-warning" },
-    full: { label: "Budget reached", className: "status-full" },
-    exceeded: { label: "Over budget", className: "status-exceeded" },
-  };
-
-  /**
-   * @param {import("$lib/api/budgets").Budget} budget
-   */
-  function statusMeta(budget) {
-    return STATUS_META[budget.status] ?? { label: "Unknown", className: "status-unknown" };
-  }
-
-  /**
-   * @param {import("$lib/api/budgets").Budget} budget
-   * @returns {string} e.g. "47.0" — capped at 100 for the progress bar's
-   *   width even when the budget is exceeded (the "Over budget" label,
-   *   not the bar, is what communicates overspend).
-   */
-  function percentForBar(budget) {
-    const percent = percentOf(budget.spent, budget.amount);
-    return compareDecimal(percent, "100") > 0 ? "100" : percent;
-  }
 
   async function load() {
     state = "loading";
@@ -101,30 +76,10 @@
   {:else}
     <ul class="budget-list">
       {#each budgets as budget (budget.id)}
-        {@const meta = statusMeta(budget)}
-        <li class={meta.className}>
-          <div class="budget-header">
-            <span class="category">
-              {categoryNames.get(budget.category_id) ?? "Unknown category"}
-            </span>
-            <span class="status-label">{meta.label}</span>
-          </div>
-          <p class="amounts">
-            {formatAmount(budget.spent)} spent of {formatAmount(budget.amount)}
-            ({formatAmount(budget.remaining)} remaining)
-          </p>
-          <div
-            class="progress-track"
-            role="progressbar"
-            aria-valuenow={percentForBar(budget)}
-            aria-valuemin="0"
-            aria-valuemax="100"
-            aria-label={`${categoryNames.get(budget.category_id) ?? "Budget"} consumption`}
-          >
-            <div class="progress-fill" style={`width: ${percentForBar(budget)}%`}></div>
-          </div>
-          <a href={`/budgets/${budget.id}/edit`}>Edit</a>
-        </li>
+        <BudgetCard
+          {budget}
+          categoryName={categoryNames.get(budget.category_id) ?? "Unknown category"}
+        />
       {/each}
     </ul>
   {/if}
@@ -169,69 +124,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-md);
-  }
-
-  .budget-list li {
-    border: 1px solid var(--color-border-subtle);
-    border-left-width: 4px;
-    border-radius: var(--radius-sm);
-    padding: var(--space-md) var(--space-lg);
-  }
-
-  .budget-header {
-    display: flex;
-    justify-content: space-between;
-    gap: var(--space-lg);
-    font-weight: 600;
-  }
-
-  .amounts {
-    margin: var(--space-xs) 0 var(--space-sm);
-  }
-
-  .progress-track {
-    height: 0.6rem;
-    border-radius: var(--radius-sm);
-    background: var(--color-border-subtle);
-    overflow: hidden;
-    margin-bottom: var(--space-sm);
-  }
-
-  .progress-fill {
-    height: 100%;
-    background: currentColor;
-  }
-
-  /* Color never carries the status alone — the text label next to it does
-     the real work (docs/mvp-scope.md §3.7). These classes only tint the
-     card's border/accent and the progress fill. */
-  .status-ok {
-    border-left-color: var(--color-success-border);
-    color: var(--color-success-border);
-  }
-
-  .status-warning {
-    border-left-color: var(--color-warning-border);
-    color: var(--color-warning-border);
-  }
-
-  .status-full {
-    border-left-color: var(--color-full-border);
-    color: var(--color-full-border);
-  }
-
-  .status-exceeded {
-    border-left-color: var(--color-error-border);
-    color: var(--color-error-border);
-  }
-
-  .status-unknown {
-    border-left-color: var(--color-border);
-    color: var(--color-muted-text);
-  }
-
-  .status-label {
-    font-size: var(--font-size-sm);
   }
 
   a {
