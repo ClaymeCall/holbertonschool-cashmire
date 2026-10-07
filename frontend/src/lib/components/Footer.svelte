@@ -3,12 +3,13 @@
   // componentization follow-up). Self-contained: no props, just the
   // site-wide link to /privacy required by issue #63 (AC-5) and the
   // API health link.
+  import { Shield, Activity } from "@lucide/svelte";
   import textureTile from "$lib/images/cashmere-texture-tile.webp";
 </script>
 
 <footer style="--texture-photo: url({textureTile})">
-  <a href="/privacy">Privacy &amp; legal</a>
-  <a href="/health">API health</a>
+  <a href="/privacy"><Shield size={14} /> Privacy &amp; legal</a>
+  <a href="/health"><Activity size={14} /> API health</a>
 </footer>
 
 <style>
@@ -34,6 +35,9 @@
   }
 
   footer a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
     color: var(--color-primary);
   }
 </style>

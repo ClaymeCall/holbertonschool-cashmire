@@ -6,6 +6,7 @@
   // split out for file-size reasons. Each preview is capped at 3 items and
   // links through to its full route rather than paginating here.
   import { onMount } from "svelte";
+  import { ArrowRight } from "@lucide/svelte";
   import { apiFetch } from "$lib/api";
   import heroImage from "$lib/images/cashmere-hero.webp";
   import { authState } from "$lib/auth.svelte.js";
@@ -40,7 +41,7 @@
     <section class="preview" aria-labelledby="expenses-preview-heading">
       <div class="preview-header">
         <h2 id="expenses-preview-heading">Recent expenses</h2>
-        <a href="/expenses">View all</a>
+        <a href="/expenses">View all <ArrowRight size={14} /></a>
       </div>
       <ExpensesList limit={PREVIEW_LIMIT} />
     </section>
@@ -48,7 +49,7 @@
     <section class="preview" aria-labelledby="budgets-preview-heading">
       <div class="preview-header">
         <h2 id="budgets-preview-heading">Your budgets</h2>
-        <a href="/budgets">View all</a>
+        <a href="/budgets">View all <ArrowRight size={14} /></a>
       </div>
       <BudgetsList limit={PREVIEW_LIMIT} />
     </section>
@@ -111,6 +112,9 @@
   }
 
   .preview-header a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
     font-size: var(--font-size-sm);
     color: var(--color-primary);
   }

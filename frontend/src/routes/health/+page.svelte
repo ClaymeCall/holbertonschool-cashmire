@@ -6,6 +6,7 @@
   // "loading" state inside this page, and would route failures through
   // SvelteKit's error boundary instead of this component's error state).
   import { onMount } from "svelte";
+  import { CircleCheck, CircleX } from "@lucide/svelte";
 
   /**
    * Body returned by GET /api/health/.
@@ -147,7 +148,7 @@
       <p class="url-line">Calling <code>{requestUrl}</code></p>
     {:else if uiState === "success"}
       <p class="state state-success">
-        <span class="glyph" aria-hidden="true">✓</span>
+        <CircleCheck size={18} />
         <strong>API is reachable</strong>
       </p>
       <p>Reported status: {health.status}</p>
@@ -160,7 +161,7 @@
       <pre>{JSON.stringify(health, null, 2)}</pre>
     {:else if uiState === "error"}
       <p class="state state-error">
-        <span class="glyph" aria-hidden="true">✕</span>
+        <CircleX size={18} />
         <strong>API check failed</strong>
       </p>
       <p>{errorMessage}</p>
@@ -196,28 +197,38 @@
     overflow-wrap: anywhere;
   }
 
+  .state-loading,
+  .state-success,
+  .state-error {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-sm);
+  }
+
+  .state-loading :global(svg),
+  .state-success :global(svg),
+  .state-error :global(svg) {
+    flex-shrink: 0;
+  }
+
   .state-loading {
     color: var(--color-text-muted);
     background: var(--color-oatmeal);
     border-left: 4px solid var(--color-border-subtle);
-    padding: var(--space-sm) var(--space-md);
-    border-radius: var(--radius-sm);
   }
 
   .state-success {
     color: var(--color-success-text);
     background: var(--color-success-bg);
     border-left: 4px solid var(--color-success-border);
-    padding: var(--space-sm) var(--space-md);
-    border-radius: var(--radius-sm);
   }
 
   .state-error {
     color: var(--color-error-text);
     background: var(--color-error-bg);
     border-left: 4px solid var(--color-error-border);
-    padding: var(--space-sm) var(--space-md);
-    border-radius: var(--radius-sm);
   }
 
   .url-line code {

@@ -14,6 +14,15 @@
   // for exactly this (see its file-top comment) — that's display
   // arithmetic, not the ok/warning/full/exceeded decision itself.
   import { onMount } from "svelte";
+  import {
+    CircleCheck,
+    TriangleAlert,
+    CircleAlert,
+    CircleX,
+    CircleHelp,
+    Pencil,
+    RefreshCw,
+  } from "@lucide/svelte";
   import { listBudgets } from "$lib/api/budgets";
   import { listCategories } from "$lib/api/categories";
   import { formatAmount, percentOf, compareDecimal } from "$lib/money";
@@ -44,18 +53,27 @@
     typeof limit === "number" ? budgets.slice(0, limit) : budgets,
   );
 
+  // Icon always paired with the text label, never alone — color is never
+  // the sole carrier of status either (docs/mvp-scope.md §3.7); the icon
+  // is a second, non-color channel reinforcing the same label.
   const STATUS_META = {
-    ok: { label: "On track", className: "status-ok" },
-    warning: { label: "Approaching limit", className: "status-warning" },
-    full: { label: "Budget reached", className: "status-full" },
-    exceeded: { label: "Over budget", className: "status-exceeded" },
+    ok: { label: "On track", className: "status-ok", icon: CircleCheck },
+    warning: { label: "Approaching limit", className: "status-warning", icon: TriangleAlert },
+    full: { label: "Budget reached", className: "status-full", icon: CircleAlert },
+    exceeded: { label: "Over budget", className: "status-exceeded", icon: CircleX },
   };
 
   /**
    * @param {import("$lib/api/budgets").Budget} budget
    */
   function statusMeta(budget) {
-    return STATUS_META[budget.status] ?? { label: "Unknown", className: "status-unknown" };
+    return (
+      STATUS_META[budget.status] ?? {
+        label: "Unknown",
+        className: "status-unknown",
+        icon: CircleHelp,
+      }
+    );
   }
 
   /**
@@ -94,7 +112,7 @@
   <p role="status">Loading your budgets…</p>
 {:else if state === "error"}
   <FormError messages={errorMessage ? [errorMessage] : []} />
-  <Button type="button" onclick={load}>Retry</Button>
+  <Button type="button" onclick={load}><RefreshCw size={16} /> Retry</Button>
 {:else if visibleBudgets.length === 0}
   <p>
     No budgets yet. <a href="/budgets/new">Set a monthly limit for a category</a>
@@ -109,7 +127,7 @@
           <span class="category">
             {categoryNames.get(budget.category_id) ?? "Unknown category"}
           </span>
-          <span class="status-label">{meta.label}</span>
+          <span class="status-label"><meta.icon size={16} /> {meta.label}</span>
         </div>
         <p class="amounts">
           {formatAmount(budget.spent)} spent of {formatAmount(budget.amount)}
@@ -125,7 +143,7 @@
         >
           <div class="progress-fill" style={`width: ${percentForBar(budget)}%`}></div>
         </div>
-        <a href={`/budgets/${budget.id}/edit`}>Edit</a>
+        <a href={`/budgets/${budget.id}/edit`}><Pencil size={14} /> Edit</a>
       </li>
     {/each}
   </ul>
@@ -201,10 +219,16 @@
   }
 
   .status-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
     font-size: var(--font-size-sm);
   }
 
   a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
     color: var(--color-primary);
   }
 

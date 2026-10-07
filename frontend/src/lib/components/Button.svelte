@@ -27,6 +27,10 @@
      decorative `--color-camel` token; see tokens.css's header comment for
      why (plain Camel fails contrast with Ivory text). */
   button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
     font-family: var(--font-body);
     font-size: var(--font-size-base);
     font-weight: 500;

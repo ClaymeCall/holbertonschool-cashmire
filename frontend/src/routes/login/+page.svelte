@@ -15,6 +15,7 @@
   // — if it lands on a different mechanism, this call site is the one place
   // to change.
   import { goto } from "$app/navigation";
+  import { LogIn, LoaderCircle } from "@lucide/svelte";
   import { apiFetch, ApiError } from "$lib/api";
   import { setCurrentUser } from "$lib/auth.svelte.js";
   import Button from "$lib/components/Button.svelte";
@@ -125,7 +126,11 @@
     {/if}
 
     <Button type="submit" disabled={formState === "submitting"}>
-      {formState === "submitting" ? "Logging in…" : "Log in"}
+      {#if formState === "submitting"}
+        <LoaderCircle size={16} class="spin" /> Logging in…
+      {:else}
+        <LogIn size={16} /> Log in
+      {/if}
     </Button>
   </form>
 
@@ -148,5 +153,21 @@
 
   a {
     color: var(--color-primary);
+  }
+
+  /* `:global` because the LoaderCircle icon's <svg> is rendered inside
+     @lucide/svelte's own Icon.svelte, not this component's template — a
+     plain `.spin` rule here would never match it (Svelte's style scoping
+     only tags elements written directly in this file). Respects
+     prefers-reduced-motion via base.css's blanket
+     `animation-duration: 0.01ms !important` rule. */
+  :global(.spin) {
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 </style>

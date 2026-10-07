@@ -24,6 +24,17 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
+  import {
+    House,
+    Receipt,
+    Wallet,
+    Shield,
+    LogIn,
+    UserPlus,
+    LogOut,
+    Menu,
+    X,
+  } from "@lucide/svelte";
   import textureTile from "$lib/images/cashmere-texture-tile.webp";
   import { authState, refreshCurrentUser, setCurrentUser } from "$lib/auth.svelte.js";
   import { apiFetch } from "$lib/api";
@@ -36,17 +47,23 @@
   // them land on a page that can only show its own generic 401 error.
   // Login/Register only make sense to show when nobody is logged in —
   // otherwise they're replaced by the "Log out" action further down.
+  //
+  // Icons are decorative, paired with the label text rather than replacing
+  // it (issue #104 icon pass) — `aria-hidden` is applied automatically by
+  // @lucide/svelte whenever an icon has no accessible-name prop of its own
+  // (see its Icon.svelte), so each link's accessible name still comes from
+  // its visible text alone.
   const navLinks = $derived([
-    { href: "/", label: "Home" },
-    { href: "/expenses", label: "Expenses", protected: true },
-    { href: "/budgets", label: "Budgets", protected: true },
+    { href: "/", label: "Home", icon: House },
+    { href: "/expenses", label: "Expenses", icon: Receipt, protected: true },
+    { href: "/budgets", label: "Budgets", icon: Wallet, protected: true },
     ...(authState.status === "authenticated"
       ? []
       : [
-          { href: "/login", label: "Log in" },
-          { href: "/register", label: "Register" },
+          { href: "/login", label: "Log in", icon: LogIn },
+          { href: "/register", label: "Register", icon: UserPlus },
         ]),
-    { href: "/privacy", label: "Privacy" },
+    { href: "/privacy", label: "Privacy", icon: Shield },
   ]);
 
   /**
@@ -111,9 +128,13 @@
       aria-label={menuOpen ? "Close menu" : "Open menu"}
       onclick={() => (menuOpen = !menuOpen)}
     >
-      <span class="menu-toggle-bar"></span>
-      <span class="menu-toggle-bar"></span>
-      <span class="menu-toggle-bar"></span>
+      <!-- Icon-only: the button's own aria-label above is the accessible
+           name, so the icon swap (Menu/X) is purely visual. -->
+      {#if menuOpen}
+        <X size={22} />
+      {:else}
+        <Menu size={22} />
+      {/if}
     </button>
     <nav aria-label="Main" id="main-nav" class:open={menuOpen}>
       <ul>
@@ -124,6 +145,7 @@
               aria-current={$page?.url?.pathname === link.href ? "page" : undefined}
               onclick={(event) => handleNavClick(event, link)}
             >
+              <link.icon size={16} />
               {link.label}
             </a>
           </li>
@@ -139,6 +161,7 @@
                 handleLogout();
               }}
             >
+              <LogOut size={16} />
               {loggingOut ? "Logging out…" : "Log out"}
             </button>
           </li>
@@ -185,29 +208,21 @@
 
   .menu-toggle {
     display: none;
-    flex-direction: column;
+    align-items: center;
     justify-content: center;
-    gap: 5px;
     width: 2.25rem;
     height: 2.25rem;
     padding: 5px;
     border: none;
     border-radius: var(--radius-sm);
     background: transparent;
+    color: var(--color-primary);
     cursor: pointer;
     transition: background-color var(--motion-duration) var(--motion-ease);
   }
 
   .menu-toggle:hover {
     background-color: var(--color-oatmeal);
-  }
-
-  .menu-toggle-bar {
-    display: block;
-    width: 100%;
-    height: 2px;
-    border-radius: var(--radius-full);
-    background-color: var(--color-primary);
   }
 
   nav ul {
@@ -235,13 +250,20 @@
        with identical padding, the inline <a> still rendered ~4px shorter
        than the button (inline elements' vertical padding doesn't expand
        their box the same way), making the pills visibly different sizes.
-       Forcing both to the same display mode fixes that. */
-    display: inline-block;
+       Forcing both to the same display mode (now `inline-flex`, to lay
+       out each link/button's icon next to its label) fixes that. */
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
     padding: var(--space-xs) var(--space-sm);
     border-radius: var(--radius-full);
     text-decoration: none;
     transition: background-color var(--motion-duration) var(--motion-ease),
       color var(--motion-duration) var(--motion-ease);
+  }
+
+  nav :global(svg) {
+    flex-shrink: 0;
   }
 
   nav a:hover,

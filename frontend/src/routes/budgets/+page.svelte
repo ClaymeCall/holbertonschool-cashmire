@@ -3,6 +3,7 @@
   // `$lib/components/BudgetsList.svelte` (issue #104 componentization
   // follow-up); this route just supplies the page chrome (title, heading,
   // "Add budget" link) around it.
+  import { Plus } from "@lucide/svelte";
   import BudgetsList from "$lib/components/BudgetsList.svelte";
 </script>
 
@@ -14,7 +15,7 @@
 <main>
   <div class="header-row">
     <h1>Budgets</h1>
-    <a class="button-link" href="/budgets/new">Add budget</a>
+    <a class="button-link" href="/budgets/new"><Plus size={16} /> Add budget</a>
   </div>
 
   <BudgetsList />
@@ -37,7 +38,9 @@
   }
 
   .button-link {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
     font-size: var(--font-size-base);
     padding: var(--space-sm) var(--space-lg);
     border-radius: var(--radius-sm);

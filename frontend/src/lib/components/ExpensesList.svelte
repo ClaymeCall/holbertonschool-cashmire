@@ -14,6 +14,7 @@
   // Deleting an expense is issue #42's scope (confirmation flow), not this
   // one — only "Edit" is offered here.
   import { onMount } from "svelte";
+  import { Calendar, Pencil, RefreshCw } from "@lucide/svelte";
   import { listExpenses } from "$lib/api/expenses";
   import { listCategories } from "$lib/api/categories";
   import { formatAmount } from "$lib/money";
@@ -69,7 +70,7 @@
   <p role="status">Loading your expenses…</p>
 {:else if state === "error"}
   <FormError messages={errorMessage ? [errorMessage] : []} />
-  <Button type="button" onclick={load}>Retry</Button>
+  <Button type="button" onclick={load}><RefreshCw size={16} /> Retry</Button>
 {:else if visibleExpenses.length === 0}
   <p>No expenses yet. <a href="/expenses/new">Add your first one</a>.</p>
 {:else}
@@ -81,12 +82,12 @@
           <span class="category">
             {categoryNames.get(expense.category_id) ?? "Unknown category"}
           </span>
-          <span class="date">{expense.date}</span>
+          <span class="date"><Calendar size={14} /> {expense.date}</span>
         </div>
         {#if expense.description}
           <p class="description">{expense.description}</p>
         {/if}
-        <a href={`/expenses/${expense.id}/edit`}>Edit</a>
+        <a href={`/expenses/${expense.id}/edit`}><Pencil size={14} /> Edit</a>
       </li>
     {/each}
   </ul>
@@ -124,6 +125,9 @@
   }
 
   .date {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
     color: var(--color-muted-text);
     margin-left: auto;
   }
@@ -133,6 +137,9 @@
   }
 
   a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
     color: var(--color-primary);
   }
 
