@@ -35,6 +35,15 @@ body {
   font-family: var(--font-body);
   font-size: var(--font-size-base);
   line-height: var(--line-height-body);
+  /* Sticky footer: app.html's SvelteKit mount point is a `display: contents`
+     div, so +layout.svelte's <header>, page content and <footer> become
+     direct flex children of body here. Paired with that footer's own
+     `margin-top: auto` (+layout.svelte), this keeps the footer pinned to
+     the viewport bottom on short pages while still flowing below content
+     that's taller than the viewport. */
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 
 h1,

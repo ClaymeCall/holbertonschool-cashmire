@@ -267,6 +267,11 @@
   }
 
   footer {
+    /* Sticky footer: pushed to the bottom of a short page by consuming
+       all free space in body's column flex (base.css); has no effect
+       once content is taller than the viewport, where it flows below it
+       as normal. */
+    margin-top: auto;
     padding: var(--space-lg) var(--space-xl);
     border-top: 1px dashed var(--color-border-subtle);
     background-color: var(--color-surface);
