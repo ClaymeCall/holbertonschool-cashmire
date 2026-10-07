@@ -1,9 +1,12 @@
+from datetime import date
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from .models import Category, DEFAULT_CATEGORIES
+from .models import Category, DEFAULT_CATEGORIES, Expense
 
 
 User = get_user_model()
@@ -80,3 +83,52 @@ class CategoryListTests(TestCase):
                 user=self.user,
                 name=DEFAULT_CATEGORIES[0][0],
             )
+
+
+class ExpenseModelTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="expense-owner",
+            email="expense-owner@example.com",
+            password="test-password",
+        )
+        self.category = self.user.categories.first()
+
+    def test_expense_persists_money_as_decimal_with_required_relations(self):
+        expense = Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("15.50"),
+            description="Market",
+            date=date(2026, 10, 7),
+        )
+
+        expense.refresh_from_db()
+
+        self.assertIsInstance(expense.amount, Decimal)
+        self.assertEqual(expense.amount, Decimal("15.50"))
+        self.assertEqual(expense.user, self.user)
+        self.assertEqual(expense.category, self.category)
+        self.assertEqual(expense.description, "Market")
+        self.assertEqual(expense.date, date(2026, 10, 7))
+
+    def test_database_rejects_non_positive_expense_amounts(self):
+        for amount in (Decimal("0.00"), Decimal("-0.01")):
+            with self.subTest(amount=amount):
+                with self.assertRaises(IntegrityError), transaction.atomic():
+                    Expense.objects.create(
+                        user=self.user,
+                        category=self.category,
+                        amount=amount,
+                        date=date(2026, 10, 7),
+                    )
+
+    def test_database_enforces_category_foreign_key(self):
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Expense.objects.create(
+                user=self.user,
+                category_id=99999999,
+                amount=Decimal("1.00"),
+                date=date(2026, 10, 7),
+            )
+            connection.check_constraints(table_names=["api_expense"])
