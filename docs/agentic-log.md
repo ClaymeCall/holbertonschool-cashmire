@@ -1113,3 +1113,101 @@ agent run is claimed.
 commands to recreate PostgreSQL and apply all committed migrations from
 empty. The procedure was verified against an isolated fresh database; no
 existing local database was deleted.
+
+## 2026-10-07 — Add reusable session authentication and current-user endpoint (Issue #26)
+
+**Objective.** Provide a shared DRF session-authentication guard that resolves
+the user from Django's session, returns 401 for anonymous requests, and can be
+reused by function- and class-based protected views.
+
+**Agent/role used.** Copilot-assisted implementation on the authentication
+stack from issue #24. No specialized agent run is claimed.
+
+**What was delegated.** Nothing.
+
+**Main proposal.** Add a common `SessionAuthenticatedAPIView` base class and
+`session_authenticated_api_view` decorator, backed by one session
+authentication class and `IsAuthenticated` permission. Use them for the
+logout and current-user views, and expose `GET /api/auth/me/` using the
+existing read-only `UserSerializer`.
+
+**How the change was verified.**
+- Ran `docker compose -p cashmire-issue26-test run --rm api python manage.py
+  test api`: all 27 API tests pass, including anonymous 401, authenticated
+  session user serialization, Basic authentication rejection, and logout
+  CSRF/session behavior.
+- Ran `docker compose -p cashmire-issue26-test run --rm api python manage.py
+  check`: no system-check issues.
+- Called `GET /api/auth/me/` with `curl` and no session; received 401,
+  `WWW-Authenticate: Session`, and the expected JSON error.
+- Generated the OpenAPI schema; the custom session cookie authenticator is
+  described as a cookie security scheme. Existing health/logout serializer
+  generation errors remain outside this issue.
+- Removed only the isolated Compose verification volumes and networks.
+
+**Accepted / modified / rejected.**
+- Accepted: Use Django sessions, not Basic or JWT, per decision 0003.
+- Modified: Provide both a function-view decorator and a class-view base so
+  future expense and budget endpoints can share the guard without repeating
+  authentication configuration.
+- Rejected: Duplicating user fields or exposing password data; the existing
+  `UserSerializer` defines the response shape.
+
+**Final decision.** Protected endpoints now share one session-authentication
+implementation, anonymous access returns 401, and `GET /api/auth/me/` returns
+only the authenticated user's public fields.
+
+## 2026-10-08 — Rebase conflict resolution: fix `tests.py`/`tests/` module shadow
+
+**Objective.** Resolve the multi-commit rebase of
+`feat/50-budget-consumption-service` onto `main` (bdf9b9b), replaying
+registration, login, logout, health-check, database-recreation, and
+current-user commits on top of the budget consumption work.
+
+**Agent/role used.** Claude Code-assisted conflict resolution. No
+specialized agent run is claimed.
+
+**What was delegated.** Nothing — resolved interactively, commit by commit.
+
+**Main proposal.** Most conflicts in `docs/agentic-log.md` were pure
+append-only positional conflicts (two branches adding entries at the same
+line): resolved by keeping both sides' entries in chronological order.
+`backend/api/{urls,views}.py` conflicts were resolved the same way —
+additive route/view blocks kept from both sides, with import lines merged
+by hand.
+
+One conflict was not purely cosmetic: resolving the registration commit's
+test-restructuring (`backend/api/tests/` package with
+`test_registration.py`, `test_login.py`, etc.) left both that package and
+the pre-existing `backend/api/tests.py` module on disk simultaneously.
+Python/Django only discovers one of the two when both exist beside each
+other — the package shadows the module — so every test class that lived in
+`tests.py` (health check, categories, expenses, budgets, CSRF trusted
+origins) would have silently stopped running. This was caught by comparing
+against the original (pre-rebase) branch history, where a later merge
+commit's log entry explicitly described moving `tests.py`'s coverage into
+the `tests/` package for exactly this reason.
+
+**How the change was verified.**
+- `git mv backend/api/tests.py backend/api/tests/test_core.py`, then fixed
+  its now-one-level-deeper relative import (`.models` → `..models`); its one
+  other import (`api.services.budget_consumption`) was already absolute and
+  needed no change.
+- `python3 -m py_compile` on every conflict-touched file
+  (`backend/api/{urls,views}.py`, `backend/api/tests/test_core.py`).
+- Grepped for leftover `<<<<<<<`/`=======`/`>>>>>>>`/`|||||||` markers after
+  every resolved file.
+
+**Accepted / modified / rejected.**
+- Accepted: keep both sides for every additive conflict (routes, views, log
+  entries) rather than picking one.
+- Rejected: including the orphaned "Integrate session-auth endpoints with
+  main" log entry inherited from a merge commit (`ac3350c`) that this linear
+  rebase does not replay — its described actions (a `main` merge, "53 API
+  tests pass") don't match what this rebase actually did, so keeping it
+  would have misrepresented the history.
+
+**Final decision.** The rebase completed with all tests discoverable from
+one `backend/api/tests/` package and no shadowing `tests.py` module. Running
+the full backend test suite after the rebase remains a human follow-up, the
+same caveat this log has flagged after every prior rebase/merge step.

@@ -10,7 +10,7 @@ from django.middleware.csrf import get_token
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
-from .models import Budget, Category, DEFAULT_CATEGORIES, Expense
+from ..models import Budget, Category, DEFAULT_CATEGORIES, Expense
 
 
 User = get_user_model()
