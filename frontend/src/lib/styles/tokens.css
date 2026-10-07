@@ -83,6 +83,18 @@
   --color-success-bg: var(--color-income-bg);
   --color-success-border: var(--color-income-border);
 
+  /* Added for the budget dashboard (#52)'s four-status table
+     (docs/decisions/budget-thresholds.md): `full` needs a color distinct
+     from both `warning` (ochre) and `exceeded`/error (overspend red).
+     Values follow this file's existing dark-text/pale-bg/mid-border
+     pattern for semantic trios rather than the saturated placeholder hex
+     budget-thresholds.md's author used before the #104 palette overhaul
+     landed. WCAG-checked: text-on-bg ~8.0:1 (AAA), border-on-bg ~3.8:1
+     (matches --color-overspend-border's own ~3.9:1). */
+  --color-full-text: #6b3410;
+  --color-full-bg: #f8e4d2;
+  --color-full-border: #a8632a;
+
   /* ---- Typography ---- */
   --font-heading: "Fraunces", "Iowan Old Style", Georgia, serif;
   --font-mono: "IBM Plex Mono", "Geist Mono", ui-monospace, Menlo, monospace;
