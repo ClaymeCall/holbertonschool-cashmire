@@ -739,3 +739,27 @@ none have a screen or asset pipeline to attach to yet.
 every screen that exists on `main` today, with the remaining #104
 acceptance criteria (nav expansion, auth-aware nav, dashboard home)
 explicitly left open pending #40/#41/#52/#53.
+
+## 2026-10-07 — Integrate session-auth endpoints with main
+
+**Objective.** Bring the registration, login, and logout endpoints from
+`feat/20-user-model` onto current `main`, resolve API-file conflicts, and
+preserve a single discoverable Django test package.
+
+**Main proposal.** Merge current `main` into the auth foundation branch,
+retain both authentication and expense/category routes, and move the existing
+`api/tests.py` coverage into `api/tests/test_expenses.py` beside the
+registration/login/logout modules.
+
+**How the change was verified.**
+- `docker compose -p cashmire-pr120-foundation run --rm api python manage.py
+  test api`: all 53 API tests pass.
+- `python manage.py check` reports no issues.
+- `python manage.py makemigrations api --check --dry-run` reports no model
+  or migration drift.
+- The isolated Compose resources were removed; the regular development
+  database was not modified.
+
+**Final decision.** The auth endpoints and current main functionality
+coexist, and all API tests are discoverable from one `backend/api/tests/`
+package without a shadowing `tests.py` module.
