@@ -1713,6 +1713,114 @@ class BudgetConsumptionServiceTests(TestCase):
         # Verify they're different
         self.assertNotEqual(consumption1.spent, consumption2.spent)
 
+    # ===== T-28 to T-35: status field (docs/decisions/budget-thresholds.md §2) =====
+    #
+    # The service originally shipped (issue #50) without a `status` field at
+    # all, despite the decision document it's supposed to implement defining
+    # one — caught while testing the merged budget stack end-to-end (issue
+    # #104 nav follow-up), not by the original review. These are the
+    # decision's own table and boundary rules, directly against the service.
+
+    def _budget(self, amount, alert_threshold=None):
+        return Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal(amount),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+            alert_threshold=Decimal(alert_threshold) if alert_threshold is not None else None,
+        )
+
+    def _spend(self, budget, amount):
+        Expense.objects.create(
+            user=self.user,
+            category=budget.category,
+            amount=Decimal(amount),
+            date=date(2026, 10, 15),
+        )
+
+    def test_status_ok_below_threshold(self):
+        """T-28: percentage < threshold -> "ok"."""
+        calculate_consumption, _ = self._import_service()
+        budget = self._budget("100.00")
+        self._spend(budget, "79.99")
+
+        self.assertEqual(calculate_consumption(budget).status, "ok")
+
+    def test_status_warning_at_exact_threshold(self):
+        """T-29: percentage == threshold -> "warning" (lower bound inclusive,
+        default threshold is 80%)."""
+        calculate_consumption, _ = self._import_service()
+        budget = self._budget("100.00")
+        self._spend(budget, "80.00")
+
+        self.assertEqual(calculate_consumption(budget).status, "warning")
+
+    def test_status_warning_between_threshold_and_100(self):
+        """T-30: threshold <= percentage < 100 -> "warning"."""
+        calculate_consumption, _ = self._import_service()
+        budget = self._budget("100.00")
+        self._spend(budget, "95.00")
+
+        self.assertEqual(calculate_consumption(budget).status, "warning")
+
+    def test_status_full_at_exactly_100_percent(self):
+        """T-31: spent == amount -> "full", not "exceeded" — the decision is
+        explicit that exactly reaching the budget is not a overspend."""
+        calculate_consumption, _ = self._import_service()
+        budget = self._budget("100.00")
+        self._spend(budget, "100.00")
+
+        self.assertEqual(calculate_consumption(budget).status, "full")
+
+    def test_status_exceeded_above_100_percent(self):
+        """T-32: spent > amount -> "exceeded"."""
+        calculate_consumption, _ = self._import_service()
+        budget = self._budget("100.00")
+        self._spend(budget, "100.01")
+
+        self.assertEqual(calculate_consumption(budget).status, "exceeded")
+
+    def test_status_defaults_to_80_percent_threshold_when_null(self):
+        """T-33: alert_threshold NULL -> service applies the 80% default."""
+        calculate_consumption, _ = self._import_service()
+        budget = self._budget("100.00", alert_threshold=None)
+        self._spend(budget, "80.00")
+
+        self.assertEqual(calculate_consumption(budget).status, "warning")
+
+    def test_status_custom_threshold_respected(self):
+        """T-34: a budget's own alert_threshold overrides the 80% default."""
+        calculate_consumption, _ = self._import_service()
+        budget = self._budget("100.00", alert_threshold="50.00")
+        self._spend(budget, "60.00")
+
+        self.assertEqual(calculate_consumption(budget).status, "warning")
+
+    def test_status_threshold_100_skips_warning_entirely(self):
+        """T-35: alert_threshold == 100 -> warning is unreachable; status
+        goes straight from "ok" to "full"/"exceeded", per the decision's
+        own note ("si alert_threshold = 100, le statut warning est vide")."""
+        calculate_consumption, _ = self._import_service()
+        budget = self._budget("100.00", alert_threshold="100.00")
+        self._spend(budget, "99.99")
+
+        self.assertEqual(calculate_consumption(budget).status, "ok")
+
+    def test_status_matches_between_single_and_batch_calculation(self):
+        """T-36: calculate_consumption and calculate_consumption_batch agree
+        on status for the same budget — the list endpoint uses the batch
+        path, the create/update endpoints use the single path."""
+        calculate_consumption, calculate_consumption_batch = self._import_service()
+        budget = self._budget("100.00")
+        self._spend(budget, "85.00")
+
+        single = calculate_consumption(budget)
+        batch = calculate_consumption_batch([budget])[budget.id]
+
+        self.assertEqual(single.status, "warning")
+        self.assertEqual(single.status, batch.status)
+
 
 class BudgetListTests(TestCase):
     """Tests for GET /api/budgets/ endpoint."""
@@ -1811,9 +1919,11 @@ class BudgetListTests(TestCase):
         self.assertIn("spent", budget_data)
         self.assertIn("remaining", budget_data)
         self.assertIn("percentage", budget_data)
+        self.assertIn("status", budget_data)
         self.assertEqual(budget_data["spent"], "234.50")
         self.assertEqual(budget_data["remaining"], "265.50")
         self.assertEqual(budget_data["percentage"], "46.90")
+        self.assertEqual(budget_data["status"], "ok")
 
     def test_budget_list_monetary_fields_are_strings(self):
         """Test that monetary fields are serialized as decimal strings."""
@@ -1868,6 +1978,7 @@ class BudgetListTests(TestCase):
             "spent",
             "remaining",
             "percentage",
+            "status",
             "created_at",
             "updated_at",
         }
@@ -2700,6 +2811,7 @@ class BudgetUpdateEndpointTests(TestCase):
             "spent",
             "remaining",
             "percentage",
+            "status",
             "created_at",
             "updated_at",
         }

@@ -9,6 +9,8 @@ from api.models import Budget, Expense
 
 QUANT = Decimal("0.01")
 
+DEFAULT_ALERT_THRESHOLD = Decimal("80.00")
+
 
 @dataclass
 class BudgetConsumption:
@@ -24,6 +26,11 @@ class BudgetConsumption:
                    Can be negative if spent > amount (Decimal, 2 places).
         percentage: Consumption as a percentage ((spent / amount) * 100).
                    Not capped at 100, allowing over-budget detection (Decimal, 2 places).
+        status: One of "ok", "warning", "full", "exceeded" — see
+                docs/decisions/budget-thresholds.md §2. Computed from the
+                unrounded `spent`/`amount`/`alert_threshold` Decimals, per
+                that decision's §3 ("sans arrondi préalable"), not from the
+                already-quantized `percentage` field above.
 
     Note:
         This object represents a snapshot of consumption at calculation time.
@@ -33,6 +40,30 @@ class BudgetConsumption:
     spent: Decimal
     remaining: Decimal
     percentage: Decimal
+    status: str
+
+
+def _compute_status(spent: Decimal, amount: Decimal, alert_threshold) -> str:
+    """
+    Status per docs/decisions/budget-thresholds.md §2's table, evaluated in
+    that order (each condition assumes the ones above it are false):
+      - exceeded: spent > amount
+      - full:     spent == amount
+      - warning:  spent >= amount * threshold / 100 (threshold's lower
+                  bound is inclusive)
+      - ok:       otherwise
+
+    `alert_threshold` defaults to 80.00 when `None` (`Budget.alert_threshold`
+    is nullable; the decision names 80% as the system default for that case).
+    """
+    threshold = alert_threshold if alert_threshold is not None else DEFAULT_ALERT_THRESHOLD
+    if spent > amount:
+        return "exceeded"
+    if spent == amount:
+        return "full"
+    if spent >= amount * threshold / 100:
+        return "warning"
+    return "ok"
 
 
 def calculate_consumption(budget: Budget) -> BudgetConsumption:
@@ -75,6 +106,8 @@ def calculate_consumption(budget: Budget) -> BudgetConsumption:
     remaining = budget.amount - spent
     percentage = (spent / budget.amount * 100) if budget.amount > 0 else Decimal("0.00")
 
+    status = _compute_status(spent, budget.amount, budget.alert_threshold)
+
     # Quantize all values to 2 decimal places
     spent = spent.quantize(QUANT)
     remaining = remaining.quantize(QUANT)
@@ -84,6 +117,7 @@ def calculate_consumption(budget: Budget) -> BudgetConsumption:
         spent=spent,
         remaining=remaining,
         percentage=percentage,
+        status=status,
     )
 
 
@@ -152,6 +186,8 @@ def calculate_consumption_batch(budgets: Iterable[Budget]) -> Dict[int, BudgetCo
             (spent / budget.amount * 100) if budget.amount > 0 else Decimal("0.00")
         )
 
+        status = _compute_status(spent, budget.amount, budget.alert_threshold)
+
         # Quantize all values to 2 decimal places
         spent = spent.quantize(QUANT)
         remaining = remaining.quantize(QUANT)
@@ -161,6 +197,7 @@ def calculate_consumption_batch(budgets: Iterable[Budget]) -> Dict[int, BudgetCo
             spent=spent,
             remaining=remaining,
             percentage=percentage,
+            status=status,
         )
 
     return results

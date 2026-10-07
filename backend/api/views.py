@@ -417,6 +417,7 @@ class BudgetWithConsumptionSerializer(serializers.ModelSerializer):
     spent = serializers.SerializerMethodField()
     remaining = serializers.SerializerMethodField()
     percentage = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
 
     class Meta:
         model = Budget
@@ -431,6 +432,7 @@ class BudgetWithConsumptionSerializer(serializers.ModelSerializer):
             "spent",
             "remaining",
             "percentage",
+            "status",
             "created_at",
             "updated_at",
         ]
@@ -456,6 +458,18 @@ class BudgetWithConsumptionSerializer(serializers.ModelSerializer):
         if obj.id in consumption_data:
             return str(consumption_data[obj.id].percentage)
         return "0.00"
+
+    def get_status(self, obj):
+        """Return status ("ok"/"warning"/"full"/"exceeded") from
+        consumption_data if available — see
+        docs/decisions/budget-thresholds.md §2 and
+        api.services.budget_consumption._compute_status. Falls back to
+        "ok" alongside this class's other no-consumption-data fallbacks
+        (0.00 spent, full amount remaining)."""
+        consumption_data = self.context.get("consumption_data", {})
+        if obj.id in consumption_data:
+            return consumption_data[obj.id].status
+        return "ok"
 
 
 class BudgetListSerializer(serializers.Serializer):
