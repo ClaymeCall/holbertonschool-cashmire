@@ -95,6 +95,39 @@ class ExpenseCreateSerializer(serializers.Serializer):
         )
 
 
+class ExpenseUpdateSerializer(serializers.Serializer):
+    category_id = serializers.IntegerField(min_value=1)
+    amount = DecimalStringField(
+        max_digits=10,
+        decimal_places=2,
+        min_value=Decimal("0.01"),
+    )
+    description = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        default=None,
+    )
+    date = serializers.DateField()
+
+    def validate_category_id(self, category_id):
+        user = self.context["request"].user
+        if not Category.objects.filter(pk=category_id, user=user).exists():
+            raise NotFound(
+                {
+                    "error": "NOT_FOUND",
+                    "message": "Catégorie non trouvée",
+                }
+            )
+        return category_id
+
+    def update(self, instance, validated_data):
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        instance.save()
+        return instance
+
+
 class ExpenseSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(read_only=True)
     category_id = serializers.IntegerField(read_only=True)
@@ -168,3 +201,50 @@ def expenses(request):
         ExpenseSerializer(expense).data,
         status=status.HTTP_201_CREATED,
     )
+
+
+def get_user_expense_or_404(expense_id, user):
+    try:
+        return Expense.objects.get(pk=expense_id, user=user)
+    except Expense.DoesNotExist as exc:
+        raise NotFound(
+            {
+                "error": "NOT_FOUND",
+                "message": "Dépense non trouvée",
+            }
+        ) from exc
+
+
+@extend_schema(
+    methods=["PATCH"],
+    request=ExpenseUpdateSerializer,
+    responses=ExpenseSerializer,
+)
+@extend_schema(
+    methods=["PUT"],
+    request=ExpenseUpdateSerializer,
+    responses=ExpenseSerializer,
+)
+@extend_schema(
+    methods=["DELETE"],
+    responses={status.HTTP_204_NO_CONTENT: None},
+)
+@api_view(["PATCH", "PUT", "DELETE"])
+@authentication_classes([SessionAuthentication])
+@permission_classes([IsAuthenticated])
+def expense_detail_mutation(request, expense_id):
+    expense = get_user_expense_or_404(expense_id, request.user)
+
+    if request.method == "DELETE":
+        expense.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    serializer = ExpenseUpdateSerializer(
+        expense,
+        data=request.data,
+        context={"request": request},
+        partial=request.method == "PATCH",
+    )
+    serializer.is_valid(raise_exception=True)
+    updated_expense = serializer.save()
+    return Response(ExpenseSerializer(updated_expense).data)

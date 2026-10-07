@@ -606,3 +606,39 @@ array when no records match.
 **Final decision.** Authenticated users can list only their own expenses,
 optionally filtered by category/date, and an empty result is returned as
 `{"expenses": []}`.
+
+## 2026-10-07 — Update and delete expenses (Issues #37 and #38)
+
+**Objective.** Implement authenticated expense update and deletion on the
+existing expense API, preserving validation, decimal precision, and
+user-level ownership boundaries.
+
+**Agent/role used.** Copilot-assisted backend implementation. No specialized
+agent run is claimed.
+
+**What was delegated.** Nothing.
+
+**Main proposal.** Add `PATCH`, `PUT`, and `DELETE` on
+`/api/expenses/<id>/`. Scope the lookup to the authenticated user so a
+foreign expense and a missing expense have the same 404 response. Reuse the
+creation rules for positive decimal-string amounts and categories owned by
+the current user.
+
+**How the change was verified.**
+- Ran the isolated API suite with
+  `docker compose -p cashmire-issue37-38-test run --rm api python manage.py
+  test api`: all 29 tests pass, including new update/delete coverage.
+- Ran the same isolated project's `python manage.py check`: no issues.
+- `git diff --check` passes.
+- Removed only the isolated verification Compose resources.
+
+**Accepted / modified / rejected.**
+- Accepted: `PATCH` is partial, `PUT` requires `category_id`, `amount`, and
+  `date`, and `DELETE` returns 204 with no response body.
+- Modified: An omitted description in `PUT` is reset to `null`, consistent
+  with replacement semantics and the create endpoint's optional description.
+- Rejected: Revealing whether a foreign expense exists; foreign and missing
+  IDs return the same 404 response.
+
+**Final decision.** Issues #37 and #38 are implemented on the expense feature
+branch, with update and delete operations restricted to the current user.

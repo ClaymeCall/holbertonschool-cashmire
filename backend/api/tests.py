@@ -450,3 +450,168 @@ class ExpenseListTests(TestCase):
 
                 self.assertEqual(response.status_code, 400)
                 self.assertIn(field, response.json())
+
+
+class ExpenseDetailMutationTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="expense-editor",
+            email="expense-editor@example.com",
+            password="correct-horse-battery-staple-42",
+        )
+        self.other_user = User.objects.create_user(
+            username="other-expense-editor",
+            email="other-expense-editor@example.com",
+            password="correct-horse-battery-staple-42",
+        )
+        self.category = self.user.categories.first()
+        self.other_category = self.user.categories.exclude(pk=self.category.pk).first()
+        self.other_users_category = self.other_user.categories.first()
+        self.expense = Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("25.50"),
+            description="Original",
+            date=date(2026, 10, 6),
+        )
+        self.other_expense = Expense.objects.create(
+            user=self.other_user,
+            category=self.other_users_category,
+            amount=Decimal("80.00"),
+            description="Private",
+            date=date(2026, 10, 5),
+        )
+        self.client = APIClient()
+
+    def detail_url(self, expense_id):
+        return f"/api/expenses/{expense_id}/"
+
+    def test_patch_updates_only_supplied_fields_and_preserves_decimal_precision(self):
+        self.client.force_login(self.user)
+
+        response = self.client.patch(
+            self.detail_url(self.expense.pk),
+            {"amount": "1234.56", "description": "Updated"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.expense.refresh_from_db()
+        self.assertEqual(self.expense.amount, Decimal("1234.56"))
+        self.assertEqual(self.expense.description, "Updated")
+        self.assertEqual(self.expense.category, self.category)
+        self.assertEqual(self.expense.date, date(2026, 10, 6))
+        self.assertEqual(response.json()["amount"], "1234.56")
+
+    def test_patch_can_change_to_an_owned_category(self):
+        self.client.force_login(self.user)
+
+        response = self.client.patch(
+            self.detail_url(self.expense.pk),
+            {"category_id": self.other_category.pk},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.expense.refresh_from_db()
+        self.assertEqual(self.expense.category, self.other_category)
+
+    def test_put_requires_creation_fields_and_replaces_expense_values(self):
+        self.client.force_login(self.user)
+
+        incomplete = self.client.put(
+            self.detail_url(self.expense.pk),
+            {"amount": "40.00"},
+            format="json",
+        )
+        self.assertEqual(incomplete.status_code, 400)
+        self.assertIn("category_id", incomplete.json())
+        self.assertIn("date", incomplete.json())
+
+        response = self.client.put(
+            self.detail_url(self.expense.pk),
+            {
+                "category_id": self.category.pk,
+                "amount": "40.05",
+                "date": "2026-10-09",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.expense.refresh_from_db()
+        self.assertEqual(self.expense.amount, Decimal("40.05"))
+        self.assertEqual(self.expense.date, date(2026, 10, 9))
+        self.assertIsNone(self.expense.description)
+
+    def test_update_rejects_invalid_amount_without_changing_expense(self):
+        self.client.force_login(self.user)
+
+        response = self.client.patch(
+            self.detail_url(self.expense.pk),
+            {"amount": 12.34},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("amount", response.json())
+        self.expense.refresh_from_db()
+        self.assertEqual(self.expense.amount, Decimal("25.50"))
+
+    def test_update_rejects_a_foreign_or_missing_category(self):
+        self.client.force_login(self.user)
+        for category_id in (self.other_users_category.pk, 99999999):
+            with self.subTest(category_id=category_id):
+                response = self.client.patch(
+                    self.detail_url(self.expense.pk),
+                    {"category_id": category_id},
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, 404)
+                self.assertEqual(
+                    response.json(),
+                    {
+                        "error": "NOT_FOUND",
+                        "message": "Catégorie non trouvée",
+                    },
+                )
+
+    def test_update_returns_identical_404_for_foreign_and_missing_expenses(self):
+        self.client.force_login(self.user)
+
+        foreign_response = self.client.patch(
+            self.detail_url(self.other_expense.pk),
+            {"amount": "30.00"},
+            format="json",
+        )
+        missing_response = self.client.patch(
+            self.detail_url(99999999),
+            {"amount": "30.00"},
+            format="json",
+        )
+
+        self.assertEqual(foreign_response.status_code, 404)
+        self.assertEqual(missing_response.status_code, 404)
+        self.assertEqual(foreign_response.json(), missing_response.json())
+        self.other_expense.refresh_from_db()
+        self.assertEqual(self.other_expense.amount, Decimal("80.00"))
+
+    def test_delete_removes_owned_expense_and_returns_204(self):
+        self.client.force_login(self.user)
+
+        response = self.client.delete(self.detail_url(self.expense.pk))
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Expense.objects.filter(pk=self.expense.pk).exists())
+
+    def test_delete_returns_identical_404_for_foreign_and_missing_expenses(self):
+        self.client.force_login(self.user)
+
+        foreign_response = self.client.delete(self.detail_url(self.other_expense.pk))
+        missing_response = self.client.delete(self.detail_url(99999999))
+
+        self.assertEqual(foreign_response.status_code, 404)
+        self.assertEqual(missing_response.status_code, 404)
+        self.assertEqual(foreign_response.json(), missing_response.json())
+        self.assertTrue(Expense.objects.filter(pk=self.other_expense.pk).exists())
