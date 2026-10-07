@@ -102,3 +102,31 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.set_password(password)
         user.save()
         return user
+
+
+class LoginSerializer(serializers.Serializer):
+    """POST /api/auth/login/ — docs/api-design.md §2.2, issue #23.
+
+    Input validation only: presence and basic shape of email/password.
+    Credential verification itself happens in the view via `authenticate()`,
+    not here — a serializer-level check would need direct DB/password
+    access that belongs with the authentication call, not validation.
+    """
+
+    email = serializers.EmailField()
+    password = serializers.CharField(trim_whitespace=False, write_only=True)
+
+
+class UserSerializer(serializers.ModelSerializer):
+    """Read-only public user representation.
+
+    Shared by login's 200 response and (per docs/api-design.md §2.4) the
+    future GET /api/auth/me/ (#26) — both describe "the current user" in
+    exactly this shape, so there's one definition of it rather than two
+    that could drift apart.
+    """
+
+    class Meta:
+        model = User
+        fields = ["id", "email", "username", "first_name", "last_name", "is_active", "created_at", "updated_at"]
+        read_only_fields = fields

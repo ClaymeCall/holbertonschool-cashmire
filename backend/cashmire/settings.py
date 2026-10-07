@@ -122,6 +122,12 @@ REST_FRAMEWORK = {
         "rest_framework.renderers.JSONRenderer",
     ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    # "login" scope used by LoginView's ScopedRateThrottle (issue #23,
+    # AC-3) — per-IP, intentionally minimal. See
+    # docs/decisions/0004-login-rate-limiting.md.
+    "DEFAULT_THROTTLE_RATES": {
+        "login": "5/min",
+    },
 }
 
 SPECTACULAR_SETTINGS = {
