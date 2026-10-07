@@ -125,6 +125,20 @@ CORS_ALLOWED_ORIGINS = os.environ.get(
 # False; without it the browser discards any `Set-Cookie` from the API.
 CORS_ALLOW_CREDENTIALS = True
 
+# Independent of the two CORS settings above, which only control whether
+# the *browser* is allowed to read a cross-origin response. Django's own
+# `CsrfViewMiddleware` does a separate `Origin` header check on every
+# cross-origin unsafe-method request once a session user is authenticated
+# (docs/decisions/0003-session-cookie-auth-strategy.md point 5) — without
+# the frontend's origin listed here, every such request is rejected with
+# "CSRF Failed: Origin checking failed", regardless of how correct the
+# `X-CSRFToken` header and session cookie are. Reuses the same env var and
+# default as CORS_ALLOWED_ORIGINS above since both describe "the frontend's
+# origin(s)" and have never had a reason to differ in this project.
+CSRF_TRUSTED_ORIGINS = os.environ.get(
+    "DJANGO_CORS_ALLOWED_ORIGINS", "http://localhost:5173"
+).split(",")
+
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
