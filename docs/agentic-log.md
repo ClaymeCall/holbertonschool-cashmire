@@ -487,6 +487,11 @@ is otherwise unresolved.
 - Ran `docker compose exec api python manage.py test api`: all 7 tests pass,
   including exact `Decimal` round-trip, non-positive amount rejection, and
   database enforcement of the category foreign key.
+- Updated the privacy page to distinguish the newly defined Expense schema
+  from the not-yet-available expense submission feature; added a focused
+  frontend assertion for that distinction. Ran
+  `docker compose exec frontend npm run test -- --run
+  src/routes/privacy/page.test.js`: all 7 tests pass.
 - `git diff --check` passes.
 
 **Accepted / modified / rejected.**
