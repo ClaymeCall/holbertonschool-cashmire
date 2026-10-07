@@ -86,6 +86,33 @@ export class ApiError extends Error {
 }
 
 /**
+ * HTTP methods Django's CSRF protection treats as unsafe — matches
+ * `CsrfViewMiddleware`'s own safe-method list (GET/HEAD/OPTIONS/TRACE are
+ * exempt), not an arbitrary subset of this app's verbs.
+ */
+const CSRF_PROTECTED_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+/**
+ * Reads a cookie's raw value by name, or `null` if unset or if there is no
+ * `document` (SSR). Used to read the `csrftoken` cookie Django issues —
+ * see docs/decisions/auth-strategy.md's CSRF section: "The frontend must
+ * obtain the `csrftoken` cookie and send its value in `X-CSRFToken` for
+ * state-changing requests."
+ * @param {string} name
+ * @returns {string | null}
+ */
+function getCookie(name) {
+  if (typeof document === "undefined") return null;
+  const prefix = `${name}=`;
+  for (const part of document.cookie.split("; ")) {
+    if (part.startsWith(prefix)) {
+      return decodeURIComponent(part.slice(prefix.length));
+    }
+  }
+  return null;
+}
+
+/**
  * @param {unknown} body
  * @returns {boolean} true when `body` should be JSON-encoded by `apiFetch`.
  */
@@ -140,6 +167,14 @@ export async function apiFetch(path, options = {}) {
     // FormData, Blob, string, etc: passed through untouched, no
     // Content-Type set — the platform (or the caller) decides it.
     requestBody = /** @type {BodyInit} */ (body);
+  }
+
+  const method = (rest.method ?? "GET").toUpperCase();
+  if (CSRF_PROTECTED_METHODS.has(method)) {
+    const csrfToken = getCookie("csrftoken");
+    if (csrfToken) {
+      requestHeaders["X-CSRFToken"] = csrfToken;
+    }
   }
 
   // Caller's headers win over the defaults above.
