@@ -16,6 +16,8 @@ urlpatterns = [
         views.expense_detail_mutation,
         name="expense-detail-mutation",
     ),
+    path("budgets/", views.budget_list_create, name="budget-list-create"),
+    path("budgets/<int:budget_id>/", views.budget_update_patch, name="budget-update-patch"),
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
         "docs/",

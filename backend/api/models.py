@@ -1,4 +1,7 @@
+from decimal import Decimal
+
 from django.contrib.auth.models import AbstractUser
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 
@@ -105,3 +108,61 @@ class Expense(models.Model):
 
     def __str__(self):
         return f"{self.amount} on {self.date}"
+
+
+class Budget(models.Model):
+    user = models.ForeignKey(
+        "api.User",
+        on_delete=models.CASCADE,
+        related_name="budgets",
+    )
+    category = models.ForeignKey(
+        "api.Category",
+        on_delete=models.PROTECT,
+        related_name="budgets",
+    )
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    period_start = models.DateField()
+    period_end = models.DateField()
+    alert_threshold = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        default=Decimal("80.00"),
+        validators=[MinValueValidator(Decimal("0")), MaxValueValidator(Decimal("100"))],
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "category", "period_start", "period_end"],
+                name="unique_budget_per_user_category_period",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(amount__gt=0),
+                name="budget_amount_positive",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(period_end__gte=models.F("period_start")),
+                name="budget_period_end_gte_start",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(alert_threshold__isnull=True) | models.Q(alert_threshold__gte=0, alert_threshold__lte=100),
+                name="budget_alert_threshold_valid_range",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["user"], name="idx_budget_user_id"),
+            models.Index(fields=["user", "period_start", "period_end"], name="idx_budget_user_period"),
+        ]
+
+    def __str__(self):
+        return f"Budget {self.id} — User {self.user.id}, Category {self.category.name}, {self.period_start} to {self.period_end}"

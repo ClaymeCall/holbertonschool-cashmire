@@ -1,6 +1,11 @@
-from django.contrib.auth import authenticate, login, logout
+from calendar import monthrange
+from datetime import date
 from decimal import Decimal
 
+from django.contrib.auth import authenticate, login, logout
+
+from django.db import IntegrityError, transaction
+from django.db.models import Q
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, serializers, status
 from rest_framework.authentication import SessionAuthentication
@@ -17,7 +22,8 @@ from rest_framework.throttling import ScopedRateThrottle
 from .auth import SessionAuthenticatedAPIView, session_authenticated_api_view
 from .serializers import LoginSerializer, RegisterSerializer, UserSerializer
 
-from .models import Category, Expense
+from .models import Budget, Category, Expense
+from .services.budget_consumption import calculate_consumption_batch
 
 
 @api_view(["GET"])
@@ -363,3 +369,418 @@ def expense_detail_mutation(request, expense_id):
     serializer.is_valid(raise_exception=True)
     updated_expense = serializer.save()
     return Response(ExpenseSerializer(updated_expense).data)
+class BudgetSerializer(serializers.ModelSerializer):
+    user_id = serializers.IntegerField(read_only=True)
+    category_id = serializers.IntegerField()
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    alert_threshold = serializers.DecimalField(
+        max_digits=5, decimal_places=2, allow_null=True, required=False
+    )
+
+    class Meta:
+        model = Budget
+        fields = [
+            "id",
+            "user_id",
+            "category_id",
+            "amount",
+            "period_start",
+            "period_end",
+            "alert_threshold",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "user_id", "created_at", "updated_at"]
+
+    def validate_amount(self, value):
+        if value <= Decimal("0"):
+            raise serializers.ValidationError("Doit être > 0")
+        return value
+
+    def validate_alert_threshold(self, value):
+        if value is not None and (value < Decimal("0") or value > Decimal("100")):
+            raise serializers.ValidationError("Doit être entre 0 et 100")
+        return value
+
+    def validate(self, data):
+        period_start = data.get("period_start")
+        period_end = data.get("period_end")
+        if period_start and period_end and period_end < period_start:
+            raise serializers.ValidationError("period_end doit être >= period_start")
+        return data
+
+
+class BudgetWithConsumptionSerializer(serializers.ModelSerializer):
+    """Serializer for budgets including consumption data (spent, remaining, percentage)."""
+
+    user_id = serializers.IntegerField(read_only=True)
+    spent = serializers.SerializerMethodField()
+    remaining = serializers.SerializerMethodField()
+    percentage = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Budget
+        fields = [
+            "id",
+            "user_id",
+            "category_id",
+            "amount",
+            "period_start",
+            "period_end",
+            "alert_threshold",
+            "spent",
+            "remaining",
+            "percentage",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+    def get_spent(self, obj):
+        """Return spent from consumption_data if available."""
+        consumption_data = self.context.get("consumption_data", {})
+        if obj.id in consumption_data:
+            return str(consumption_data[obj.id].spent)
+        return "0.00"
+
+    def get_remaining(self, obj):
+        """Return remaining from consumption_data if available."""
+        consumption_data = self.context.get("consumption_data", {})
+        if obj.id in consumption_data:
+            return str(consumption_data[obj.id].remaining)
+        return str(obj.amount)
+
+    def get_percentage(self, obj):
+        """Return percentage from consumption_data if available."""
+        consumption_data = self.context.get("consumption_data", {})
+        if obj.id in consumption_data:
+            return str(consumption_data[obj.id].percentage)
+        return "0.00"
+
+
+class BudgetListSerializer(serializers.Serializer):
+    budgets = BudgetWithConsumptionSerializer(many=True)
+
+
+@extend_schema(
+    request=BudgetSerializer,
+    responses=BudgetListSerializer,
+    description="List budgets or create a new budget for the authenticated user",
+)
+@api_view(["GET", "POST"])
+@authentication_classes([SessionAuthentication])
+@permission_classes([IsAuthenticated])
+def budget_list_create(request):
+    """
+    Handle GET and POST on /api/budgets/.
+
+    GET: List budgets for the authenticated user, with optional filtering by period and category.
+    POST: Create a new budget for the authenticated user.
+    """
+    if request.method == "GET":
+        return _budget_list_get(request)
+    elif request.method == "POST":
+        return _budget_create_post(request)
+
+
+def _budget_list_get(request):
+    """
+    List budgets for the authenticated user, with optional filtering by period and category.
+
+    Query parameters (all optional):
+    - month: int [1, 12] — must be paired with year
+    - year: int (valid year) — must be paired with month
+    - category_id: int — filter by category
+
+    Filtering by period (month + year):
+    A budget is included if its [period_start, period_end] overlaps the given month.
+    """
+    # Parse and validate query parameters
+    month = request.query_params.get("month")
+    year = request.query_params.get("year")
+    category_id = request.query_params.get("category_id")
+
+    # Validate month/year pair
+    if (month is None) != (year is None):
+        return Response(
+            {
+                "error": "INVALID_DATA",
+                "message": "month et year doivent tous les deux être fournis",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if month is not None:
+        try:
+            month = int(month)
+            if month < 1 or month > 12:
+                raise ValueError()
+        except (ValueError, TypeError):
+            return Response(
+                {
+                    "error": "INVALID_DATA",
+                    "message": "month doit être entre 1 et 12",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    if year is not None:
+        try:
+            year = int(year)
+            # Validate year is reasonable (optional: add bounds)
+            if year < 1900 or year > 2100:
+                raise ValueError()
+        except (ValueError, TypeError):
+            return Response(
+                {
+                    "error": "INVALID_DATA",
+                    "message": "year doit être un entier valide",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    if category_id is not None:
+        try:
+            category_id = int(category_id)
+        except (ValueError, TypeError):
+            return Response(
+                {
+                    "error": "INVALID_DATA",
+                    "message": "category_id doit être un entier valide",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    # Build queryset
+    budgets_qs = Budget.objects.filter(user=request.user)
+
+    # Filter by category_id if provided
+    if category_id is not None:
+        # Option: silently filter if category doesn't exist or is foreign
+        # (could also return 404, but silently filtering is simpler)
+        budgets_qs = budgets_qs.filter(category_id=category_id, category__user=request.user)
+
+    # Filter by period (month + year) if provided
+    if month is not None and year is not None:
+        # Calculate the first and last day of the given month
+        month_start = date(year, month, 1)
+        month_end = date(year, month, monthrange(year, month)[1])
+
+        # Include budgets whose [period_start, period_end] overlaps [month_start, month_end]
+        # Overlap condition: period_start <= month_end AND period_end >= month_start
+        budgets_qs = budgets_qs.filter(
+            Q(period_start__lte=month_end) & Q(period_end__gte=month_start)
+        )
+
+    # Sort deterministically by ID
+    budgets_qs = budgets_qs.order_by("id")
+
+    # Convert to list to calculate consumption in batch
+    budgets_list = list(budgets_qs)
+
+    # Calculate consumption for all budgets in a single query
+    consumption_data = calculate_consumption_batch(budgets_list)
+
+    # Serialize with consumption data
+    context = {"consumption_data": consumption_data}
+    serializer = BudgetWithConsumptionSerializer(
+        budgets_list, many=True, context=context
+    )
+
+    return Response({"budgets": serializer.data}, status=status.HTTP_200_OK)
+
+
+def _budget_create_post(request):
+    """
+    Create a new budget for the authenticated user.
+
+    Validation:
+    - category_id must exist and belong to request.user (404 otherwise).
+    - amount must be > 0 (400 otherwise).
+    - period_end must be >= period_start (400 otherwise).
+    - alert_threshold must be between 0 and 100 if provided (400 otherwise).
+    - Duplicate check (user, category, period_start, period_end) returns 409 Conflict.
+    """
+    serializer = BudgetSerializer(data=request.data)
+
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    category_id = serializer.validated_data.get("category_id")
+    period_start = serializer.validated_data.get("period_start")
+    period_end = serializer.validated_data.get("period_end")
+
+    # Validate category exists and belongs to request.user
+    try:
+        category = Category.objects.get(id=category_id, user=request.user)
+    except Category.DoesNotExist:
+        return Response(
+            {"error": "NOT_FOUND", "message": "Catégorie non trouvée"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # Application-level duplicate check (defense in depth)
+    if Budget.objects.filter(
+        user=request.user,
+        category=category,
+        period_start=period_start,
+        period_end=period_end,
+    ).exists():
+        return Response(
+            {
+                "error": "CONFLICT",
+                "message": "Budget déjà existant pour cette période et catégorie",
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    # Create budget with owner = request.user
+    budget_data = {
+        "user": request.user,
+        "category": category,
+        "amount": serializer.validated_data.get("amount"),
+        "period_start": period_start,
+        "period_end": period_end,
+    }
+    # Only set alert_threshold if explicitly provided
+    if "alert_threshold" in serializer.validated_data:
+        budget_data["alert_threshold"] = serializer.validated_data.get("alert_threshold")
+
+    # Wrap in transaction.atomic() and catch IntegrityError for race condition safety
+    try:
+        with transaction.atomic():
+            budget = Budget.objects.create(**budget_data)
+    except IntegrityError:
+        # Race condition: duplicate was created between check and create
+        return Response(
+            {
+                "error": "CONFLICT",
+                "message": "Budget déjà existant pour cette période et catégorie",
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    return Response(
+        BudgetSerializer(budget).data, status=status.HTTP_201_CREATED
+    )
+
+
+@extend_schema(
+    methods=["PATCH"],
+    request=BudgetSerializer,
+    responses=BudgetWithConsumptionSerializer,
+    description="Update an existing budget for the authenticated user",
+)
+@extend_schema(
+    methods=["DELETE"],
+    responses={status.HTTP_204_NO_CONTENT: None},
+    description="Delete an existing budget for the authenticated user",
+)
+@api_view(["PATCH", "DELETE"])
+@authentication_classes([SessionAuthentication])
+@permission_classes([IsAuthenticated])
+def budget_update_patch(request, budget_id):
+    """
+    Handle PATCH and DELETE on /api/budgets/{budget_id}/.
+
+    PATCH: Update an existing budget for the authenticated user. All fields are optional.
+    Validates ownership, uniqueness constraint, and re-validates all fields.
+    Returns 200 OK with updated budget including consumption data.
+
+    DELETE: Delete an existing budget for the authenticated user.
+    Returns 204 No Content on success.
+    """
+    # Retrieve budget and check ownership
+    try:
+        budget = Budget.objects.get(id=budget_id, user=request.user)
+    except Budget.DoesNotExist:
+        return Response(
+            {"error": "NOT_FOUND", "message": "Budget non trouvé"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    if request.method == "DELETE":
+        budget.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    # PATCH handling
+    # Validate partial update with BudgetSerializer (all fields optional for PATCH)
+    serializer = BudgetSerializer(budget, data=request.data, partial=True)
+
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # Resolve category_id (use new value if provided, else existing)
+    category_id = serializer.validated_data.get("category_id", budget.category_id)
+
+    # Resolve period dates (use new values if provided, else existing)
+    period_start = serializer.validated_data.get("period_start", budget.period_start)
+    period_end = serializer.validated_data.get("period_end", budget.period_end)
+
+    # Validate period_end >= period_start (using resolved values)
+    if period_end < period_start:
+        return Response(
+            {
+                "error": "INVALID_DATA",
+                "message": "period_end doit être >= period_start",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Validate category exists and belongs to request.user (if category_id changed)
+    if category_id != budget.category_id:
+        try:
+            category = Category.objects.get(id=category_id, user=request.user)
+        except Category.DoesNotExist:
+            return Response(
+                {"error": "NOT_FOUND", "message": "Catégorie non trouvée"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+    # Application-level duplicate check: ensure no other budget has this combination
+    if Budget.objects.filter(
+        user=request.user,
+        category_id=category_id,
+        period_start=period_start,
+        period_end=period_end,
+    ).exclude(id=budget.id).exists():
+        return Response(
+            {
+                "error": "CONFLICT",
+                "message": "Budget déjà existant pour cette période et catégorie",
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    # Apply updates to the budget instance
+    try:
+        with transaction.atomic():
+            # Update all provided fields
+            if "amount" in serializer.validated_data:
+                budget.amount = serializer.validated_data["amount"]
+            if "alert_threshold" in serializer.validated_data:
+                budget.alert_threshold = serializer.validated_data["alert_threshold"]
+            if "category_id" in serializer.validated_data:
+                budget.category_id = serializer.validated_data["category_id"]
+            if "period_start" in serializer.validated_data:
+                budget.period_start = serializer.validated_data["period_start"]
+            if "period_end" in serializer.validated_data:
+                budget.period_end = serializer.validated_data["period_end"]
+
+            budget.save()
+    except IntegrityError:
+        # Race condition: duplicate was created between check and save
+        return Response(
+            {
+                "error": "CONFLICT",
+                "message": "Budget déjà existant pour cette période et catégorie",
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    # Return updated budget with consumption data
+    consumption = calculate_consumption_batch([budget])
+    context = {"consumption_data": consumption}
+    response_serializer = BudgetWithConsumptionSerializer(budget, context=context)
+
+    return Response(response_serializer.data, status=status.HTTP_200_OK)

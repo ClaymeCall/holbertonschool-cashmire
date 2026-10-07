@@ -415,6 +415,76 @@ in the next cycle if the command proves incorrect.
 - Once approved, Full-Stack Development agent proceeds to implement the 19 routes (auth, expenses, budgets, categories) against the specification, following the same verification process.
 - Review artifacts: `docs/reviews/issue-7-api-contract.md` documents all findings (blockers, non-blockers, verification steps) with section-by-section analysis of all 20 criteria and security checks.
 
+## 2026-10-07 — QA & Security review of Budget Model (Issue #45)
+
+**Objective.** Closes #45 (QA review). Verify the Budget model implementation against its 
+specification (`docs/specs/issue-45-budget-model.md`) across all 14 acceptance criteria (AC-1 through 
+AC-14), focusing on data validation, database constraints, ORM configuration, test coverage, and 
+security.
+
+**Agent/role used.** QA & Security agent (read-only review, no source code edits).
+
+**What was delegated.** Verify Budget model implementation against specification:
+- Confirm model exists in `backend/api/models.py` with all fields and metadata
+- Verify migration `0003_budget.py` creates table with complete structure (fields, constraints, indices)
+- Run test suite (`python manage.py test api.tests.BudgetModelTests`) and verify all tests pass
+- Audit input validation (amount, alert_threshold, period dates) at both Django and database levels
+- Check referential integrity (user CASCADE, category PROTECT)
+- Verify no information leaks or security issues
+- Compare implementation against spec; flag any deviations
+- Document findings in `docs/reviews/issue-45-budget-model.md`
+
+**Main proposal.** All 14 acceptance criteria passed. The implementation is conformant, secure, 
+fully tested (23 tests, 100% pass rate), and ready for merge. One non-blocking finding: Django model 
+uses `check=` parameter instead of `condition=` for CheckConstraint (deprecated in Django 5.0+ but 
+accepted for backward compatibility in 5.1.3). Migration correctly uses `condition=`.
+
+**How the team verified it.**
+- Ran full test suite: `python manage.py test api.tests.BudgetModelTests -v 2` → all 23 tests passed
+- Verified AC-1: Budget model present in models.py with all required fields (user, category, amount, 
+  period_start, period_end, alert_threshold, created_at, updated_at)
+- Verified AC-2: Migration file 0003_budget.py creates table with single CreateModel operation 
+  (modern Django 5.1 style)
+- Verified AC-3: Migration applied without error (test database created and all migrations applied)
+- Verified AC-4: amount is DecimalField(max_digits=10, decimal_places=2) with MinValueValidator(Decimal("0.01"))
+- Verified AC-5: alert_threshold is DecimalField(max_digits=5, decimal_places=2, null=True, 
+  default=Decimal("80.00")) with validators MinValueValidator(0) and MaxValueValidator(100)
+- Verified AC-6: period_start and period_end are DateField with CheckConstraint(period_end >= period_start)
+- Verified AC-7: UniqueConstraint(fields=['user', 'category', 'period_start', 'period_end'])
+- Verified AC-8: ForeignKey to User with on_delete=models.CASCADE (test_user_cascade_delete passed)
+- Verified AC-9: ForeignKey to Category with on_delete=models.PROTECT (test_category_protect_delete passed)
+- Verified AC-10: Two indexes present: idx_budget_user_id on user, idx_budget_user_period on 
+  (user, period_start, period_end)
+- Verified AC-11: DateTimeField(auto_now_add=True) for created_at, DateTimeField(auto_now=True) for updated_at
+- Verified AC-12: CheckConstraint(check=models.Q(amount__gt=0)) preventing zero/negative amounts
+- Verified AC-13 & AC-14: All 23 tests cover required cases:
+  - Valid budget creation (4 tests)
+  - UNIQUE constraint enforcement (1 test)
+  - Amount validation (5 tests covering 0, negative, 0.01, max, precision)
+  - Period validation (3 tests covering end < start, end = start, end > start)
+  - Alert threshold validation (5 tests covering null, 0, 100, negative, > 100)
+  - Referential integrity (3 tests covering cascade/protect)
+  - Timestamps (1 test)
+- Audited security: No SQL injection (Django ORM used throughout), no information leaks in __str__ 
+  method, proper cascading/protection behavior, validators at both ORM and database levels
+- Verified no deviations from spec (acknowledged limitation: category.user_id == budget.user_id 
+  must be validated at application level, as noted in spec section 6)
+
+**Accepted / modified / rejected.**
+- Accepted: All 14 acceptance criteria met. Implementation is conformant to specification.
+- Accepted: One non-blocking finding (check= vs condition=) does not block merge; Django 5.1.3 
+  accepts both for backward compatibility.
+- Rejected: Nothing. The Budget model is ready for merge.
+
+**Final decision.**
+- The Budget model implementation is **approved for merge**. All acceptance criteria satisfied; 
+  23 tests passing; no security issues, no spec deviations, no blockers.
+- **Non-blocking follow-up (future maintenance):** Update CheckConstraint definitions in models.py 
+  to use `condition=` instead of `check=` for consistency with Django 5.1.3 convention 
+  (migration already correct). This is a maintenance task, not a blocker.
+- Review artifacts: `docs/reviews/issue-45-budget-model.md` documents all findings with per-AC 
+  verification, security audit results, and non-blocking recommendations.
+
 ## 2026-10-07 — Complete the authentication strategy documentation (Issue #25)
 
 **Objective.** Close the documentation gap in #25: the session-cookie decision
@@ -963,3 +1033,93 @@ specialized agent run (`agentic/orchestrator.py`) is claimed.
 since both reuse `lib/api/categories.js`), built against the documented
 but not-yet-merged budget API, with one shared create/edit form as the
 issue explicitly requires.
+
+## 2026-10-07 — QA & Security review of Budget Create Endpoint (Issue #46)
+
+**Objective.** Closes #46 (QA review). Verify the Budget create endpoint implementation against 
+its specification (`docs/specs/issue-46-create-budget-endpoint.md`) across all 15 acceptance criteria 
+(AC-1 through AC-15), focusing on endpoint routing, authentication, input validation, ownership 
+enforcement, duplicate detection, and security.
+
+**Agent/role used.** QA & Security agent (read-only review, no source code edits).
+
+**What was delegated.** Verify Budget endpoint implementation against specification:
+- Confirm endpoint `POST /api/budgets/` exists at the correct route with trailing slash
+- Verify authentication required (SessionAuthentication + IsAuthenticated)
+- Audit input validation (category_id, amount, period_start, period_end, alert_threshold)
+- Verify category ownership check returns 404 for foreign/nonexistent categories
+- Confirm duplicate detection at application level (returns 409 Conflict before DB touch)
+- Verify owner always set to request.user (not from client input)
+- Run test suite (`python manage.py test api.tests.BudgetCreateEndpointTests -v 2`) and verify 
+  all tests pass
+- Audit response serialization (Decimal to JSON string, ISO 8601 timestamps)
+- Check for information leaks in error messages
+- Verify race condition handling for concurrent duplicates
+- Document findings in `docs/reviews/issue-46-create-budget-endpoint.md`
+
+**Main proposal.** 14 of 15 acceptance criteria passed. **1 blocking finding:** `IntegrityError` 
+not caught when a race condition creates duplicate budgets (two concurrent requests bypass the 
+applicative check and both reach the database). Returns 500 Internal Server Error instead of 409 
+Conflict as specified. Requires adding `try/except IntegrityError` around the `Budget.objects.create()` 
+call. Additionally, 2 non-blocking findings: (1) HTTP 403 returned for missing authentication instead 
+of spec's 401 (consistent with category_list and DRF IsAuthenticated behavior, but spec mismatch); 
+(2) duplicate validators in serializer and model (defense in depth, not a bug).
+
+**How the team verified it.**
+- Ran full test suite: `python manage.py test api.tests.BudgetCreateEndpointTests -v 2` 
+  → all 28 tests passed (4.140s)
+- Verified AC-1: Route `POST /api/budgets/` present in `backend/api/urls.py` with trailing slash
+- Verified AC-2: SessionAuthentication + IsAuthenticated decorators present; test confirms 403 for 
+  unauthenticated requests (DRF standard, not 401 per spec — non-blocking finding)
+- Verified AC-3: BudgetSerializer defines all fields (category_id, amount, period_start, period_end, 
+  alert_threshold)
+- Verified AC-4: DecimalField used for amount; test `test_budget_create_amount_serialized_as_string` 
+  confirms JSON serialization as string `"123.45"`, not float
+- Verified AC-5: amount > 0 enforced; `validate_amount()` and MinValueValidator in model both check; 
+  tests verify 0, negative, and 0.01 (minimum) all handled correctly
+- Verified AC-6: DateField validation for YYYY-MM-DD format; `validate()` method checks 
+  period_end >= period_start; tests verify invalid dates, inverted ranges, and single-day budgets
+- Verified AC-7: Category ownership check at line 124 (`Category.objects.get(id=category_id, user=request.user)`) 
+  with DoesNotExist → 404; tests `test_budget_create_nonexistent_category_404` and 
+  `test_budget_create_foreign_category_404` confirm 404 for both missing and foreign categories
+- Verified AC-8: alert_threshold optional, 0–100 if provided; `validate_alert_threshold()` and 
+  model validators both enforce range; tests verify null, 0, 100, and out-of-bounds all correct
+- Verified AC-9: Applicative duplicate check at lines 132–144 (`Budget.objects.filter(...).exists()`) 
+  before create; test `test_budget_create_duplicate_409` confirms 409 Conflict. **However, no try/except 
+  around create() for IntegrityError** — this is the blocking finding.
+- Verified AC-10: Owner always `request.user` (line 148); serializer marks user_id as read-only; 
+  test confirms created budget's user_id matches authenticated user
+- Verified AC-11: 201 Created response includes all fields (id, user_id, category_id, amount, 
+  period_start, period_end, alert_threshold, created_at, updated_at); test verifies all present
+- Verified AC-12: DecimalField serializes amount and alert_threshold as JSON strings; verified 
+  in response
+- Verified AC-13: Timestamps include ISO 8601 format ("T" separator, timezone info); test passes
+- Verified AC-14: 28 comprehensive tests covering all scenarios (authentication, validation, 
+  ownership, duplicates, serialization)
+- Verified AC-15: DB UNIQUE constraint `unique_budget_per_user_category_period` exists in migration 
+  and enforces the constraint. **Constraint is not caught by endpoint code** (blocking finding).
+- Audited security: No SQL injection (Django ORM), no information leaks (generic error messages), 
+  ownership not spoofable, Decimal arithmetic (not float), but race condition vulnerability.
+
+**Accepted / modified / rejected.**
+- Accepted: 14 of 15 acceptance criteria met. Endpoint is functionally conformant to specification 
+  for normal (non-race-condition) operation.
+- Rejected: **1 blocking finding must be fixed:** `IntegrityError` not caught. Add try/except block 
+  around `Budget.objects.create()` to catch `IntegrityError` and return 409 Conflict (as promised 
+  in the spec's "filet de sécurité" section).
+- Accepted: 2 non-blocking findings (403 vs 401 authentication status, duplicate validators) do not 
+  gate merge once the blocking finding is fixed.
+
+**Final decision.**
+- The Budget create endpoint has **1 blocking finding** (IntegrityError handling) that must be fixed 
+  before merge.
+- The fix is minimal (4–6 lines of code): import IntegrityError, wrap create() in try/except, return 
+  409 Conflict on catch.
+- Once fixed, the endpoint is approved for merge. All 28 tests pass; specification is conformant; 
+  no security issues remain.
+- **Critical next action:** Full-Stack Development agent (or human) adds IntegrityError handling 
+  to `backend/api/views.py` lines 158–161, then reruns test suite to confirm fix does not break 
+  any existing tests.
+- Review artifacts: `docs/reviews/issue-46-create-budget-endpoint.md` documents all findings 
+  (blocking, non-blocking, verification steps, OWASP audit, data integrity checks) with reproduction 
+  steps for the race condition.
