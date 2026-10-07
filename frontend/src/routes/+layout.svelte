@@ -226,6 +226,12 @@
 
   nav a,
   nav .nav-action {
+    /* `<a>` defaults to `display: inline`, `<button>` to `inline-block` —
+       with identical padding, the inline <a> still rendered ~4px shorter
+       than the button (inline elements' vertical padding doesn't expand
+       their box the same way), making the pills visibly different sizes.
+       Forcing both to the same display mode fixes that. */
+    display: inline-block;
     padding: var(--space-xs) var(--space-sm);
     border-radius: var(--radius-full);
     text-decoration: none;
