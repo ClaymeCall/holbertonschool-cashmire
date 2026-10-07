@@ -5,6 +5,7 @@ from . import views
 
 urlpatterns = [
     path("health/", views.health, name="health"),
+    path("auth/register/", views.RegisterView.as_view(), name="register"),
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
         "docs/",
