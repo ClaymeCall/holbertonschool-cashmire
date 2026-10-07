@@ -726,3 +726,62 @@ check this form needs (amount > 0) without ever coercing to a float.
 `feat/40-41-expense-screens`, built directly against the real (already
 merged) expense/category API, with no mock layer and no premature shared
 form component.
+
+## 2026-10-07 — Build the budget dashboard and create/edit form (Issues #52, #53)
+
+**Objective.** Give the front-end a budget dashboard (spent/remaining,
+percentage, status) and a create/edit form, against the budget endpoints
+documented in `docs/api-design.md` §4 — not yet merged into `main` at the
+time this was written (#45, #115/#121-125 open).
+
+**Agent/role used.** Claude Code-assisted frontend implementation. No
+specialized agent run (`agentic/orchestrator.py`) is claimed.
+
+**What was delegated.** Nothing — implemented directly in this session.
+
+**Main proposal.**
+- `frontend/src/lib/api/budgets.js`: real `apiFetch` wrappers over
+  `/api/budgets/`, plus `monthToPeriod`/`periodToMonth` translating the
+  "month/year" picker issue #53 asks for into the `period_start`/
+  `period_end` pair the API actually stores.
+- `frontend/src/lib/components/BudgetForm.svelte`: **one** form reused for
+  both create and edit, per #53's explicit acceptance criterion (unlike
+  #40/#41, where create/edit stayed two separate screens) — category and
+  month are read-only in edit mode, since the API only accepts
+  `amount`/`alert_threshold` on `PATCH` (`docs/api-design.md` §4.4).
+- `routes/budgets/+page.svelte` renders each budget's `status` field
+  exactly as the API returns it (`ok`/`warning`/`full`/`exceeded`,
+  colored + labelled per `docs/decisions/budget-thresholds.md`'s table) —
+  it never recomputes the status, only the percentage-for-the-progress-bar
+  number, which `money.js`'s `percentOf` exists for.
+- Added `--color-success-*`/`--color-full-*` to `tokens.css`: the existing
+  two semantic colors (warning, error) don't cover the decision's
+  four-status table, so this is a concrete, decision-driven extension, not
+  speculative design-system growth.
+
+**How the change was verified.**
+- `npm test` in `frontend/`: 122/122 passing (19 new, across the API
+  client, the dashboard, and both form screens), including the 409
+  duplicate-budget conflict surfacing a specific message (#53's AC) and
+  the dashboard's progress bar capping its displayed value at 100 while
+  still labelling an over-budget entry as such in text (never color alone,
+  per `docs/mvp-scope.md` §3.7).
+- Unit-tested `monthToPeriod` against a 31-day month, a leap-year February,
+  and a non-leap-year February, since an off-by-one here would silently
+  mis-scope every budget's spending window.
+
+**Accepted / modified / rejected.**
+- Accepted: issue #52's text says three statuses (ok/warning/exceeded);
+  followed the later, more specific `budget-thresholds.md` decision's four
+  statuses instead, since it explicitly supersedes that part of
+  `docs/mvp-scope.md` and the issue predates it.
+- Accepted: no delete-budget action on the dashboard — no issue currently
+  asks for one (unlike expenses, which has #42), so it isn't guessed at.
+- Rejected: wiring `/budgets` into the shared nav — left to #104, same as
+  #40/#41's expense routes.
+
+**Final decision.** Issues #52 and #53 are implemented on
+`feat/52-53-budget-screens` (stacked on `feat/40-41-expense-screens`,
+since both reuse `lib/api/categories.js`), built against the documented
+but not-yet-merged budget API, with one shared create/edit form as the
+issue explicitly requires.
