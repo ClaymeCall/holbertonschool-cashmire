@@ -27,6 +27,17 @@
   --color-warning-bg: #fff6e5;
   --color-warning-border: #7a4b00;
 
+  /* Added for the budget dashboard (#52), per the four-status table in
+     docs/decisions/budget-thresholds.md: `ok` and `full` each need a color
+     distinct from the existing warning/error pair. */
+  --color-success-text: #0b4d1e;
+  --color-success-bg: #e6f4ea;
+  --color-success-border: #1a7f37;
+
+  --color-full-text: #5c2e00;
+  --color-full-bg: #fdf0e3;
+  --color-full-border: #b35900;
+
   /* Spacing */
   --space-xs: 0.25rem;
   --space-sm: 0.5rem;
