@@ -41,6 +41,21 @@ class CategoryListSerializer(serializers.Serializer):
     categories = CategorySerializer(many=True)
 
 
+class ExpenseListQuerySerializer(serializers.Serializer):
+    category_id = serializers.IntegerField(required=False, min_value=1)
+    date_from = serializers.DateField(required=False)
+    date_to = serializers.DateField(required=False)
+
+    def validate(self, attrs):
+        date_from = attrs.get("date_from")
+        date_to = attrs.get("date_to")
+        if date_from and date_to and date_from > date_to:
+            raise serializers.ValidationError(
+                {"date_from": "Must be on or before date_to."}
+            )
+        return attrs
+
+
 class DecimalStringField(serializers.DecimalField):
     def to_internal_value(self, data):
         if not isinstance(data, str):
@@ -99,6 +114,10 @@ class ExpenseSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class ExpenseListSerializer(serializers.Serializer):
+    expenses = ExpenseSerializer(many=True)
+
+
 @extend_schema(responses=CategoryListSerializer)
 @api_view(["GET"])
 @authentication_classes([SessionAuthentication])
@@ -110,13 +129,35 @@ def category_list(request):
 
 
 @extend_schema(
+    methods=["GET"],
+    parameters=[ExpenseListQuerySerializer],
+    responses=ExpenseListSerializer,
+)
+@extend_schema(
+    methods=["POST"],
     request=ExpenseCreateSerializer,
     responses={status.HTTP_201_CREATED: ExpenseSerializer},
 )
-@api_view(["POST"])
+@api_view(["GET", "POST"])
 @authentication_classes([SessionAuthentication])
 @permission_classes([IsAuthenticated])
-def expense_create(request):
+def expenses(request):
+    if request.method == "GET":
+        filters = ExpenseListQuerySerializer(data=request.query_params)
+        filters.is_valid(raise_exception=True)
+
+        expenses = Expense.objects.filter(user=request.user)
+        if "category_id" in filters.validated_data:
+            expenses = expenses.filter(
+                category_id=filters.validated_data["category_id"]
+            )
+        if "date_from" in filters.validated_data:
+            expenses = expenses.filter(date__gte=filters.validated_data["date_from"])
+        if "date_to" in filters.validated_data:
+            expenses = expenses.filter(date__lte=filters.validated_data["date_to"])
+
+        return Response({"expenses": ExpenseSerializer(expenses, many=True).data})
+
     serializer = ExpenseCreateSerializer(
         data=request.data,
         context={"request": request},

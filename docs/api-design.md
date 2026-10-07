@@ -260,7 +260,7 @@ Pas de corps. Code 204.
 
 ### 3.1 `GET /api/expenses/`
 
-**Authentification :** Requise
+**Authentification :** Requise par session Django (`sessionid`).
 
 **Description :** Lister toutes les dépenses de l'utilisateur courant, avec filtrage optionnel.
 
@@ -300,10 +300,9 @@ Pas de corps. Code 204.
 **Note :** MVP sans pagination. Retourne toutes les dépenses de l'utilisateur courant (filtrées selon les query params si présents).
 
 **Erreurs possibles :**
-- `401 Unauthorized` — Token absent ou invalide
-  - Message : `"error": "UNAUTHORIZED", "message": "Token invalide ou expiré"`
+- `403 Forbidden` — Session absente ou invalide (comportement actuel de `SessionAuthentication`).
 - `400 Bad Request` — Paramètres invalides
-  - Message : `"error": "INVALID_DATA", "message": "Format date invalide (YYYY-MM-DD attendu)"`
+  - Message : erreur de validation au niveau du paramètre, notamment pour une date invalide, un identifiant de catégorie non positif ou `date_from` postérieure à `date_to`.
 
 ---
 

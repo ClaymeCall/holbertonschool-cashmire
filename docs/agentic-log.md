@@ -561,3 +561,48 @@ because that migration provides the Expense model.
 are implemented. The feature depends on the #34 model/migration and is not
 independently deployable until that dependency is merged and migrations are
 applied. Human review remains required.
+
+## 2026-10-07 — Add authenticated, filtered expense listing (Issue #36)
+
+**Objective.** Implement `GET /api/expenses/` on top of the Expense model
+from #34 and authenticated expense-creation endpoint from #35, preserving
+user ownership and supporting category and inclusive date-range filters.
+
+**Agent/role used.** Copilot-assisted backend implementation. No specialized
+agent run is claimed.
+
+**What was delegated.** Nothing.
+
+**Main proposal.** Reuse the existing `/api/expenses/` route and
+`ExpenseSerializer`, adding GET alongside POST. Validate optional
+`category_id`, `date_from`, and `date_to` query parameters; always scope the
+queryset to `request.user`; return `{"expenses": [...]}` including an empty
+array when no records match.
+
+**How the change was verified.**
+- Ran `docker compose -p cashmire-issue36-test run --rm api python manage.py
+  test api`: all 21 API tests pass, including existing create/model tests and
+  new listing tests for session authentication, cross-user isolation,
+  empty-result shape, inclusive dates/category filters, and invalid query
+  validation.
+- Ran `docker compose -p cashmire-issue36-test run --rm api python manage.py
+  check`: no system-check issues.
+- `git diff --check` passes.
+- Removed only the isolated verification Compose resources.
+- Inspected generated OpenAPI for `/api/expenses/`: GET and POST are both
+  present, and GET exposes `category_id`, `date_from`, and `date_to` query
+  parameters with the expected integer/date types. The existing health-view
+  serializer inference warning remains unrelated.
+
+**Accepted / modified / rejected.**
+- Accepted: Support all three documented filters, inclusive date bounds,
+  and no pagination for the MVP.
+- Modified: Reject an inverted date range (`date_from > date_to`) with a
+  field-level 400 error rather than silently returning an empty list.
+- Rejected: Returning expenses belonging to other users or exposing a
+  distinct response for a category owned by another user; the user scope is
+  applied before optional filters.
+
+**Final decision.** Authenticated users can list only their own expenses,
+optionally filtered by category/date, and an empty result is returned as
+`{"expenses": []}`.

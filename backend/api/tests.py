@@ -287,3 +287,166 @@ class ExpenseCreateTests(TestCase):
                     },
                 )
                 self.assertEqual(Expense.objects.count(), 0)
+
+
+class ExpenseListTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="expense-reader",
+            email="expense-reader@example.com",
+            password="correct-horse-battery-staple-42",
+        )
+        self.other_user = User.objects.create_user(
+            username="other-expense-reader",
+            email="other-expense-reader@example.com",
+            password="correct-horse-battery-staple-42",
+        )
+        self.category = self.user.categories.first()
+        self.other_category = self.user.categories.exclude(pk=self.category.pk).first()
+        self.other_users_category = self.other_user.categories.first()
+        self.client = APIClient()
+        self.url = "/api/expenses/"
+
+    def create_expense(
+        self,
+        *,
+        user=None,
+        category=None,
+        amount=Decimal("10.00"),
+        expense_date=date(2026, 10, 7),
+        description="Expense",
+    ):
+        user = user or self.user
+        category = category or self.category
+        return Expense.objects.create(
+            user=user,
+            category=category,
+            amount=amount,
+            date=expense_date,
+            description=description,
+        )
+
+    def test_list_requires_session_authentication(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(
+            response.json(),
+            {"detail": "Authentication credentials were not provided."},
+        )
+
+    def test_list_returns_only_the_authenticated_users_expenses(self):
+        own_expense = self.create_expense(description="Mine")
+        self.create_expense(
+            user=self.other_user,
+            category=self.other_users_category,
+            description="Not mine",
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [item["id"] for item in response.json()["expenses"]],
+            [own_expense.pk],
+        )
+        self.assertEqual(response.json()["expenses"][0]["user_id"], self.user.pk)
+
+        response = self.client.get(
+            self.url,
+            {"category_id": self.other_users_category.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"expenses": []})
+
+    def test_empty_list_returns_an_empty_array(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"expenses": []})
+
+    def test_filters_by_category_and_inclusive_date_range(self):
+        matching = self.create_expense(
+            expense_date=date(2026, 10, 1),
+            description="First boundary",
+        )
+        end_boundary = self.create_expense(
+            expense_date=date(2026, 10, 7),
+            description="Last boundary",
+        )
+        self.create_expense(
+            expense_date=date(2026, 10, 8),
+            description="After range",
+        )
+        self.create_expense(
+            category=self.other_category,
+            expense_date=date(2026, 10, 5),
+            description="Other category",
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            self.url,
+            {
+                "category_id": self.category.pk,
+                "date_from": "2026-10-01",
+                "date_to": "2026-10-07",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [item["id"] for item in response.json()["expenses"]],
+            [end_boundary.pk, matching.pk],
+        )
+        self.assertEqual(response.json()["expenses"][0]["amount"], "10.00")
+
+    def test_category_and_date_filters_work_independently(self):
+        category_expenses = [
+            self.create_expense(expense_date=date(2026, 10, 1)),
+            self.create_expense(expense_date=date(2026, 10, 8)),
+        ]
+        date_expenses = [
+            self.create_expense(
+                category=self.other_category,
+                expense_date=date(2026, 10, 5),
+            ),
+        ]
+        self.client.force_login(self.user)
+
+        category_response = self.client.get(
+            self.url,
+            {"category_id": self.category.pk},
+        )
+        date_response = self.client.get(self.url, {"date_from": "2026-10-05"})
+
+        self.assertEqual(category_response.status_code, 200)
+        self.assertEqual(date_response.status_code, 200)
+        self.assertEqual(
+            [item["id"] for item in category_response.json()["expenses"]],
+            [category_expenses[1].pk, category_expenses[0].pk],
+        )
+        self.assertEqual(
+            [item["id"] for item in date_response.json()["expenses"]],
+            [category_expenses[1].pk, date_expenses[0].pk],
+        )
+
+    def test_invalid_filters_return_field_level_errors(self):
+        self.client.force_login(self.user)
+        for query, field in (
+            ({"category_id": "invalid"}, "category_id"),
+            ({"date_from": "not-a-date"}, "date_from"),
+            (
+                {"date_from": "2026-10-08", "date_to": "2026-10-07"},
+                "date_from",
+            ),
+        ):
+            with self.subTest(query=query):
+                response = self.client.get(self.url, query)
+
+                self.assertEqual(response.status_code, 400)
+                self.assertIn(field, response.json())
