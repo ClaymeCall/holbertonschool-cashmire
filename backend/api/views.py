@@ -1,8 +1,9 @@
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.views import APIView
 
 from .serializers import LoginSerializer, RegisterSerializer, UserSerializer
 
@@ -87,3 +88,44 @@ class LoginView(generics.GenericAPIView):
 
         login(request, user)
         return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
+
+
+class LogoutView(APIView):
+    """POST /api/auth/logout/ — docs/api-design.md §2.3, issue #24.
+
+    `permission_classes = [AllowAny]` looks backwards for an endpoint that
+    requires authentication, but it's deliberate: DRF's `IsAuthenticated`
+    raises `NotAuthenticated`, which hits the exact same 401→403
+    downgrade as `LoginView`'s `AuthenticationFailed` did (see that view's
+    docstring) whenever the first authenticator in
+    `DEFAULT_AUTHENTICATION_CLASSES` has no `WWW-Authenticate` header —
+    true here for the same reason. Checking `request.user.is_authenticated`
+    directly and returning the 401 ourselves sidesteps that entirely, so
+    this endpoint's error shape stays consistent with `LoginView`'s rather
+    than silently becoming a different status code.
+
+    CSRF (decision 0003, point 5): this is the first endpoint in the
+    codebase where DRF's `SessionAuthentication` actually enforces it —
+    register/login don't, because neither resolves a session user at
+    request time, but a logout call, by definition, is made by someone
+    already logged in. A caller must send the `csrftoken` cookie's value
+    back as an `X-CSRFToken` header (Django sets that cookie
+    automatically, deliberately not `HttpOnly`, so client JS can read it)
+    or this 403s with "CSRF Failed". No frontend logout button exists yet
+    (#24 is backend-only) — flagged here for whoever builds one.
+
+    `logout()` flushes the session server-side and rotates the session
+    cookie (AC-2: "subsequent requests with the logged-out credential are
+    rejected" — the old `sessionid` value stops referring to anything).
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        if not request.user.is_authenticated:
+            return Response(
+                {"detail": "Authentication credentials were not provided."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        logout(request)
+        return Response(status=status.HTTP_204_NO_CONTENT)
