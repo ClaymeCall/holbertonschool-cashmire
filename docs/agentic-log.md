@@ -458,3 +458,51 @@ checklist. It distinguishes the chosen strategy from what is implemented on
 **Final decision.** The requested strategy guide and checklist are present.
 Issue #25 must remain open until Jason and Clément explicitly confirm their
 understanding; implementation of the auth endpoints remains future work.
+
+## 2026-10-07 — Add the Expense data model (Issue #34)
+
+**Objective.** Implement the core `Expense` entity and migration required by
+#34, preserving exact decimal money and database-enforced relationships.
+
+**Agent/role used.** Copilot-assisted implementation against the issue
+acceptance criteria and the approved ERD. The orchestrator was reviewed but
+not run: the issue and ERD already define this bounded schema change, and no
+new architecture decision or API surface is introduced. This is not a claim
+that the Product & Architecture or QA & Security agents ran.
+
+**What was delegated.** Nothing.
+
+**Main proposal.** Add `Expense` with `DecimalField(max_digits=10,
+decimal_places=2)`, optional `description`, required `date`, and required
+foreign keys to `User` and `Category`. Keep amount positivity in the database
+with a check constraint. Use `CASCADE` for user deletion and `PROTECT` for
+category deletion, preserving expense history while category-deletion policy
+is otherwise unresolved.
+
+**How the change was verified.**
+- Compared fields and constraints with `docs/erd.md` and the MVP scope.
+- Ran `docker compose exec api python manage.py makemigrations api` to
+  generate `0003_expense.py`; `makemigrations api --check --dry-run` reports
+  no model/migration drift.
+- Ran `docker compose exec api python manage.py test api`: all 7 tests pass,
+  including exact `Decimal` round-trip, non-positive amount rejection, and
+  database enforcement of the category foreign key.
+- Updated the privacy page to distinguish the newly defined Expense schema
+  from the not-yet-available expense submission feature; added a focused
+  frontend assertion for that distinction. Ran
+  `docker compose exec frontend npm run test -- --run
+  src/routes/privacy/page.test.js`: all 7 tests pass.
+- `git diff --check` passes.
+
+**Accepted / modified / rejected.**
+- Accepted: Use ERD `description` as the optional expense label, retain the
+  `NUMERIC(10, 2)` precision, and enforce `amount > 0` in PostgreSQL.
+- Modified: Use `PROTECT` for the category FK because `SET_NULL` would
+  conflict with the ERD's required category reference; this avoids silently
+  deleting financial records if a category is removed.
+- Rejected: Adding create/list API behavior, which belongs to follow-up issues
+  #35 and #36.
+
+**Final decision.** The model and migration implement the storage scope of
+#34. API creation/listing behavior remains out of scope and a human review is
+still required before merge.
