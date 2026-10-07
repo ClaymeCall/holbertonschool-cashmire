@@ -70,8 +70,9 @@
   <p>
     Expense records support the expense-tracking feature: recording an
     amount, date, and optional description under a category for the
-    authenticated user. This endpoint creates records; listing, editing, and
-    deleting expenses are not implemented yet.
+    authenticated user. The authenticated API lets the owner create, list,
+    edit, and delete expense records. The website does not yet provide an
+    expense form or interface for those operations.
   </p>
 
   <h2>Where data would live</h2>
@@ -127,9 +128,10 @@
   <h2>How long we keep data</h2>
   <p>
     No retention period or automatic deletion schedule for expense records
-    is defined in this project. The API has no expense deletion endpoint or
-    account-deletion flow. Records remain in the database until they are
-    removed through another authorized means or the database itself is
+    is defined in this project. An authenticated owner can delete an
+    individual expense through the API, but there is no account-deletion
+    flow. Records remain in the database until an owner deletes them, they
+    are removed through another authorized means, or the database itself is
     deleted; the user foreign key is configured to cascade if an account is
     deleted through Django.
   </p>
@@ -138,11 +140,12 @@
   <p>
     Readers of a privacy page are typically entitled to rights such as access,
     rectification, erasure, restriction, portability, objection, and the
-    ability to complain to a supervisory authority. This project does not
-    provide user-facing endpoints to list, correct, export, or delete
-    expenses. Whether a deployment holds records about you depends on its
-    use and database state; contact the operator to ask about a specific
-    record or request.
+    ability to complain to a supervisory authority. The authenticated API
+    lets an owner list, edit, and delete their expenses, but provides no
+    expense export or account-deletion feature. The website does not yet
+    provide an interface for these operations. Whether a deployment holds
+    records about you depends on its use and database state; contact the
+    operator to ask about a specific record or request.
   </p>
   <p>
     To ask a question or exercise any of these rights, the contact route is:
@@ -152,11 +155,12 @@
 
   <h2>How we protect data</h2>
   <p>
-    The expense creation endpoint requires an authenticated Django session,
-    assigns the expense to that session's user, and only accepts a category
-    owned by that user. Django/DRF session authentication applies CSRF checks
-    to authenticated state-changing requests. These application checks do
-    not amount to a production security guarantee.
+    Expense endpoints require an authenticated Django session and scope
+    records to that session's user. Creation assigns the expense to that
+    user, and writes only accept categories owned by that user.
+    Django/DRF session authentication applies CSRF checks to authenticated
+    state-changing requests. These application checks do not amount to a
+    production security guarantee.
   </p>
   <p>
     Browser access to the project's API is limited by a CORS allowlist that,
@@ -184,8 +188,9 @@
 
   <h2>What is planned, and not yet built</h2>
   <p>
-    Registration and login routes, an expense form, and expense listing,
-    editing, and deletion are not implemented. Budgets and their user
+    Registration and login routes, an expense form, and interfaces for
+    managing expenses are not implemented. Authenticated API routes support
+    expense creation, listing, editing, and deletion. Budgets and their user
     interface are also not implemented. This page must be updated as those
     features become available and their actual data handling is known.
   </p>

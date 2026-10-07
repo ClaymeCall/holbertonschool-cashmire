@@ -150,9 +150,17 @@ describe("privacy page (#63)", () => {
       "The endpoint requires an authenticated Django session",
     );
     expect(text).toContain(
+      "The authenticated API lets the owner create, list, edit, and delete expense records",
+    );
+    expect(text).toContain(
       "No retention period or automatic deletion schedule for expense records is defined",
     );
+    expect(text).toContain(
+      "An authenticated owner can delete an individual expense through the API",
+    );
     expect(text).not.toContain("Nothing is kept");
+    expect(text).not.toContain("listing, editing, and deleting expenses are not implemented yet");
+    expect(text).not.toContain("The API has no expense deletion endpoint");
   });
 
   it("T-4 (AC-5): the shared layout footer links to /privacy with a self-describing name", () => {
