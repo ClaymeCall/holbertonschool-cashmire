@@ -1012,3 +1012,53 @@ specialized agent run (`agentic/orchestrator.py`) is claimed.
 every MVP screen reachable from the shared nav and the home page replaced
 by the real summary, while explicitly leaving the mock-to-real API swap
 (#92) and the a11y/responsive passes (#64/#65) untouched.
+
+## 2026-10-07 — Fix missing CSRF_TRUSTED_ORIGINS (Issue #130)
+
+**Objective.** Fix a backend gap found while manually testing the #104 PR
+stack (#127/#128/#129) end-to-end: every authenticated mutation from the
+real frontend was failing with a Django CSRF "Origin checking failed"
+error, regardless of a correct session cookie and `X-CSRFToken` header.
+
+**Agent/role used.** Claude Code-assisted backend fix. No specialized
+agent run (`agentic/orchestrator.py`) is claimed.
+
+**What was delegated.** Nothing.
+
+**How the gap was found.** While demoing the #104 stack, locally (never
+pushed) integrated the then-unmerged auth (#126) and budget (#115,
+#121-125) backend branches into a throwaway branch to exercise a real
+login → create-budget flow end-to-end. The create request reproducibly
+failed with `"CSRF Failed: Origin checking failed - http://localhost:5173
+does not match any trusted origins."`, isolated via `curl` with/without an
+`Origin` header to confirm it was Django's CSRF middleware's own
+cross-origin check — a different, more specific gap than the
+"no CSRF-bootstrap-route" one `docs/decisions/0003-session-cookie-auth-strategy.md`
+already names, and one that affects endpoints already merged into `main`
+(`/api/expenses/`), not just the unmerged branches used to reproduce it.
+
+**Main proposal.** Add `CSRF_TRUSTED_ORIGINS` to
+`backend/cashmire/settings.py`, reusing the same `DJANGO_CORS_ALLOWED_ORIGINS`
+env var and default `CORS_ALLOWED_ORIGINS` already uses, since both
+describe "the frontend's origin(s)" and have never had reason to differ.
+
+**How the change was verified.**
+- Reproduced the failure against the real backend via `curl` (session
+  cookie + valid `X-CSRFToken` + `Origin: http://localhost:5173` → 403)
+  before the fix, and confirmed 201 after.
+- Added `CsrfTrustedOriginsTests` to `backend/api/tests.py`, using
+  `APIClient(enforce_csrf_checks=True)` (every other test class in this
+  file uses the default `APIClient()`, which disables CSRF checking
+  entirely — exactly why this gap had zero test coverage until now).
+  Proves the setting is both sufficient (succeeds with it) and necessary
+  (`@override_settings(CSRF_TRUSTED_ORIGINS=[])` reproduces the original
+  403) against the already-merged `/api/expenses/` endpoint.
+- `python manage.py test api`: 31/31 passing (2 new). `python manage.py
+  check`: no issues.
+
+**Accepted / modified / rejected.** Nothing modified or rejected — this is
+a one-setting fix plus the regression test that was missing for it.
+
+**Final decision.** `CSRF_TRUSTED_ORIGINS` is set on `fix/130-csrf-trusted-origins`,
+closing #130, with regression coverage proving both the failure mode and
+the fix.
