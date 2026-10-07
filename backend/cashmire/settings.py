@@ -102,6 +102,17 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Custom user model (docs/erd.md USER entity, issue #20): Django's default
+# `auth.User` does not make `email` unique, and this project logs in by
+# email. This must be set before the migration that creates the user table
+# runs — and that migration must be `api`'s `__first__` migration, because
+# every other app's own migrations that reference `AUTH_USER_MODEL` (e.g.
+# `admin.0001_initial`) resolve it via `swappable_dependency`, which always
+# points at app `api`'s first migration by name, not by which one actually
+# creates the model. That's why `api/migrations/0001_initial.py` creates
+# `User` directly rather than staying empty with a later migration doing it.
+AUTH_USER_MODEL = "api.User"
+
 CORS_ALLOWED_ORIGINS = os.environ.get(
     "DJANGO_CORS_ALLOWED_ORIGINS", "http://localhost:5173"
 ).split(",")
