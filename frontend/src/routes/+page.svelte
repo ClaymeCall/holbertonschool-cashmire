@@ -1,7 +1,18 @@
 <script>
+  // Landing page. For a logged-in visitor it also previews their most
+  // recent expenses and budgets (issue #104 componentization follow-up) —
+  // proof that ExpensesList/BudgetsList (lib/components/) are genuinely
+  // reusable outside their own /expenses and /budgets routes, not just
+  // split out for file-size reasons. Each preview is capped at 3 items and
+  // links through to its full route rather than paginating here.
   import { onMount } from "svelte";
   import { apiFetch } from "$lib/api";
   import heroImage from "$lib/images/cashmere-hero.webp";
+  import { authState } from "$lib/auth.svelte.js";
+  import ExpensesList from "$lib/components/ExpensesList.svelte";
+  import BudgetsList from "$lib/components/BudgetsList.svelte";
+
+  const PREVIEW_LIMIT = 3;
 
   let status = "checking...";
 
@@ -24,6 +35,24 @@
 
 <main>
   <p>API status: <code>{status}</code></p>
+
+  {#if authState.status === "authenticated"}
+    <section class="preview" aria-labelledby="expenses-preview-heading">
+      <div class="preview-header">
+        <h2 id="expenses-preview-heading">Recent expenses</h2>
+        <a href="/expenses">View all</a>
+      </div>
+      <ExpensesList limit={PREVIEW_LIMIT} />
+    </section>
+
+    <section class="preview" aria-labelledby="budgets-preview-heading">
+      <div class="preview-header">
+        <h2 id="budgets-preview-heading">Your budgets</h2>
+        <a href="/budgets">View all</a>
+      </div>
+      <BudgetsList limit={PREVIEW_LIMIT} />
+    </section>
+  {/if}
 </main>
 
 <style>
@@ -60,5 +89,29 @@
     max-width: 60ch;
     margin: 0 auto;
     padding: var(--space-2xl) var(--space-xl) var(--space-3xl);
+  }
+
+  .preview {
+    margin-top: var(--space-2xl);
+  }
+
+  .preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-md);
+  }
+
+  .preview-header h2 {
+    font-family: var(--font-heading);
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--color-heading);
+  }
+
+  .preview-header a {
+    font-size: var(--font-size-sm);
+    color: var(--color-primary);
   }
 </style>
