@@ -205,19 +205,15 @@
     background-color: var(--color-primary);
   }
 
-  nav {
-    /* `flex-grow` only (not the `flex` shorthand, which sets
-       `flex-basis: 0%` and would override the mobile media query's
-       `width: 100%` below) — takes the width left over after the brand
-       (and, on desktop, the hidden menu-toggle) so its links can center
-       within that space instead of hugging the right edge. */
-    flex-grow: 1;
-  }
-
   nav ul {
     display: flex;
     flex-wrap: wrap;
-    justify-content: center;
+    /* Cross-axis alignment: without this, each <li> stretches to the row's
+       full height (flex's default `align-items: stretch`) and the <a>/
+       <button> pills inside them don't vertically center within that
+       stretched box, so they sit at inconsistent heights relative to
+       each other. */
+    align-items: center;
     gap: var(--space-lg);
     margin: 0;
     padding: 0;
@@ -301,7 +297,7 @@
     nav ul {
       display: none;
       flex-direction: column;
-      align-items: center;
+      align-items: flex-start;
       gap: var(--space-xs);
       margin-top: var(--space-md);
     }
