@@ -21,23 +21,65 @@
   // actually started a navigation — which is not the case when this
   // component is rendered standalone in a test harness, as
   // privacy/page.test.js does without mocking `$app/stores` at all.
+  import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import "$lib/styles/tokens.css";
   import "$lib/styles/fonts.css";
   import "$lib/styles/base.css";
   import textureTile from "$lib/images/cashmere-texture-tile.webp";
+  import { authState, refreshCurrentUser, setCurrentUser } from "$lib/auth.svelte.js";
+  import { apiFetch } from "$lib/api";
 
   let { children } = $props();
 
   // Exactly the routes that exist today — no placeholder links to unbuilt
   // pages (see docs/specs/issue-15-svelte-skeleton.md §4.2.1). Login/Register
-  // added for #28/#29.
-  const navLinks = [
-    { href: "/", label: "Home" },
-    { href: "/login", label: "Log in" },
-    { href: "/register", label: "Register" },
-    { href: "/privacy", label: "Privacy" },
-  ];
+  // only make sense to show when nobody is logged in — otherwise they're
+  // replaced by the "Log out" action further down.
+  const navLinks = $derived(
+    authState.status === "authenticated"
+      ? [
+          { href: "/", label: "Home" },
+          { href: "/privacy", label: "Privacy" },
+        ]
+      : [
+          { href: "/", label: "Home" },
+          { href: "/login", label: "Log in" },
+          { href: "/register", label: "Register" },
+          { href: "/privacy", label: "Privacy" },
+        ],
+  );
+
+  // Resolved once per full page load — the layout itself doesn't remount
+  // on client-side navigation, so login/register set the state directly
+  // on success (see their own handleSubmit) rather than relying on this
+  // running again.
+  onMount(() => {
+    refreshCurrentUser();
+  });
+
+  let loggingOut = $state(false);
+
+  async function handleLogout() {
+    if (loggingOut) return;
+    loggingOut = true;
+    try {
+      await apiFetch("/api/auth/logout/", {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch (err) {
+      // Logout is idempotent from the user's point of view: even if the
+      // request failed (e.g. the session had already expired server-side),
+      // there is nothing actionable to show them — clear local state and
+      // send them home regardless.
+      console.error("Logout failed:", err);
+    }
+    setCurrentUser(null);
+    loggingOut = false;
+    await goto("/");
+  }
 
   // Mobile nav collapse (issue #104 navbar follow-up). Closed by default so
   // the links don't flash open on small screens before CSS hides them.
@@ -72,6 +114,21 @@
             </a>
           </li>
         {/each}
+        {#if authState.status === "authenticated"}
+          <li>
+            <button
+              type="button"
+              class="nav-action"
+              disabled={loggingOut}
+              onclick={() => {
+                menuOpen = false;
+                handleLogout();
+              }}
+            >
+              {loggingOut ? "Logging out…" : "Log out"}
+            </button>
+          </li>
+        {/if}
       </ul>
     </nav>
   </div>
@@ -161,7 +218,8 @@
     color: var(--color-primary);
   }
 
-  nav a {
+  nav a,
+  nav .nav-action {
     padding: var(--space-xs) var(--space-sm);
     border-radius: var(--radius-full);
     text-decoration: none;
@@ -169,7 +227,8 @@
       color var(--motion-duration) var(--motion-ease);
   }
 
-  nav a:hover {
+  nav a:hover,
+  nav .nav-action:hover:not(:disabled) {
     background-color: var(--color-oatmeal);
   }
 
@@ -177,6 +236,22 @@
     font-weight: 700;
     background-color: var(--color-camel);
     color: var(--color-ivory);
+  }
+
+  /* Matches `nav a`'s look exactly, but it's a <button> (issue #104
+     follow-up) — logout is a state-changing POST, not a navigation, so it
+     must not be a link. */
+  nav .nav-action {
+    font: inherit;
+    color: var(--color-primary);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+  }
+
+  nav .nav-action:disabled {
+    cursor: default;
+    opacity: 0.65;
   }
 
   footer {

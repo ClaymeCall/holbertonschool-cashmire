@@ -16,6 +16,7 @@
   // server-side validation errors once the backend exists.
   import { goto } from "$app/navigation";
   import { apiFetch, ApiError } from "$lib/api";
+  import { setCurrentUser } from "$lib/auth.svelte.js";
   import Button from "$lib/components/Button.svelte";
   import TextField from "$lib/components/TextField.svelte";
   import FormError from "$lib/components/FormError.svelte";
@@ -90,7 +91,7 @@
     errorMessages = [];
 
     try {
-      await apiFetch("/api/auth/register/", {
+      const createdUser = await apiFetch("/api/auth/register/", {
         method: "POST",
         body: { email: email.trim(), password },
         credentials: "include",
@@ -98,6 +99,10 @@
       });
       // Registration also establishes a session per docs/mvp-scope.md §3.1
       // ("inscription immédiate") — same redirect as a successful login.
+      // The response body is already the created user (UserSerializer
+      // shape), so the nav can reflect the logged-in state immediately
+      // without a round trip to /api/auth/me/.
+      setCurrentUser(/** @type {{ id: number, email: string }} */ (createdUser));
       await goto("/");
     } catch (err) {
       if (err instanceof ApiError && err.status === 400) {

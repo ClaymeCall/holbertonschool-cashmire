@@ -16,6 +16,7 @@
   // to change.
   import { goto } from "$app/navigation";
   import { apiFetch, ApiError } from "$lib/api";
+  import { setCurrentUser } from "$lib/auth.svelte.js";
   import Button from "$lib/components/Button.svelte";
   import TextField from "$lib/components/TextField.svelte";
   import FormError from "$lib/components/FormError.svelte";
@@ -53,14 +54,16 @@
     errorMessage = null;
 
     try {
-      await apiFetch("/api/auth/login/", {
+      const loggedInUser = await apiFetch("/api/auth/login/", {
         method: "POST",
         body: { email: email.trim(), password },
         credentials: "include",
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
-      // Successful login: the server has set a session cookie. Nothing to
-      // store client-side — redirect into the app shell (AC-3).
+      // Successful login: the server has set a session cookie, and the
+      // response body is already the logged-in user (UserSerializer
+      // shape) — feed it straight into the nav's auth state (AC-3).
+      setCurrentUser(/** @type {{ id: number, email: string }} */ (loggedInUser));
       await goto("/");
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
