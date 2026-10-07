@@ -22,6 +22,7 @@
   // component is rendered standalone in a test harness, as
   // privacy/page.test.js does without mocking `$app/stores` at all.
   import { page } from "$app/stores";
+  import "$lib/styles/tokens.css";
 
   let { children } = $props();
 
@@ -65,31 +66,31 @@
 
 <style>
   header {
-    padding: 1rem 1.25rem;
-    border-bottom: 1px solid #c8c8c8;
+    padding: var(--space-lg) var(--space-xl);
+    border-bottom: 1px solid var(--color-border-subtle);
   }
 
   .brand {
     display: inline-block;
-    margin-bottom: 0.5rem;
+    margin-bottom: var(--space-sm);
     font-weight: 700;
   }
 
   nav ul {
     display: flex;
     flex-wrap: wrap;
-    gap: 1rem;
+    gap: var(--space-lg);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
   header a {
-    color: #0b3d91;
+    color: var(--color-primary);
   }
 
   header a:focus-visible {
-    outline: 3px solid #0b3d91;
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
     outline-offset: 2px;
   }
 
@@ -99,17 +100,17 @@
   }
 
   footer {
-    padding: 1rem 1.25rem;
-    border-top: 1px solid #c8c8c8;
-    font-size: 0.95rem;
+    padding: var(--space-lg) var(--space-xl);
+    border-top: 1px solid var(--color-border-subtle);
+    font-size: var(--font-size-sm);
   }
 
   footer a {
-    color: #0b3d91;
+    color: var(--color-primary);
   }
 
   footer a:focus-visible {
-    outline: 3px solid #0b3d91;
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
     outline-offset: 2px;
   }
 </style>

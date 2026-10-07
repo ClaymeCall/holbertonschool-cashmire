@@ -1,4 +1,6 @@
 <script>
+  import "$lib/styles/tokens.css";
+
   // TODO(#63-legal): these values require a human decision - see docs/specs/issue-63-privacy-page.md section 10.
   // Do not invent values. Do not remove this comment while any value is unresolved.
   const LEGAL = {
@@ -202,24 +204,24 @@
   main {
     max-width: 70ch;
     margin: 0 auto;
-    padding: 1.5rem 1.25rem 3rem;
+    padding: var(--space-2xl) var(--space-xl) var(--space-3xl);
     line-height: 1.5;
   }
 
   .draft-banner {
-    border: 2px solid #7a4b00;
-    background: #fff6e5;
-    color: #3b2200;
-    padding: 0.75rem 1rem;
-    border-radius: 4px;
+    border: 2px solid var(--color-warning-border);
+    background: var(--color-warning-bg);
+    color: var(--color-warning-text);
+    padding: var(--space-md) var(--space-lg);
+    border-radius: var(--radius-sm);
   }
 
   a {
-    color: #0b3d91;
+    color: var(--color-primary);
   }
 
   a:focus-visible {
-    outline: 3px solid #0b3d91;
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
     outline-offset: 2px;
   }
 

@@ -1,6 +1,6 @@
 # 0001 — Introduce a minimal shared app shell (`+layout.svelte`)
 
-- **Status:** Proposed — amended by #15
+- **Status:** Proposed — amended by #15, #104
 - **Date:** 2026-10-05
 - **Context issue:** #63 (privacy and legal information page)
 - **Supersedes / superseded by:** —
@@ -87,3 +87,45 @@ own `<style>` block, with no global stylesheet, CSS reset or design tokens
 introduced. Point 2's "accretion" warning stands for anything beyond these
 two links — this amendment is not a licence for a sidebar, theme switcher
 or auth menu later.
+
+## Amendment — 2026-10-06 (issue #104, design-system slice)
+
+**What changed:** point 6 ("styling stays component-scoped until there is a
+concrete reason for a global stylesheet") no longer holds without
+qualification. By the time #28/#29 (login/register) landed, the same color,
+spacing, border, and focus-ring values were being hand-typed in three
+places (`+layout.svelte`, `login/+page.svelte`, `register/+page.svelte`),
+and `privacy/+page.svelte` had its own copies of the same primary/warning
+colors — the "concrete reason" point 6 asked for. This amendment
+introduces:
+
+- `frontend/src/lib/styles/tokens.css` — `:root` custom properties naming
+  the colors, spacing scale, border radius, and focus-ring values already
+  in use. No new values were invented; existing hex codes were given names.
+  It is imported from wherever it's consumed (the layout, and each shared
+  component below) rather than globally in `app.html` — Svelte's
+  per-component style scoping does not apply to `:root` custom properties,
+  so this is sufficient for the variables to resolve document-wide once any
+  importer is on the page.
+- `frontend/src/lib/components/Button.svelte`, `TextField.svelte`, and
+  `FormError.svelte` — the three repeated patterns (a submit button, a
+  labelled input with an optional hint, and a form-level `role="alert"`
+  block for one message or a list) factored out of login/register into
+  reusable components built on the tokens above.
+- `+layout.svelte`, `login/+page.svelte`, `register/+page.svelte`, and
+  `privacy/+page.svelte` were adopted to use the tokens (and, for
+  login/register, the shared components) in place of their local copies.
+
+**What is unchanged:** points 2 through 5 still hold — the layout still adds
+no header/nav/footer beyond what #15 already introduced, still adds no
+`<main>`, and `+layout.js`/`+layout.svelte` still coexist. This is a styling
+amendment, not a structural one.
+
+**What is explicitly deferred:** issue #104's full scope — expanding the nav
+to cover expenses/budgets, making it auth-state-aware, and replacing the
+home page's health-check placeholder with the budgets/expenses dashboard —
+depends on screens from #40/#41/#52/#53 and a session/auth-state mechanism
+(#25), none of which exist in this codebase yet. This amendment covers only
+the design-system foundation; the nav/dashboard work is a follow-up once
+those land. A `Card` style is likewise not introduced yet, since no screen
+needs one until the budget/expense dashboards exist.
