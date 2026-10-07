@@ -116,26 +116,15 @@
   /* ---- Elevation ---- */
   --shadow-soft: 0 8px 24px -12px rgba(42, 23, 15, 0.22);
 
-  /* ---- Texture: faint knit/weave crosshatch, ~3.5% opacity ---- */
-  --texture-weave: repeating-linear-gradient(
-      45deg,
-      rgba(42, 35, 31, 0.035) 0,
-      rgba(42, 35, 31, 0.035) 1px,
-      transparent 1px,
-      transparent 5px
-    ),
-    repeating-linear-gradient(
-      -45deg,
-      rgba(42, 35, 31, 0.035) 0,
-      rgba(42, 35, 31, 0.035) 1px,
-      transparent 1px,
-      transparent 5px
-    );
-
   /* Focus ring, per decision 0001's accessibility intent. Camel-deep, not
      plain Camel, for the same contrast reason as the button fill above. */
   --focus-ring-width: 3px;
   --focus-ring-color: var(--color-camel-deep);
+
+  /* Tint drawn over the macro-photo weave texture (cashmere-texture-tile.webp)
+     on header/footer so the photo reads at the brief's 3-4% opacity rather
+     than as a visible tiled image — same surface color, mostly opaque. */
+  --texture-overlay-tint: rgba(233, 223, 204, 0.94);
 }
 
 /* Dark mode: automatic (prefers-color-scheme), no theme-switcher UI — decision
@@ -153,5 +142,6 @@
     --color-primary: var(--color-camel);
     --color-border: var(--color-heather-taupe);
     --color-border-subtle: #4a3f37;
+    --texture-overlay-tint: rgba(42, 35, 31, 0.94);
   }
 }

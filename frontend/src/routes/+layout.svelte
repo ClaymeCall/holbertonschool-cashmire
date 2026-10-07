@@ -25,6 +25,7 @@
   import "$lib/styles/tokens.css";
   import "$lib/styles/fonts.css";
   import "$lib/styles/base.css";
+  import textureTile from "$lib/images/cashmere-texture-tile.webp";
 
   let { children } = $props();
 
@@ -43,7 +44,7 @@
   let menuOpen = $state(false);
 </script>
 
-<header>
+<header style="--texture-photo: url({textureTile})">
   <div class="header-row">
     <a class="brand" href="/">Cashmire</a>
     <button
@@ -80,7 +81,7 @@
   {@render children()}
 {/if}
 
-<footer>
+<footer style="--texture-photo: url({textureTile})">
   <a href="/privacy">Privacy &amp; legal</a>
   <a href="/health">API health</a>
 </footer>
@@ -90,7 +91,14 @@
     padding: var(--space-lg) var(--space-xl);
     border-bottom: 1px dashed var(--color-border-subtle);
     background-color: var(--color-surface);
-    background-image: var(--texture-weave);
+    /* Real macro-knit photo, tinted near-opaque so it reads as the brief's
+       faint surface texture rather than a visible photograph. */
+    background-image: linear-gradient(
+        var(--texture-overlay-tint),
+        var(--texture-overlay-tint)
+      ),
+      var(--texture-photo);
+    background-size: auto, 150px 150px;
   }
 
   .header-row {
@@ -175,7 +183,12 @@
     padding: var(--space-lg) var(--space-xl);
     border-top: 1px dashed var(--color-border-subtle);
     background-color: var(--color-surface);
-    background-image: var(--texture-weave);
+    background-image: linear-gradient(
+        var(--texture-overlay-tint),
+        var(--texture-overlay-tint)
+      ),
+      var(--texture-photo);
+    background-size: auto, 150px 150px;
     font-family: var(--font-mono);
     font-size: var(--font-size-sm);
     letter-spacing: var(--tracking-mono-label);
