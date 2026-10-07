@@ -1564,3 +1564,767 @@ class BudgetCreateEndpointTests(TestCase):
             ).count(),
             1,
         )
+
+
+class BudgetConsumptionServiceTests(TestCase):
+    """Tests for the budget consumption calculation service (issue #50).
+
+    These tests verify the pure service functions without HTTP/DRF layers,
+    directly testing the calculation logic with database fixtures.
+    """
+
+    def setUp(self):
+        """Create test user, categories, budgets, and expenses."""
+        self.user = User.objects.create_user(
+            username="consumption-test-user",
+            email="consumption@example.com",
+            password="test-password",
+        )
+        self.other_user = User.objects.create_user(
+            username="other-consumption-user",
+            email="other-consumption@example.com",
+            password="test-password",
+        )
+        self.category = Category.objects.create(
+            user=self.user,
+            name="Test Category",
+            description="Category for consumption tests",
+        )
+        self.other_category = Category.objects.create(
+            user=self.user,
+            name="Other Category",
+            description="Another category",
+        )
+        self.other_user_category = Category.objects.create(
+            user=self.other_user,
+            name="Other User Category",
+            description="Category for other user",
+        )
+
+    def _import_service(self):
+        """Import service functions (deferred until test runs)."""
+        from api.services.budget_consumption import (
+            calculate_consumption,
+            calculate_consumption_batch,
+        )
+        return calculate_consumption, calculate_consumption_batch
+
+    # ===== T-1 to T-10: Basic consumption calculation =====
+
+    def test_budget_no_expenses_zero_consumption(self):
+        """T-1: Budget without expenses → spent=0, remaining=amount, percentage=0."""
+        calculate_consumption, _ = self._import_service()
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("100.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+
+        consumption = calculate_consumption(budget)
+
+        self.assertEqual(consumption.spent, Decimal("0.00"))
+        self.assertEqual(consumption.remaining, Decimal("100.00"))
+        self.assertEqual(consumption.percentage, Decimal("0.00"))
+
+    def test_budget_expense_equals_amount_100_percent(self):
+        """T-2: Expense equal to budget amount → spent=amount, remaining=0, percentage=100."""
+        calculate_consumption, _ = self._import_service()
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("100.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("100.00"),
+            date=date(2026, 10, 15),
+        )
+
+        consumption = calculate_consumption(budget)
+
+        self.assertEqual(consumption.spent, Decimal("100.00"))
+        self.assertEqual(consumption.remaining, Decimal("0.00"))
+        self.assertEqual(consumption.percentage, Decimal("100.00"))
+
+    def test_budget_expense_less_than_amount(self):
+        """T-3: Expense less than budget → spent < amount, remaining > 0, percentage < 100."""
+        calculate_consumption, _ = self._import_service()
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("100.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("50.00"),
+            date=date(2026, 10, 15),
+        )
+
+        consumption = calculate_consumption(budget)
+
+        self.assertEqual(consumption.spent, Decimal("50.00"))
+        self.assertEqual(consumption.remaining, Decimal("50.00"))
+        self.assertEqual(consumption.percentage, Decimal("50.00"))
+
+    def test_budget_expense_exceeds_amount_negative_remaining(self):
+        """T-4: Expense exceeds budget → spent > amount, remaining < 0, percentage > 100."""
+        calculate_consumption, _ = self._import_service()
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("100.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("150.00"),
+            date=date(2026, 10, 15),
+        )
+
+        consumption = calculate_consumption(budget)
+
+        self.assertEqual(consumption.spent, Decimal("150.00"))
+        self.assertEqual(consumption.remaining, Decimal("-50.00"))
+        self.assertEqual(consumption.percentage, Decimal("150.00"))
+
+    def test_budget_multiple_expenses_sum_correctly(self):
+        """T-5: Multiple expenses sum correctly."""
+        calculate_consumption, _ = self._import_service()
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("200.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("50.00"),
+            date=date(2026, 10, 5),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("75.50"),
+            date=date(2026, 10, 10),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("25.25"),
+            date=date(2026, 10, 20),
+        )
+
+        consumption = calculate_consumption(budget)
+
+        self.assertEqual(consumption.spent, Decimal("150.75"))
+        self.assertEqual(consumption.remaining, Decimal("49.25"))
+        self.assertEqual(consumption.percentage, Decimal("75.38"))
+
+    def test_budget_expense_before_period_start_not_included(self):
+        """T-6: Expense before period_start is not included."""
+        calculate_consumption, _ = self._import_service()
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("100.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("50.00"),
+            date=date(2026, 9, 30),
+        )
+
+        consumption = calculate_consumption(budget)
+
+        self.assertEqual(consumption.spent, Decimal("0.00"))
+        self.assertEqual(consumption.remaining, Decimal("100.00"))
+        self.assertEqual(consumption.percentage, Decimal("0.00"))
+
+    def test_budget_expense_after_period_end_not_included(self):
+        """T-7: Expense after period_end is not included."""
+        calculate_consumption, _ = self._import_service()
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("100.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("50.00"),
+            date=date(2026, 11, 1),
+        )
+
+        consumption = calculate_consumption(budget)
+
+        self.assertEqual(consumption.spent, Decimal("0.00"))
+        self.assertEqual(consumption.remaining, Decimal("100.00"))
+        self.assertEqual(consumption.percentage, Decimal("0.00"))
+
+    def test_budget_expense_exactly_period_start_included(self):
+        """T-8: Expense exactly on period_start is included (inclusive boundary)."""
+        calculate_consumption, _ = self._import_service()
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("100.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("50.00"),
+            date=date(2026, 10, 1),
+        )
+
+        consumption = calculate_consumption(budget)
+
+        self.assertEqual(consumption.spent, Decimal("50.00"))
+        self.assertEqual(consumption.remaining, Decimal("50.00"))
+        self.assertEqual(consumption.percentage, Decimal("50.00"))
+
+    def test_budget_expense_exactly_period_end_included(self):
+        """T-9: Expense exactly on period_end is included (inclusive boundary)."""
+        calculate_consumption, _ = self._import_service()
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("100.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("50.00"),
+            date=date(2026, 10, 31),
+        )
+
+        consumption = calculate_consumption(budget)
+
+        self.assertEqual(consumption.spent, Decimal("50.00"))
+        self.assertEqual(consumption.remaining, Decimal("50.00"))
+        self.assertEqual(consumption.percentage, Decimal("50.00"))
+
+    def test_budget_only_correct_user_category_counted(self):
+        """T-10: Only expenses for correct user and category are counted."""
+        calculate_consumption, _ = self._import_service()
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("100.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+
+        # Create expense for correct user/category/period
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("25.00"),
+            date=date(2026, 10, 15),
+        )
+
+        # Create expense for different user, same period
+        Expense.objects.create(
+            user=self.other_user,
+            category=self.other_user_category,
+            amount=Decimal("50.00"),
+            date=date(2026, 10, 15),
+        )
+
+        # Create expense for same user but different category
+        Expense.objects.create(
+            user=self.user,
+            category=self.other_category,
+            amount=Decimal("75.00"),
+            date=date(2026, 10, 15),
+        )
+
+        consumption = calculate_consumption(budget)
+
+        # Only the first expense should be counted
+        self.assertEqual(consumption.spent, Decimal("25.00"))
+        self.assertEqual(consumption.remaining, Decimal("75.00"))
+        self.assertEqual(consumption.percentage, Decimal("25.00"))
+
+    # ===== T-11 to T-13: Decimal precision =====
+
+    def test_decimal_precision_two_places_maintained(self):
+        """T-11: Decimal amounts with 2 places are maintained exactly."""
+        calculate_consumption, _ = self._import_service()
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("123.45"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("45.67"),
+            date=date(2026, 10, 15),
+        )
+
+        consumption = calculate_consumption(budget)
+
+        self.assertEqual(consumption.spent, Decimal("45.67"))
+        self.assertEqual(consumption.remaining, Decimal("77.78"))
+        # 45.67 / 123.45 * 100 = 36.9937... → rounds to 36.99
+        self.assertEqual(consumption.percentage, Decimal("36.99"))
+
+    def test_decimal_quantized_to_two_places(self):
+        """T-12: All return values are quantized to exactly 2 decimal places."""
+        calculate_consumption, _ = self._import_service()
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("1.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("0.01"),
+            date=date(2026, 10, 15),
+        )
+
+        consumption = calculate_consumption(budget)
+
+        # Verify quantization (exponent should be -2)
+        self.assertEqual(consumption.spent.as_tuple().exponent, -2)
+        self.assertEqual(consumption.remaining.as_tuple().exponent, -2)
+        self.assertEqual(consumption.percentage.as_tuple().exponent, -2)
+
+    def test_percentage_rounding_precision(self):
+        """T-13: Percentage is rounded correctly to 2 decimal places."""
+        calculate_consumption, _ = self._import_service()
+
+        # 123.456 / 100 * 100 = 123.456, should round to 123.46
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("100.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("123.456"),  # Over-budget amount
+            date=date(2026, 10, 15),
+        )
+
+        consumption = calculate_consumption(budget)
+
+        # 123.456 / 100 * 100 = 123.456 → rounds to 123.46
+        self.assertEqual(consumption.percentage, Decimal("123.46"))
+
+    # ===== T-14 to T-19: Batch function tests =====
+
+    def test_batch_empty_budgets_returns_empty_dict(self):
+        """T-14: Empty budgets iterable returns empty dict."""
+        _, calculate_consumption_batch = self._import_service()
+
+        results = calculate_consumption_batch([])
+
+        self.assertEqual(results, {})
+
+    def test_batch_single_budget_matches_single_function(self):
+        """T-15: Batch with single budget matches single-budget function result."""
+        calculate_consumption, calculate_consumption_batch = self._import_service()
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("100.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("35.50"),
+            date=date(2026, 10, 15),
+        )
+
+        single_result = calculate_consumption(budget)
+        batch_results = calculate_consumption_batch([budget])
+
+        self.assertIn(budget.id, batch_results)
+        self.assertEqual(batch_results[budget.id].spent, single_result.spent)
+        self.assertEqual(batch_results[budget.id].remaining, single_result.remaining)
+        self.assertEqual(batch_results[budget.id].percentage, single_result.percentage)
+
+    def test_batch_multiple_same_category_period(self):
+        """T-16: Multiple budgets for same user/category/period are all included."""
+        _, calculate_consumption_batch = self._import_service()
+
+        # Create multiple budgets for same user/category but different periods
+        budget1 = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("100.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        budget2 = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("200.00"),
+            period_start=date(2026, 11, 1),
+            period_end=date(2026, 11, 30),
+        )
+
+        # Create expenses for each period
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("50.00"),
+            date=date(2026, 10, 15),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("75.00"),
+            date=date(2026, 11, 15),
+        )
+
+        results = calculate_consumption_batch([budget1, budget2])
+
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results[budget1.id].spent, Decimal("50.00"))
+        self.assertEqual(results[budget2.id].spent, Decimal("75.00"))
+
+    def test_batch_crossed_budgets_no_contamination(self):
+        """T-17: Budgets for different users/categories don't cross-contaminate."""
+        _, calculate_consumption_batch = self._import_service()
+
+        budget1 = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("100.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        budget2 = Budget.objects.create(
+            user=self.user,
+            category=self.other_category,
+            amount=Decimal("200.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        budget3 = Budget.objects.create(
+            user=self.other_user,
+            category=self.other_user_category,
+            amount=Decimal("300.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+
+        # Create expenses for each
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("30.00"),
+            date=date(2026, 10, 15),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.other_category,
+            amount=Decimal("60.00"),
+            date=date(2026, 10, 15),
+        )
+        Expense.objects.create(
+            user=self.other_user,
+            category=self.other_user_category,
+            amount=Decimal("90.00"),
+            date=date(2026, 10, 15),
+        )
+
+        results = calculate_consumption_batch([budget1, budget2, budget3])
+
+        self.assertEqual(results[budget1.id].spent, Decimal("30.00"))
+        self.assertEqual(results[budget2.id].spent, Decimal("60.00"))
+        self.assertEqual(results[budget3.id].spent, Decimal("90.00"))
+
+    def test_batch_single_query_for_all_budgets(self):
+        """T-18: Batch uses only one SQL query (no N+1)."""
+        _, calculate_consumption_batch = self._import_service()
+
+        budget1 = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("100.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        budget2 = Budget.objects.create(
+            user=self.user,
+            category=self.other_category,
+            amount=Decimal("200.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("50.00"),
+            date=date(2026, 10, 15),
+        )
+
+        # Count queries during batch calculation
+        with self.assertNumQueries(1):
+            results = calculate_consumption_batch([budget1, budget2])
+
+        self.assertEqual(len(results), 2)
+
+    def test_batch_returns_dict_indexed_by_budget_id(self):
+        """T-19: Batch returns dict with budget.id as keys."""
+        _, calculate_consumption_batch = self._import_service()
+
+        budget1 = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("100.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        budget2 = Budget.objects.create(
+            user=self.user,
+            category=self.other_category,
+            amount=Decimal("200.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+
+        results = calculate_consumption_batch([budget1, budget2])
+
+        self.assertIsInstance(results, dict)
+        self.assertIn(budget1.id, results)
+        self.assertIn(budget2.id, results)
+        self.assertEqual(len(results), 2)
+
+    # ===== T-20 to T-23: Edge cases =====
+
+    def test_budget_very_small_amount_minimum(self):
+        """T-20: Budget with minimum amount (0.01) works correctly."""
+        calculate_consumption, _ = self._import_service()
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("0.01"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+
+        consumption = calculate_consumption(budget)
+
+        self.assertEqual(consumption.spent, Decimal("0.00"))
+        self.assertEqual(consumption.remaining, Decimal("0.01"))
+        self.assertEqual(consumption.percentage, Decimal("0.00"))
+
+    def test_budget_very_large_amount_maximum(self):
+        """T-21: Budget with maximum amount (99999999.99) works correctly."""
+        calculate_consumption, _ = self._import_service()
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("99999999.99"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+
+        consumption = calculate_consumption(budget)
+
+        self.assertEqual(consumption.spent, Decimal("0.00"))
+        self.assertEqual(consumption.remaining, Decimal("99999999.99"))
+        self.assertEqual(consumption.percentage, Decimal("0.00"))
+
+    def test_percentage_very_small_value(self):
+        """T-22: Small percentage (0.01 / 1.00 * 100 = 1.00%) rounds correctly."""
+        calculate_consumption, _ = self._import_service()
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("100.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("1.00"),
+            date=date(2026, 10, 15),
+        )
+
+        consumption = calculate_consumption(budget)
+
+        self.assertEqual(consumption.percentage, Decimal("1.00"))
+
+    def test_percentage_just_under_100(self):
+        """T-23: Percentage just under 100% (99.99%) is not capped."""
+        calculate_consumption, _ = self._import_service()
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("100.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("99.99"),
+            date=date(2026, 10, 15),
+        )
+
+        consumption = calculate_consumption(budget)
+
+        self.assertEqual(consumption.percentage, Decimal("99.99"))
+
+    def test_percentage_over_100_not_capped(self):
+        """T-24: Percentage > 100% is not capped at 100."""
+        calculate_consumption, _ = self._import_service()
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("100.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("200.00"),
+            date=date(2026, 10, 15),
+        )
+
+        consumption = calculate_consumption(budget)
+
+        self.assertEqual(consumption.percentage, Decimal("200.00"))
+
+    # ===== T-25 to T-27: Type and immutability =====
+
+    def test_all_return_values_are_decimal(self):
+        """T-25: All return values from consumption are Decimal type."""
+        calculate_consumption, _ = self._import_service()
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("100.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("50.00"),
+            date=date(2026, 10, 15),
+        )
+
+        consumption = calculate_consumption(budget)
+
+        self.assertIsInstance(consumption.spent, Decimal)
+        self.assertIsInstance(consumption.remaining, Decimal)
+        self.assertIsInstance(consumption.percentage, Decimal)
+
+    def test_values_quantized_to_exactly_two_decimal_places(self):
+        """T-26: All values have exponent exactly -2 (quantized to 2 places)."""
+        calculate_consumption, _ = self._import_service()
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("123.45"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("45.67"),
+            date=date(2026, 10, 15),
+        )
+
+        consumption = calculate_consumption(budget)
+
+        self.assertEqual(consumption.spent.as_tuple().exponent, -2)
+        self.assertEqual(consumption.remaining.as_tuple().exponent, -2)
+        self.assertEqual(consumption.percentage.as_tuple().exponent, -2)
+
+    def test_no_cache_reflects_database_changes(self):
+        """T-27: Service calculates from current DB state; no caching."""
+        calculate_consumption, _ = self._import_service()
+
+        budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("100.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("25.00"),
+            date=date(2026, 10, 15),
+        )
+
+        # First calculation
+        consumption1 = calculate_consumption(budget)
+        self.assertEqual(consumption1.spent, Decimal("25.00"))
+
+        # Add another expense
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("25.00"),
+            date=date(2026, 10, 20),
+        )
+
+        # Second calculation reflects the new expense
+        consumption2 = calculate_consumption(budget)
+        self.assertEqual(consumption2.spent, Decimal("50.00"))
+
+        # Verify they're different
+        self.assertNotEqual(consumption1.spent, consumption2.spent)
