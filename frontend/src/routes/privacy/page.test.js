@@ -136,6 +136,19 @@ describe("privacy page (#63)", () => {
     }
   });
 
+  it("distinguishes the Expense schema from an available expense-submission feature", () => {
+    const { container } = render(PrivacyPage);
+    const text = container.textContent.replace(/\s+/g, " ");
+
+    expect(text).toContain("Expense model and migration now exist");
+    expect(text).toContain(
+      "there is no API route or UI for submitting an expense",
+    );
+    expect(text).toContain(
+      "whether these tables exist in a particular database depends on which migrations its operator has applied",
+    );
+  });
+
   it("T-4 (AC-5): the shared layout footer links to /privacy with a self-describing name", () => {
     const { container } = render(Layout, { props: { children: emptyChildrenSnippet } });
     // Scoped to the footer specifically: issue #15 added a "Privacy" nav

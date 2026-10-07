@@ -38,22 +38,25 @@
   <h2>The short version</h2>
   <p>
     Cashmire's login and registration forms will accept an email address
-    and a password if you type them in, but nothing is stored: the backend
-    does not implement the account routes those forms call yet, so
-    submitting either one fails with an error. No other feature on this
-    site asks you for personal information, and none of them store it
-    either. The sections below explain this in detail.
+    and a password if you type them in, but the backend does not implement
+    the account routes those forms call yet. The backend now defines an
+    expense data model, but there is no expense endpoint or form to submit
+    expense data. The sections below distinguish this schema groundwork
+    from data collection through the product.
   </p>
 
   <h2>What personal data we store</h2>
-  <p>Today: none.</p>
+  <p>
+    The application has database models for user accounts and categories,
+    and now defines a model for expense records. However, there is no
+    working registration or login flow, and no expense-creation endpoint or
+    form. The normal product flows therefore do not let you submit account
+    details or expense records.
+  </p>
   <ul>
-    <li>No account</li>
-    <li>No name</li>
-    <li>No email address</li>
-    <li>No password</li>
-    <li>No expense record</li>
-    <li>No budget</li>
+    <li>No working account registration or login</li>
+    <li>No expense submission endpoint or form</li>
+    <li>No budget feature</li>
     <li>No bank connection</li>
   </ul>
   <p>
@@ -63,24 +66,28 @@
     to a working account system: the backend does not implement the
     <code>/api/auth/register/</code> or <code>/api/auth/login/</code> routes
     yet (tracked in issues #22–#24), so submitting either one fails with an
-    error instead of creating an account or a session. Nothing you type into
-    either form reaches a database.
+    error instead of creating an account or a session. Expense tracking is
+    also not available through the product: although its model and migration
+    are defined, there is no API route or UI for submitting an expense.
   </p>
 
   <h2>Why we store it</h2>
   <p>
-    Nothing is collected today, so there is nothing to justify. Going forward,
-    the principle is this: data will be collected only where a named feature
-    needs it, and this page will be updated before such a feature ships.
+    The expense model is groundwork for the planned expense-tracking feature;
+    it does not itself provide a way for users to submit expense data. Data
+    should be collected only when a working, named feature needs it, and this
+    page must be updated as those features become available.
   </p>
 
   <h2>Where data would live</h2>
   <p>
-    A PostgreSQL database is configured for this project. The application
-    defines no tables in it. The backend container starts the web server
-    without running database migrations, so as shipped, not even the
-    framework's own tables are created. <em>Configured</em> is not the same
-    thing as <em>populated</em>: the database holds nothing about you today.
+    PostgreSQL is configured for this project. The application defines
+    models and migrations for users and categories, and the Expense model
+    adds a schema for expense records. The backend container starts the web
+    server without automatically applying database migrations, so whether
+    these tables exist in a particular database depends on which migrations
+    its operator has applied. No expense API endpoint currently accepts
+    user-submitted expense records.
   </p>
 
   <h2>What happens when you visit this site</h2>
@@ -173,12 +180,13 @@
 
   <h2>What is planned, and not yet built</h2>
   <p>
-    User accounts do not exist on the backend yet — the API routes that
-    would create or verify them are tracked in issues #22–#24 and are not
-    implemented. Expense tracking, budgets, and categories are likewise
-    planned and do not exist in the software today. When any of these ship
-    for real, they will involve storing personal and financial data, and
-    this page will be updated at that time.
+    User and category data models exist, but registration and login routes
+    are not implemented. The Expense model and migration now exist, but
+    expense creation and listing routes and the expense UI are not
+    implemented. A budget feature is also not yet implemented. When these
+    features become available to users, they will involve processing
+    personal and financial data, and this page must be updated to describe
+    the actual behavior.
   </p>
 
   <h2>Who operates Cashmire</h2>

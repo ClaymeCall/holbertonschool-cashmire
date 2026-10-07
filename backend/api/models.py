@@ -1,7 +1,8 @@
-from django.contrib.auth.models import AbstractUser
-from django.core.validators import MinValueValidator, MaxValueValidator
-from django.db import models
 from decimal import Decimal
+
+from django.contrib.auth.models import AbstractUser
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db import models
 
 
 DEFAULT_CATEGORIES = (
@@ -77,6 +78,36 @@ class Category(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class Expense(models.Model):
+    user = models.ForeignKey(
+        "api.User",
+        on_delete=models.CASCADE,
+        related_name="expenses",
+    )
+    category = models.ForeignKey(
+        "api.Category",
+        on_delete=models.PROTECT,
+        related_name="expenses",
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    description = models.TextField(blank=True, null=True)
+    date = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-date", "-id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(amount__gt=0),
+                name="expense_amount_positive",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.amount} on {self.date}"
 
 
 class Budget(models.Model):
