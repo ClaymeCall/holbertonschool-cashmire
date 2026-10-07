@@ -506,3 +506,58 @@ is otherwise unresolved.
 **Final decision.** The model and migration implement the storage scope of
 #34. API creation/listing behavior remains out of scope and a human review is
 still required before merge.
+
+## 2026-10-07 — Add authenticated expense creation (Issue #35)
+
+**Objective.** Implement `POST /api/expenses/` so an authenticated user can
+create an expense with validated decimal amount, date, optional description,
+and a category they own.
+
+**Agent/role used.** Copilot-assisted implementation against issue #35 and
+the existing `docs/api-design.md` contract. The orchestrator was reviewed
+but not run; this is a bounded backend endpoint and privacy-disclosure update.
+No Product & Architecture or QA & Security agent run is claimed.
+
+**What was delegated.** Nothing.
+
+**Main proposal.** Add a dedicated input serializer with field-level
+validation, require Django `SessionAuthentication` and `IsAuthenticated`,
+return a generic 404 for missing or foreign categories, and set the expense
+owner exclusively from `request.user`. Use a read-only output serializer so
+the response follows the documented shape and serializes money as a string.
+The work is on `feat/35-create-expense`, stacked on the open #34 branch,
+because that migration provides the Expense model.
+
+**How the change was verified.**
+- Ran `docker compose exec api python manage.py test api`: all 15 model and
+  endpoint tests pass, including authentication, ownership spoofing,
+  `Decimal` response serialization, invalid amount/date/category handling,
+  invalid/missing description and amount fields, and indistinguishable
+  missing/foreign category responses.
+- Ran `docker compose exec frontend npm run test -- --run
+  src/routes/privacy/page.test.js`: all 7 privacy tests pass.
+- `docker compose exec api python manage.py check` reports no issues.
+- `docker compose exec api python manage.py makemigrations api --check
+  --dry-run` reports no model/migration drift.
+- OpenAPI generation includes `POST /api/expenses/`, its request schema,
+  session-cookie security, and 201 response. The command still exits with
+  the existing schema-generation error for the unannotated `health` view;
+  this unrelated warning was not changed here.
+- Updated the privacy page and its test to disclose that authenticated API
+  clients can submit financial records, the migration must be applied, and
+  no retention period or deletion endpoint is defined.
+- `git diff --check` passes.
+
+**Accepted / modified / rejected.**
+- Accepted: Use the API contract's `category_id`, `amount` string,
+  `description`, and `date` fields; enforce category ownership and attach
+  the session user server-side.
+- Modified: Require amount input as a decimal string, matching the documented
+  API contract and avoiding acceptance of JSON floating-point values.
+- Rejected: Expense listing, editing, and deletion, which remain outside #35
+  and are tracked by follow-up issues.
+
+**Final decision.** Authenticated expense creation and field-level validation
+are implemented. The feature depends on the #34 model/migration and is not
+independently deployable until that dependency is merged and migrations are
+applied. Human review remains required.
