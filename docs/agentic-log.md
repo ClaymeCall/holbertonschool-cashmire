@@ -506,3 +506,26 @@ is otherwise unresolved.
 **Final decision.** The model and migration implement the storage scope of
 #34. API creation/listing behavior remains out of scope and a human review is
 still required before merge.
+
+## 2026-10-07 — Cover the API health endpoint with a backend test (Issue #17)
+
+**Objective.** Complete issue #17 by adding an automated check for the existing
+`GET /api/health/` endpoint, which must return HTTP 200 and JSON
+`{"status": "ok"}`.
+
+**Agent/role used.** Copilot-assisted implementation. No specialized agent
+run is claimed.
+
+**What was delegated.** Nothing.
+
+**How the change was verified.**
+- Ran `docker compose exec -T api python manage.py test
+  api.tests.HealthCheckTests`: the targeted test passed.
+- Ran `curl.exe --silent --show-error --max-time 5 --include
+  http://127.0.0.1:8000/api/health/`: received HTTP 200,
+  `Content-Type: application/json`, and `{"status":"ok"}`.
+- `git diff --check` passes.
+
+**Final decision.** The existing health route is now covered by a backend
+regression test for its successful JSON response. The endpoint was also
+verified manually over HTTP.
