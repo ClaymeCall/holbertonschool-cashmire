@@ -5,6 +5,12 @@
 - **Context issue:** #25 (document session/token strategy and security trade-offs)
 - **Supersedes / superseded by:** —
 
+The user-facing strategy, operational details, security trade-offs, and team
+confirmation checklist are maintained in
+[auth-strategy.md](./auth-strategy.md). This numbered ADR remains the decision
+record and rationale; keep implementation-state claims in that guide accurate
+as endpoints and deployment settings evolve.
+
 ## Context
 
 Issue #25 asks the team to write up the chosen identity mechanism before the
@@ -65,9 +71,8 @@ yet actually support it."
    implemented).
 
 4. **Logout calls Django's `logout(request)`, which flushes the session
-   server-side.** The cookie the browser holds becomes a reference to a
-   session that no longer exists; Django also rotates the cookie so a stolen
-   pre-logout cookie value is not quietly reusable.
+   server-side and deletes the session cookie in the response.** A stolen
+   pre-logout cookie value no longer resolves to an active session.
 
 5. **Every state-changing request from an authenticated session must carry a
    CSRF token.** DRF's default `SessionAuthentication` enforces Django's CSRF
@@ -75,10 +80,12 @@ yet actually support it."
    login/register themselves are unauthenticated-session requests, so they
    are not blocked by this, but logout and every future expense/budget
    mutation (#35-#39, #46-#49) will be. The frontend must read the
-   `csrftoken` cookie (Django sets this automatically; it is **not**
-   `HttpOnly`, by design, precisely so JS can read it) and send it back as an
-   `X-CSRFToken` header. This is new work for whichever issue builds the
-   first authenticated mutation — flagged here, not solved here.
+   `csrftoken` cookie (it is **not** `HttpOnly`, by design, precisely so JS
+   can read it) and send it back as an `X-CSRFToken` header. Django must
+   generate and issue a CSRF token before the frontend can read that cookie;
+   the current API has no CSRF bootstrap route. This is new work for the
+   issues that add login and the first authenticated mutation — flagged here,
+   not solved here.
 
 6. **Nothing is stored in `localStorage` or `sessionStorage`.** This is a
    consequence of (1), not a separate choice, and it is the main reason this
@@ -132,5 +139,6 @@ yet actually support it."
   (`/api/health/` is unauthenticated and untouched). The obligation starts
   with whichever PR implements #22 or #23 for real.
 - #25's third acceptance criterion — "every team member confirms they
-  understand it" — is a human sign-off step this PR cannot complete by
-  itself; it is left as an open checklist item on the PR for the team.
+  understand it" — is a human sign-off step. The explicit, named checklist is
+  maintained in `docs/decisions/auth-strategy.md`; keep #25 open until all
+  confirmations are recorded.
