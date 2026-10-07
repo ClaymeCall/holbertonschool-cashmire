@@ -2869,3 +2869,471 @@ class BudgetListTests(TestCase):
         # Each budget should have consumption values
         for budget_data in data["budgets"]:
             self.assertEqual(budget_data["spent"], "25.00")
+
+
+class BudgetUpdateEndpointTests(TestCase):
+    """Tests for PATCH /api/budgets/<id>/ endpoint."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="budget-update-user",
+            email="budget-update@example.com",
+            password="test-password",
+        )
+        self.other_user = User.objects.create_user(
+            username="other-update-user",
+            email="other-update@example.com",
+            password="test-password",
+        )
+        self.category = Category.objects.create(
+            user=self.user,
+            name="Test Budget Update Category",
+            description="Test category for budget update",
+        )
+        self.other_category = Category.objects.create(
+            user=self.user,
+            name="Other Update Category",
+            description="Another category for update tests",
+        )
+        self.other_user_category = Category.objects.create(
+            user=self.other_user,
+            name="Other User Update Category",
+            description="Another user's category",
+        )
+        self.budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("500.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+            alert_threshold=Decimal("80.00"),
+        )
+        self.client = APIClient()
+
+    def test_budget_update_requires_session_authentication(self):
+        """Test that PATCH /api/budgets/<id>/ requires authentication."""
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {"amount": "600.00"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_budget_update_valid_amount(self):
+        """Test updating budget amount returns 200 OK."""
+        self.client.force_login(self.user)
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {"amount": "600.00"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["amount"], "600.00")
+        self.assertEqual(data["id"], self.budget.id)
+        self.assertEqual(data["user_id"], self.user.id)
+
+    def test_budget_update_valid_alert_threshold(self):
+        """Test updating alert_threshold returns 200 OK."""
+        self.client.force_login(self.user)
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {"alert_threshold": "75.00"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["alert_threshold"], "75.00")
+
+    def test_budget_update_alert_threshold_null(self):
+        """Test updating alert_threshold to null returns 200 OK."""
+        self.client.force_login(self.user)
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {"alert_threshold": None},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIsNone(data["alert_threshold"])
+
+    def test_budget_update_valid_period(self):
+        """Test updating period_start and period_end returns 200 OK."""
+        self.client.force_login(self.user)
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {
+                "period_start": "2026-11-01",
+                "period_end": "2026-11-30",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["period_start"], "2026-11-01")
+        self.assertEqual(data["period_end"], "2026-11-30")
+
+    def test_budget_update_valid_category(self):
+        """Test updating category_id returns 200 OK."""
+        self.client.force_login(self.user)
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {"category_id": self.other_category.id},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["category_id"], self.other_category.id)
+
+    def test_budget_update_multiple_fields(self):
+        """Test updating multiple fields at once."""
+        self.client.force_login(self.user)
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {
+                "amount": "700.00",
+                "alert_threshold": "65.00",
+                "category_id": self.other_category.id,
+                "period_start": "2026-11-01",
+                "period_end": "2026-11-30",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["amount"], "700.00")
+        self.assertEqual(data["alert_threshold"], "65.00")
+        self.assertEqual(data["category_id"], self.other_category.id)
+        self.assertEqual(data["period_start"], "2026-11-01")
+        self.assertEqual(data["period_end"], "2026-11-30")
+
+    def test_budget_update_includes_consumption_data(self):
+        """Test that updated budget includes spent, remaining, percentage."""
+        self.client.force_login(self.user)
+        # Create an expense for the budget
+        Expense.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("234.50"),
+            date=date(2026, 10, 15),
+        )
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {"amount": "500.00"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("spent", data)
+        self.assertIn("remaining", data)
+        self.assertIn("percentage", data)
+        self.assertEqual(data["spent"], "234.50")
+        self.assertEqual(data["remaining"], "265.50")
+        self.assertEqual(data["percentage"], "46.90")
+
+    def test_budget_update_nonexistent_budget_404(self):
+        """Test that nonexistent budget_id returns 404."""
+        self.client.force_login(self.user)
+        response = self.client.patch(
+            "/api/budgets/99999/",
+            {"amount": "600.00"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 404)
+        data = response.json()
+        self.assertEqual(data["error"], "NOT_FOUND")
+
+    def test_budget_update_other_user_budget_404(self):
+        """Test that updating another user's budget returns 404."""
+        other_budget = Budget.objects.create(
+            user=self.other_user,
+            category=self.other_user_category,
+            amount=Decimal("300.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        self.client.force_login(self.user)
+        response = self.client.patch(
+            f"/api/budgets/{other_budget.id}/",
+            {"amount": "600.00"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 404)
+        data = response.json()
+        self.assertEqual(data["error"], "NOT_FOUND")
+
+    def test_budget_update_amount_zero_rejected(self):
+        """Test that amount = 0 is rejected with 400."""
+        self.client.force_login(self.user)
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {"amount": "0.00"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("amount", response.json())
+
+    def test_budget_update_amount_negative_rejected(self):
+        """Test that negative amount is rejected with 400."""
+        self.client.force_login(self.user)
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {"amount": "-10.50"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("amount", response.json())
+
+    def test_budget_update_alert_threshold_negative_rejected(self):
+        """Test that alert_threshold < 0 is rejected with 400."""
+        self.client.force_login(self.user)
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {"alert_threshold": "-1"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_budget_update_alert_threshold_over_hundred_rejected(self):
+        """Test that alert_threshold > 100 is rejected with 400."""
+        self.client.force_login(self.user)
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {"alert_threshold": "100.01"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_budget_update_period_end_before_start_rejected(self):
+        """Test that period_end < period_start is rejected with 400."""
+        self.client.force_login(self.user)
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {
+                "period_start": "2026-10-31",
+                "period_end": "2026-10-01",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_budget_update_period_end_before_start_partial_rejected(self):
+        """Test that period_end < existing period_start (partial update) is rejected."""
+        self.client.force_login(self.user)
+        # Only update period_end to a date before existing period_start
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {"period_end": "2026-09-30"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_budget_update_nonexistent_category_404(self):
+        """Test that nonexistent category_id returns 404."""
+        self.client.force_login(self.user)
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {"category_id": 99999},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 404)
+        data = response.json()
+        self.assertEqual(data["error"], "NOT_FOUND")
+        self.assertIn("Catégorie", data["message"])
+
+    def test_budget_update_foreign_category_404(self):
+        """Test that using another user's category returns 404."""
+        self.client.force_login(self.user)
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {"category_id": self.other_user_category.id},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 404)
+        data = response.json()
+        self.assertEqual(data["error"], "NOT_FOUND")
+
+    def test_budget_update_creates_duplicate_409(self):
+        """Test that update creating duplicate returns 409 Conflict."""
+        self.client.force_login(self.user)
+        # Create a second budget with a different period
+        other_budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("300.00"),
+            period_start=date(2026, 11, 1),
+            period_end=date(2026, 11, 30),
+        )
+        # Try to update first budget to match the second budget's period
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {
+                "period_start": "2026-11-01",
+                "period_end": "2026-11-30",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 409)
+        data = response.json()
+        self.assertEqual(data["error"], "CONFLICT")
+
+    def test_budget_update_no_change_200(self):
+        """Test that updating with no changes returns 200 OK (no 409 for own budget)."""
+        self.client.force_login(self.user)
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {
+                "amount": "500.00",
+                "period_start": "2026-10-01",
+                "period_end": "2026-10-31",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["amount"], "500.00")
+
+    def test_budget_update_empty_body_200(self):
+        """Test that PATCH with empty body returns 200 OK (no changes)."""
+        self.client.force_login(self.user)
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        # Budget should be unchanged
+        self.assertEqual(data["amount"], "500.00")
+        self.assertEqual(data["alert_threshold"], "80.00")
+
+    def test_budget_update_persists_to_database(self):
+        """Test that update actually persists changes to database."""
+        self.client.force_login(self.user)
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {"amount": "750.00", "alert_threshold": "90.00"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Verify in database
+        self.budget.refresh_from_db()
+        self.assertEqual(self.budget.amount, Decimal("750.00"))
+        self.assertEqual(self.budget.alert_threshold, Decimal("90.00"))
+
+    def test_budget_update_category_change_triggers_uniqueness_check(self):
+        """Test that changing category re-validates uniqueness constraint."""
+        self.client.force_login(self.user)
+        # Create a budget with other_category
+        other_budget = Budget.objects.create(
+            user=self.user,
+            category=self.other_category,
+            amount=Decimal("200.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        # Try to change first budget's category to other_category (same period)
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {"category_id": self.other_category.id},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 409)
+
+    def test_budget_update_period_change_triggers_uniqueness_check(self):
+        """Test that changing period re-validates uniqueness constraint."""
+        self.client.force_login(self.user)
+        # Create another budget with different period
+        other_budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("200.00"),
+            period_start=date(2026, 11, 1),
+            period_end=date(2026, 11, 30),
+        )
+        # Try to change first budget's period to match the second
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {
+                "period_start": "2026-11-01",
+                "period_end": "2026-11-30",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 409)
+
+    def test_budget_update_timestamps_updated(self):
+        """Test that updated_at is updated (created_at unchanged)."""
+        self.client.force_login(self.user)
+        original_created_at = self.budget.created_at
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {"amount": "600.00"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        self.budget.refresh_from_db()
+        # created_at should not change
+        self.assertEqual(self.budget.created_at, original_created_at)
+        # updated_at should be more recent
+        self.assertGreater(self.budget.updated_at, original_created_at)
+
+    def test_budget_update_user_id_not_modifiable(self):
+        """Test that user_id is read-only and cannot be modified."""
+        self.client.force_login(self.user)
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {"user_id": self.other_user.id, "amount": "600.00"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        # user_id should remain unchanged
+        self.assertEqual(data["user_id"], self.user.id)
+
+        self.budget.refresh_from_db()
+        self.assertEqual(self.budget.user_id, self.user.id)
+
+    def test_budget_update_response_includes_all_fields(self):
+        """Test that response includes all required fields."""
+        self.client.force_login(self.user)
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {"amount": "600.00"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        required_fields = {
+            "id",
+            "user_id",
+            "category_id",
+            "amount",
+            "period_start",
+            "period_end",
+            "alert_threshold",
+            "spent",
+            "remaining",
+            "percentage",
+            "created_at",
+            "updated_at",
+        }
+        self.assertEqual(set(data.keys()), required_fields)
+
+    def test_budget_update_monetary_fields_serialized_as_strings(self):
+        """Test that monetary fields are serialized as strings."""
+        self.client.force_login(self.user)
+        response = self.client.patch(
+            f"/api/budgets/{self.budget.id}/",
+            {"amount": "123.45"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIsInstance(data["amount"], str)
+        self.assertIsInstance(data["spent"], str)
+        self.assertIsInstance(data["remaining"], str)
+        self.assertIsInstance(data["percentage"], str)
+        self.assertEqual(data["amount"], "123.45")
