@@ -515,6 +515,68 @@ Django migrations, including an explicit warning that resetting the volume
 deletes its data.
 
 **Agent/role used.** Copilot-assisted documentation update. No specialized
+## 2026-10-07 — Add authenticated expense creation (Issue #35)
+
+**Objective.** Implement `POST /api/expenses/` so an authenticated user can
+create an expense with validated decimal amount, date, optional description,
+and a category they own.
+
+**Agent/role used.** Copilot-assisted implementation against issue #35 and
+the existing `docs/api-design.md` contract. The orchestrator was reviewed
+but not run; this is a bounded backend endpoint and privacy-disclosure update.
+No Product & Architecture or QA & Security agent run is claimed.
+
+**What was delegated.** Nothing.
+
+**Main proposal.** Add a dedicated input serializer with field-level
+validation, require Django `SessionAuthentication` and `IsAuthenticated`,
+return a generic 404 for missing or foreign categories, and set the expense
+owner exclusively from `request.user`. Use a read-only output serializer so
+the response follows the documented shape and serializes money as a string.
+The work is on `feat/35-create-expense`, stacked on the open #34 branch,
+because that migration provides the Expense model.
+
+**How the change was verified.**
+- Ran `docker compose exec api python manage.py test api`: all 15 model and
+  endpoint tests pass, including authentication, ownership spoofing,
+  `Decimal` response serialization, invalid amount/date/category handling,
+  invalid/missing description and amount fields, and indistinguishable
+  missing/foreign category responses.
+- Ran `docker compose exec frontend npm run test -- --run
+  src/routes/privacy/page.test.js`: all 7 privacy tests pass.
+- `docker compose exec api python manage.py check` reports no issues.
+- `docker compose exec api python manage.py makemigrations api --check
+  --dry-run` reports no model/migration drift.
+- OpenAPI generation includes `POST /api/expenses/`, its request schema,
+  session-cookie security, and 201 response. The command still exits with
+  the existing schema-generation error for the unannotated `health` view;
+  this unrelated warning was not changed here.
+- Updated the privacy page and its test to disclose that authenticated API
+  clients can submit financial records, the migration must be applied, and
+  no retention period or deletion endpoint is defined.
+- `git diff --check` passes.
+
+**Accepted / modified / rejected.**
+- Accepted: Use the API contract's `category_id`, `amount` string,
+  `description`, and `date` fields; enforce category ownership and attach
+  the session user server-side.
+- Modified: Require amount input as a decimal string, matching the documented
+  API contract and avoiding acceptance of JSON floating-point values.
+- Rejected: Expense listing, editing, and deletion, which remain outside #35
+  and are tracked by follow-up issues.
+
+**Final decision.** Authenticated expense creation and field-level validation
+are implemented. The feature depends on the #34 model/migration and is not
+independently deployable until that dependency is merged and migrations are
+applied. Human review remains required.
+
+## 2026-10-07 — Add authenticated, filtered expense listing (Issue #36)
+
+**Objective.** Implement `GET /api/expenses/` on top of the Expense model
+from #34 and authenticated expense-creation endpoint from #35, preserving
+user ownership and supporting category and inclusive date-range filters.
+
+**Agent/role used.** Copilot-assisted backend implementation. No specialized
 agent run is claimed.
 
 **What was delegated.** Nothing.
@@ -534,3 +596,108 @@ agent run is claimed.
 commands to recreate PostgreSQL and apply all committed migrations from
 empty. The procedure was verified against an isolated fresh database; no
 existing local database was deleted.
+**Main proposal.** Reuse the existing `/api/expenses/` route and
+`ExpenseSerializer`, adding GET alongside POST. Validate optional
+`category_id`, `date_from`, and `date_to` query parameters; always scope the
+queryset to `request.user`; return `{"expenses": [...]}` including an empty
+array when no records match.
+
+**How the change was verified.**
+- Ran `docker compose -p cashmire-issue36-test run --rm api python manage.py
+  test api`: all 21 API tests pass, including existing create/model tests and
+  new listing tests for session authentication, cross-user isolation,
+  empty-result shape, inclusive dates/category filters, and invalid query
+  validation.
+- Ran `docker compose -p cashmire-issue36-test run --rm api python manage.py
+  check`: no system-check issues.
+- `git diff --check` passes.
+- Removed only the isolated verification Compose resources.
+- Inspected generated OpenAPI for `/api/expenses/`: GET and POST are both
+  present, and GET exposes `category_id`, `date_from`, and `date_to` query
+  parameters with the expected integer/date types. The existing health-view
+  serializer inference warning remains unrelated.
+
+**Accepted / modified / rejected.**
+- Accepted: Support all three documented filters, inclusive date bounds,
+  and no pagination for the MVP.
+- Modified: Reject an inverted date range (`date_from > date_to`) with a
+  field-level 400 error rather than silently returning an empty list.
+- Rejected: Returning expenses belonging to other users or exposing a
+  distinct response for a category owned by another user; the user scope is
+  applied before optional filters.
+
+**Final decision.** Authenticated users can list only their own expenses,
+optionally filtered by category/date, and an empty result is returned as
+`{"expenses": []}`.
+
+## 2026-10-07 — Update and delete expenses (Issues #37 and #38)
+
+**Objective.** Implement authenticated expense update and deletion on the
+existing expense API, preserving validation, decimal precision, and
+user-level ownership boundaries.
+
+**Agent/role used.** Copilot-assisted backend implementation. No specialized
+agent run is claimed.
+
+**What was delegated.** Nothing.
+
+**Main proposal.** Add `PATCH`, `PUT`, and `DELETE` on
+`/api/expenses/<id>/`. Scope the lookup to the authenticated user so a
+foreign expense and a missing expense have the same 404 response. Reuse the
+creation rules for positive decimal-string amounts and categories owned by
+the current user.
+
+**How the change was verified.**
+- Ran the isolated API suite with
+  `docker compose -p cashmire-issue37-38-test run --rm api python manage.py
+  test api`: all 29 tests pass, including new update/delete coverage.
+- Ran the same isolated project's `python manage.py check`: no issues.
+- `git diff --check` passes.
+- Removed only the isolated verification Compose resources.
+
+**Accepted / modified / rejected.**
+- Accepted: `PATCH` is partial, `PUT` requires `category_id`, `amount`, and
+  `date`, and `DELETE` returns 204 with no response body.
+- Modified: An omitted description in `PUT` is reset to `null`, consistent
+  with replacement semantics and the create endpoint's optional description.
+- Rejected: Revealing whether a foreign expense exists; foreign and missing
+  IDs return the same 404 response.
+
+**Final decision.** Issues #37 and #38 are implemented on the expense feature
+branch, with update and delete operations restricted to the current user.
+
+## 2026-10-07 — Verify expense ownership controls (Issue #39)
+
+**Objective.** Verify and document that every implemented expense endpoint
+scopes access to the authenticated user, with cross-user access concealed as
+not found.
+
+**Agent/role used.** Copilot-assisted implementation and security-control
+review. No specialized agent run is claimed.
+
+**What was delegated.** Nothing.
+
+**Main proposal.** Retain query-level owner scoping for list and detail
+operations, set the creator from the authenticated session rather than the
+request body, and ensure category references are also owner-scoped. Record
+the review in `docs/reviews/issue-39-expense-ownership.md`.
+
+**How the change was verified.**
+- Existing API tests assert expense listing excludes other users' records,
+  creation ignores a client-supplied `user_id`, and update/delete return 404
+  for foreign expense IDs.
+- Added explicit `PUT` cross-user coverage alongside `PATCH`, comparing both
+  responses to the missing-resource 404.
+- Reviewed the ORM access paths for GET/POST collection and PATCH/PUT/DELETE
+  detail operations.
+
+**Accepted / modified / rejected.**
+- Accepted: All expense reads and mutations must use user-scoped database
+  lookups; writes derive ownership from the authenticated session.
+- Modified: None.
+- Rejected: Returning a different result for foreign and missing IDs, which
+  could disclose whether another user's expense exists.
+
+**Final decision.** The implemented expense endpoints enforce ownership
+before accessing expense rows. Regression coverage and the reviewed control
+are documented for issue #39.

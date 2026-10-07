@@ -37,57 +37,52 @@
 
   <h2>The short version</h2>
   <p>
-    Cashmire's login and registration forms will accept an email address
-    and a password if you type them in, but the backend does not implement
-    the account routes those forms call yet. The backend now defines an
-    expense data model, but there is no expense endpoint or form to submit
-    expense data. The sections below distinguish this schema groundwork
-    from data collection through the product.
+    The API accepts expense records at <code>POST /api/expenses/</code>
+    from an authenticated session. It can store an amount, date, optional
+    description, category, and the owning user in PostgreSQL when the
+    required migration has been applied. Registration and login routes are
+    not yet implemented, and this site has no expense form.
   </p>
 
   <h2>What personal data we store</h2>
   <p>
-    The application has database models for user accounts and categories,
-    and now defines a model for expense records. However, there is no
-    working registration or login flow, and no expense-creation endpoint or
-    form. The normal product flows therefore do not let you submit account
-    details or expense records.
+    This project can process and store financial information submitted to
+    its authenticated expense endpoint. The code does not reveal whether a
+    particular deployment has applied the Expense migration or whether its
+    database currently contains records.
   </p>
   <ul>
-    <li>No working account registration or login</li>
-    <li>No expense submission endpoint or form</li>
-    <li>No budget feature</li>
-    <li>No bank connection</li>
+    <li>Expense amount and date</li>
+    <li>Optional expense description</li>
+    <li>Category and the user account associated with the expense</li>
+    <li>No expense form or working account registration/login flow</li>
   </ul>
   <p>
-    A registration form (<code>/register</code>) and a login form
-    (<code>/login</code>) do exist in the UI, and will accept an email
-    address and a password if you type them in — but neither form is wired
-    to a working account system: the backend does not implement the
-    <code>/api/auth/register/</code> or <code>/api/auth/login/</code> routes
-    yet (tracked in issues #22–#24), so submitting either one fails with an
-    error instead of creating an account or a session. Expense tracking is
-    also not available through the product: although its model and migration
-    are defined, there is no API route or UI for submitting an expense.
+    The endpoint requires an authenticated Django session. The website does
+    not currently provide a working registration or login flow to obtain
+    such a session, but authenticated API clients can submit expense data.
+    The application container does not apply database migrations on startup;
+    the database must have the Expense migration applied for submissions to
+    be stored successfully.
   </p>
 
   <h2>Why we store it</h2>
   <p>
-    The expense model is groundwork for the planned expense-tracking feature;
-    it does not itself provide a way for users to submit expense data. Data
-    should be collected only when a working, named feature needs it, and this
-    page must be updated as those features become available.
+    Expense records support the expense-tracking feature: recording an
+    amount, date, and optional description under a category for the
+    authenticated user. The authenticated API lets the owner create, list,
+    edit, and delete expense records. The website does not yet provide an
+    expense form or interface for those operations.
   </p>
 
   <h2>Where data would live</h2>
   <p>
     PostgreSQL is configured for this project. The application defines
-    models and migrations for users and categories, and the Expense model
-    adds a schema for expense records. The backend container starts the web
-    server without automatically applying database migrations, so whether
-    these tables exist in a particular database depends on which migrations
-    its operator has applied. No expense API endpoint currently accepts
-    user-submitted expense records.
+    models and migrations for users, categories, and expenses. The expense
+    endpoint writes to the Expense table after its migration is applied.
+    The backend container starts the web server without automatically
+    applying migrations, so the schema in a particular database depends on
+    which migrations its operator has applied.
   </p>
 
   <h2>What happens when you visit this site</h2>
@@ -108,39 +103,49 @@
 
   <h2>Cookies and tracking</h2>
   <p>
-    The application code sets no cookies and includes no analytics, no tag
-    manager, no tracking pixel, no third-party script, and no third-party font
-    or other asset.
+    The application includes no analytics, tag manager, tracking pixel,
+    third-party script, or third-party font or other asset. The expense API
+    uses Django session authentication, so an authenticated browser request
+    sends its session cookie; state-changing authenticated requests are also
+    subject to Django/DRF CSRF checks.
   </p>
   <p>
     One caveat, because it is true: Django's standard admin interface is
-    mounted at <code>/admin/</code> and would set a session cookie for anyone
-    who logged into it — but there are no user accounts, that interface is not
-    part of the product, and it is unrelated to using this site.
+    mounted at <code>/admin/</code> and uses Django sessions for authenticated
+    administrators. The admin interface is not part of the product UI.
   </p>
 
   <h2>Third parties we share data with</h2>
   <p>
-    None. There is no analytics provider, no email provider, no payment
-    processor, no bank aggregator, no error-reporting service, and no CDN.
-    Nothing is shared because nothing is collected.
+    No analytics provider, email provider, payment processor,
+    error-reporting service, or CDN is configured in this project. There is
+    no bank aggregator configured.
+    Expense data submitted to the API is stored in the configured PostgreSQL
+    database; the hosting arrangement is not specified here.
   </p>
   <p>Hosting arrangement: <code>{LEGAL.hosting}</code>.</p>
 
   <h2>How long we keep data</h2>
   <p>
-    Nothing is kept, so there is nothing to retain or expire. There is no
-    account to delete, because there are no accounts. When features that
-    store data ship, this section will state real retention periods — a
-    decision for a human, not a default.
+    No retention period or automatic deletion schedule for expense records
+    is defined in this project. An authenticated owner can delete an
+    individual expense through the API, but there is no account-deletion
+    flow. Records remain in the database until an owner deletes them, they
+    are removed through another authorized means, or the database itself is
+    deleted; the user foreign key is configured to cascade if an account is
+    deleted through Django.
   </p>
 
   <h2>Your rights</h2>
   <p>
     Readers of a privacy page are typically entitled to rights such as access,
     rectification, erasure, restriction, portability, objection, and the
-    ability to complain to a supervisory authority. In practice, there is
-    currently no data of yours held to access, correct, export, or erase.
+    ability to complain to a supervisory authority. The authenticated API
+    lets an owner list, edit, and delete their expenses, but provides no
+    expense export or account-deletion feature. The website does not yet
+    provide an interface for these operations. Whether a deployment holds
+    records about you depends on its use and database state; contact the
+    operator to ask about a specific record or request.
   </p>
   <p>
     To ask a question or exercise any of these rights, the contact route is:
@@ -150,9 +155,12 @@
 
   <h2>How we protect data</h2>
   <p>
-    The strongest protection currently in place is that there is nothing to
-    protect: no personal data is collected, so none can be lost, leaked, or
-    misused.
+    Expense endpoints require an authenticated Django session and scope
+    records to that session's user. Creation assigns the expense to that
+    user, and writes only accept categories owned by that user.
+    Django/DRF session authentication applies CSRF checks to authenticated
+    state-changing requests. These application checks do not amount to a
+    production security guarantee.
   </p>
   <p>
     Browser access to the project's API is limited by a CORS allowlist that,
@@ -165,28 +173,26 @@
     production: debug mode is on by default, the allowed-hosts setting
     accepts any host, and the secret key falls back to a hardcoded
     development value when none is configured. This page makes no claim to a
-    hardened production security posture, and the project should not be
-    treated as production-ready. Hardening must happen before any real user
-    data is accepted.
+    hardened production security posture; the project should not be treated
+    as production-ready or used with real financial data without appropriate
+    operational hardening.
   </p>
   <p>
     To be explicit about what this page does not claim: it does not say that
     data is encrypted at rest; it does not say that traffic is served over
-    TLS or HTTPS; it does not say that passwords are hashed (there are no
-    passwords to hash); and it does not say that access to data is
-    role-restricted or audited. None of that is built, so none of it is
-    claimed.
+    TLS or HTTPS; or that access to data is audited or protected by a
+    production access-control policy. The product does not have working
+    public registration or login routes. These limitations are not security
+    guarantees.
   </p>
 
   <h2>What is planned, and not yet built</h2>
   <p>
-    User and category data models exist, but registration and login routes
-    are not implemented. The Expense model and migration now exist, but
-    expense creation and listing routes and the expense UI are not
-    implemented. A budget feature is also not yet implemented. When these
-    features become available to users, they will involve processing
-    personal and financial data, and this page must be updated to describe
-    the actual behavior.
+    Registration and login routes, an expense form, and interfaces for
+    managing expenses are not implemented. Authenticated API routes support
+    expense creation, listing, editing, and deletion. Budgets and their user
+    interface are also not implemented. This page must be updated as those
+    features become available and their actual data handling is known.
   </p>
 
   <h2>Who operates Cashmire</h2>
