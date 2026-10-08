@@ -663,3 +663,110 @@ def _budget_create_post(request):
     return Response(
         BudgetSerializer(budget).data, status=status.HTTP_201_CREATED
     )
+
+
+@extend_schema(
+    request=BudgetSerializer,
+    responses=BudgetWithConsumptionSerializer,
+    description="Update an existing budget for the authenticated user",
+)
+@api_view(["PATCH"])
+@authentication_classes([SessionAuthentication])
+@permission_classes([IsAuthenticated])
+def budget_update_patch(request, budget_id):
+    """
+    Handle PATCH on /api/budgets/{budget_id}/.
+
+    Update an existing budget for the authenticated user. All fields are optional.
+    Validates ownership, uniqueness constraint, and re-validates all fields.
+    Returns 200 OK with updated budget including consumption data.
+    """
+    # Retrieve budget and check ownership
+    try:
+        budget = Budget.objects.get(id=budget_id, user=request.user)
+    except Budget.DoesNotExist:
+        return Response(
+            {"error": "NOT_FOUND", "message": "Budget non trouvé"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # Validate partial update with BudgetSerializer (all fields optional for PATCH)
+    serializer = BudgetSerializer(budget, data=request.data, partial=True)
+
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # Resolve category_id (use new value if provided, else existing)
+    category_id = serializer.validated_data.get("category_id", budget.category_id)
+
+    # Resolve period dates (use new values if provided, else existing)
+    period_start = serializer.validated_data.get("period_start", budget.period_start)
+    period_end = serializer.validated_data.get("period_end", budget.period_end)
+
+    # Validate period_end >= period_start (using resolved values)
+    if period_end < period_start:
+        return Response(
+            {
+                "error": "INVALID_DATA",
+                "message": "period_end doit être >= period_start",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Validate category exists and belongs to request.user (if category_id changed)
+    if category_id != budget.category_id:
+        try:
+            category = Category.objects.get(id=category_id, user=request.user)
+        except Category.DoesNotExist:
+            return Response(
+                {"error": "NOT_FOUND", "message": "Catégorie non trouvée"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+    # Application-level duplicate check: ensure no other budget has this combination
+    if Budget.objects.filter(
+        user=request.user,
+        category_id=category_id,
+        period_start=period_start,
+        period_end=period_end,
+    ).exclude(id=budget.id).exists():
+        return Response(
+            {
+                "error": "CONFLICT",
+                "message": "Budget déjà existant pour cette période et catégorie",
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    # Apply updates to the budget instance
+    try:
+        with transaction.atomic():
+            # Update all provided fields
+            if "amount" in serializer.validated_data:
+                budget.amount = serializer.validated_data["amount"]
+            if "alert_threshold" in serializer.validated_data:
+                budget.alert_threshold = serializer.validated_data["alert_threshold"]
+            if "category_id" in serializer.validated_data:
+                budget.category_id = serializer.validated_data["category_id"]
+            if "period_start" in serializer.validated_data:
+                budget.period_start = serializer.validated_data["period_start"]
+            if "period_end" in serializer.validated_data:
+                budget.period_end = serializer.validated_data["period_end"]
+
+            budget.save()
+    except IntegrityError:
+        # Race condition: duplicate was created between check and save
+        return Response(
+            {
+                "error": "CONFLICT",
+                "message": "Budget déjà existant pour cette période et catégorie",
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    # Return updated budget with consumption data
+    consumption = calculate_consumption_batch([budget])
+    context = {"consumption_data": consumption}
+    response_serializer = BudgetWithConsumptionSerializer(budget, context=context)
+
+    return Response(response_serializer.data, status=status.HTTP_200_OK)
