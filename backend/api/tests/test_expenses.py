@@ -3,7 +3,9 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, connection, transaction
-from django.test import TestCase
+from django.http import HttpRequest
+from django.middleware.csrf import get_token
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from ..models import Category, DEFAULT_CATEGORIES, Expense
@@ -635,3 +637,60 @@ class ExpenseDetailMutationTests(TestCase):
         self.assertEqual(missing_response.status_code, 404)
         self.assertEqual(foreign_response.json(), missing_response.json())
         self.assertTrue(Expense.objects.filter(pk=self.other_expense.pk).exists())
+
+
+class CsrfTrustedOriginsTests(TestCase):
+    """Regression test for issue #130.
+
+    `APIClient(enforce_csrf_checks=True)` is what actually exercises
+    Django's CSRF middleware — the default `APIClient()` used by every
+    other test class in this file disables CSRF checking entirely, which
+    is exactly why this gap went untested until now. Reproduces the real
+    browser's cross-origin request shape (`Origin` header set to the
+    frontend's origin, session cookie, matching `X-CSRFToken` header) and
+    proves `CSRF_TRUSTED_ORIGINS` is both necessary (second test, with it
+    removed) and sufficient (first test, with the real setting) for an
+    authenticated mutation to succeed.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="csrf-owner",
+            email="csrf-owner@example.com",
+            password="test-password",
+        )
+        self.category = self.user.categories.first()
+        self.client = APIClient(enforce_csrf_checks=True)
+        self.client.force_login(self.user)
+        # No CSRF-bootstrap route exists yet (tracked separately in
+        # docs/decisions/0003-session-cookie-auth-strategy.md) to issue a
+        # real `csrftoken` cookie, so the token is generated directly and
+        # used as both the cookie and the submitted header — exactly what
+        # a real bootstrap route would hand the frontend to echo back.
+        self.csrf_token = get_token(HttpRequest())
+        self.client.cookies["csrftoken"] = self.csrf_token
+
+    def _post_expense(self):
+        return self.client.post(
+            "/api/expenses/",
+            {
+                "category_id": self.category.pk,
+                "amount": "12.50",
+                "date": "2026-10-06",
+            },
+            format="json",
+            HTTP_ORIGIN="http://localhost:5173",
+            HTTP_X_CSRFTOKEN=self.csrf_token,
+        )
+
+    def test_cross_origin_mutation_succeeds_with_trusted_origin(self):
+        response = self._post_expense()
+
+        self.assertEqual(response.status_code, 201)
+
+    @override_settings(CSRF_TRUSTED_ORIGINS=[])
+    def test_cross_origin_mutation_fails_without_trusted_origin(self):
+        response = self._post_expense()
+
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("CSRF Failed", response.json()["detail"])
