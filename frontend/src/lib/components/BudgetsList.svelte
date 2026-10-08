@@ -133,6 +133,7 @@
           {formatAmount(budget.spent)} spent of {formatAmount(budget.amount)}
           ({formatAmount(budget.remaining)} remaining)
         </p>
+        <p class="percentage">{percentOf(budget.spent, budget.amount)}% used</p>
         <div
           class="progress-track"
           role="progressbar"
