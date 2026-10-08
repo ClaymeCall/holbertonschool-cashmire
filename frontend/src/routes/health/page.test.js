@@ -222,6 +222,15 @@ describe("health page (#18)", () => {
   });
 
   it("T-11 (AC-10): the shared layout footer links to /health and still links to /privacy", () => {
+    // The layout itself now fetches GET /api/auth/me/ on mount (issue #104
+    // follow-up, #26) for the auth-aware nav — this test doesn't exercise
+    // that, so a bare 401 keeps it out of the way.
+    fetch.mockResolvedValue({
+      ok: false,
+      status: 401,
+      text: () =>
+        Promise.resolve('{"detail":"Authentication credentials were not provided."}'),
+    });
     render(Layout, { props: { children: emptyChildrenSnippet } });
 
     // Scoped to the contentinfo landmark: the header nav also has a

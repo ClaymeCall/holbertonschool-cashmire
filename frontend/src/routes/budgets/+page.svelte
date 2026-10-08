@@ -1,55 +1,10 @@
 <script>
-  // Budget dashboard screen — issue #52.
-  //
-  // `spent`/`remaining`/`status` are all computed server-side (per
-  // `docs/decisions/budget-thresholds.md`) once #45-#50 ship; this screen
-  // never recomputes `status` — it only maps the four documented values to
-  // a color + label. The percentage-consumed figure shown in the progress
-  // bar IS computed client-side with `money.js`'s `percentOf`, which exists
-  // for exactly this (see its file-top comment) — that's display
-  // arithmetic, not the ok/warning/full/exceeded decision itself.
-  //
-  // Not merged yet at the time this was written (#45, #115/#121-125): this
-  // calls the real, documented `/api/budgets/` route and will show the
-  // error state until it ships — same pattern as #40/#41 before #34-#39
-  // landed.
-  import { onMount } from "svelte";
-  import { listBudgets } from "$lib/api/budgets";
-  import { listCategories } from "$lib/api/categories";
-  import Button from "$lib/components/Button.svelte";
-  import FormError from "$lib/components/FormError.svelte";
-  import BudgetCard from "$lib/components/BudgetCard.svelte";
-
-  /** @typedef {"loading" | "ready" | "error"} ViewState */
-
-  /** @type {ViewState} */
-  let state = $state("loading");
-  /** @type {import("$lib/api/budgets").Budget[]} */
-  let budgets = $state([]);
-  /** @type {Map<number, string>} */
-  let categoryNames = $state(new Map());
-  /** @type {string | null} */
-  let errorMessage = $state(null);
-
-  async function load() {
-    state = "loading";
-    errorMessage = null;
-    try {
-      const [categories, budgetList] = await Promise.all([
-        listCategories(),
-        listBudgets(),
-      ]);
-      categoryNames = new Map(categories.map((c) => [c.id, c.name]));
-      budgets = budgetList;
-      state = "ready";
-    } catch (err) {
-      errorMessage = "Couldn't load your budgets. Try again in a moment.";
-      state = "error";
-      console.error("Failed to load budgets:", err);
-    }
-  }
-
-  onMount(load);
+  // Budget dashboard screen — issue #52. The list itself is
+  // `$lib/components/BudgetsList.svelte` (issue #104 componentization
+  // follow-up); this route just supplies the page chrome (title, heading,
+  // "Add budget" link) around it.
+  import { Plus } from "@lucide/svelte";
+  import BudgetsList from "$lib/components/BudgetsList.svelte";
 </script>
 
 <svelte:head>
@@ -60,29 +15,10 @@
 <main>
   <div class="header-row">
     <h1>Budgets</h1>
-    <a class="button-link" href="/budgets/new">Add budget</a>
+    <a class="button-link" href="/budgets/new"><Plus size={16} /> Add budget</a>
   </div>
 
-  {#if state === "loading"}
-    <p role="status">Loading your budgets…</p>
-  {:else if state === "error"}
-    <FormError messages={errorMessage ? [errorMessage] : []} />
-    <Button type="button" onclick={load}>Retry</Button>
-  {:else if budgets.length === 0}
-    <p>
-      No budgets yet. <a href="/budgets/new">Set a monthly limit for a category</a>
-      to start tracking it here.
-    </p>
-  {:else}
-    <ul class="budget-list">
-      {#each budgets as budget (budget.id)}
-        <BudgetCard
-          {budget}
-          categoryName={categoryNames.get(budget.category_id) ?? "Unknown category"}
-        />
-      {/each}
-    </ul>
-  {/if}
+  <BudgetsList />
 </main>
 
 <style>
@@ -102,7 +38,9 @@
   }
 
   .button-link {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
     font-size: var(--font-size-base);
     padding: var(--space-sm) var(--space-lg);
     border-radius: var(--radius-sm);
@@ -113,24 +51,6 @@
   }
 
   .button-link:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring-color);
-    outline-offset: 2px;
-  }
-
-  .budget-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-md);
-  }
-
-  a {
-    color: var(--color-primary);
-  }
-
-  a:focus-visible {
     outline: var(--focus-ring-width) solid var(--focus-ring-color);
     outline-offset: 2px;
   }

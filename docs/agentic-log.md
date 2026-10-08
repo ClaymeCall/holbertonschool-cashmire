@@ -772,6 +772,68 @@ the review in `docs/reviews/issue-39-expense-ownership.md`.
 before accessing expense rows. Regression coverage and the reviewed control
 are documented for issue #39.
 
+## 2026-10-07 — Cashmire design system: visual overhaul (Issue #104, slice)
+
+**Objective.** Apply the "Cashmire design system (draft)" visual brief
+(warm-neutral palette, Fraunces/IBM Plex Mono/DM Sans typography, soft
+radii, dark mode) to every screen that exists on `main`, as the
+design-system bullet of issue #104's acceptance criteria.
+
+**Agent/role used.** Claude Code (Sonnet 5), run directly against the
+request rather than through `agentic/orchestrator.py` — this was a single
+cross-cutting styling change spanning every existing screen, not a new
+feature with its own architect/developer/QA split.
+
+**What was delegated.** The full implementation: token/typography design
+(including computing WCAG contrast ratios for every new text/background
+pairing before picking values), self-hosting the three type faces,
+restyling the shared shell and components, bringing `/health` onto the
+shared tokens (the one screen the previous #104 slice had not reached),
+and writing `docs/specs/issue-104-cashmire-design-system.md` and this
+amendment's companion entry in `docs/decisions/0001-...md`.
+
+**Main proposal.** Repoint existing token names to the new palette rather
+than renaming them (avoids touching every call site); add a new
+`base.css` global layer for true document-wide defaults only; self-host
+fonts instead of a Google Fonts `<link>` to keep decision `0002` and the
+privacy page's zero-third-party-request claim true without editing
+`/privacy`; deviate from two of the brief's literal hex codes (button
+fill, muted text) where they fail AA contrast at face value, documented
+in the spec and in `tokens.css`'s own header comment; defer nav
+expansion, the dashboard, chart colors, and photography/illustration —
+none have a screen or asset pipeline to attach to yet.
+
+**How the change was verified.**
+- `npm test` in `frontend/`: all 86 existing tests pass unchanged (no test
+  asserted on the removed literal colors).
+- Contrast-checked every new text/background token pairing against the
+  WCAG relative-luminance formula before picking final hex values (see
+  the spec §3.1 table).
+- Visually verified `/`, `/login`, `/register`, `/privacy`, `/health` in a
+  real browser, in both light and (via `prefers-color-scheme: dark`)
+  dark mode, including the register form's error state and the health
+  page's error state.
+- `grep`-verified no literal hex color remains in `frontend/src/routes` or
+  `frontend/src/lib/components` outside `#104` issue references.
+
+**Accepted / modified / rejected.**
+- Accepted: the full palette, typography system, soft radii, pill
+  buttons, dashed "stitched" dividers, faint weave texture, and automatic
+  dark mode from the brief.
+- Modified: button-fill and muted-text colors darkened from the brief's
+  literal hex to clear WCAG AA contrast (see spec §3.1); fonts self-hosted
+  instead of loaded from Google Fonts, for the privacy/decision-0002
+  reason above.
+- Rejected (deferred, not rejected): macro photography, line illustration,
+  and the chart color palette — no asset pipeline or chart screen exists
+  yet to attach them to; see spec §3.5.
+
+**Final decision.** The Cashmire visual identity is implemented across
+every screen that exists on `main` today, with the remaining #104
+acceptance criteria (nav expansion, auth-aware nav, dashboard home)
+explicitly left open pending #40/#41/#52/#53.
+
+
 ## 2026-10-07 — Integrate session-auth endpoints with main
 
 **Objective.** Bring the registration, login, and logout endpoints from

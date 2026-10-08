@@ -15,8 +15,9 @@
   // — if it lands on a different mechanism, this call site is the one place
   // to change.
   import { goto } from "$app/navigation";
+  import { LogIn, LoaderCircle } from "@lucide/svelte";
   import { apiFetch, ApiError } from "$lib/api";
-  import { setCurrentUser } from "$lib/stores/auth";
+  import { setCurrentUser } from "$lib/auth.svelte.js";
   import Button from "$lib/components/Button.svelte";
   import TextField from "$lib/components/TextField.svelte";
   import FormError from "$lib/components/FormError.svelte";
@@ -54,17 +55,16 @@
     errorMessage = null;
 
     try {
-      const data = await apiFetch("/api/auth/login/", {
+      const loggedInUser = await apiFetch("/api/auth/login/", {
         method: "POST",
         body: { email: email.trim(), password },
         credentials: "include",
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
-      // Successful login: the server has set a session cookie. #104's nav
-      // needs to know a session now exists; `setCurrentUser` only records
-      // that in memory (no new request) — see lib/stores/auth.js for why
-      // this isn't a `/api/auth/me/` fetch.
-      setCurrentUser(data);
+      // Successful login: the server has set a session cookie, and the
+      // response body is already the logged-in user (UserSerializer
+      // shape) — feed it straight into the nav's auth state (AC-3).
+      setCurrentUser(/** @type {{ id: number, email: string }} */ (loggedInUser));
       await goto("/");
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
@@ -126,7 +126,11 @@
     {/if}
 
     <Button type="submit" disabled={formState === "submitting"}>
-      {formState === "submitting" ? "Logging in…" : "Log in"}
+      {#if formState === "submitting"}
+        <LoaderCircle size={16} class="spin" /> Logging in…
+      {:else}
+        <LogIn size={16} /> Log in
+      {/if}
     </Button>
   </form>
 
@@ -149,5 +153,21 @@
 
   a {
     color: var(--color-primary);
+  }
+
+  /* `:global` because the LoaderCircle icon's <svg> is rendered inside
+     @lucide/svelte's own Icon.svelte, not this component's template — a
+     plain `.spin` rule here would never match it (Svelte's style scoping
+     only tags elements written directly in this file). Respects
+     prefers-reduced-motion via base.css's blanket
+     `animation-duration: 0.01ms !important` rule. */
+  :global(.spin) {
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 </style>

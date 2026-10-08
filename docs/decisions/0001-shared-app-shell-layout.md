@@ -1,6 +1,6 @@
 # 0001 — Introduce a minimal shared app shell (`+layout.svelte`)
 
-- **Status:** Proposed — amended by #15, #104
+- **Status:** Proposed — amended by #15, #104 (×3)
 - **Date:** 2026-10-05
 - **Context issue:** #63 (privacy and legal information page)
 - **Supersedes / superseded by:** —
@@ -187,3 +187,45 @@ unmerged at the time of this amendment); the responsive layout pass (#64)
 and the accessibility pass (#65), neither of which this amendment should
 regress but whose checklists are owned elsewhere; and the reload-resets-to-
 logged-out limitation named above.
+
+## Amendment — 2026-10-07 (issue #104, Cashmire visual overhaul)
+
+**What changed:** point 6 is amended a second time. The previous
+amendment's tokens (`frontend/src/lib/styles/tokens.css`) are repointed
+from placeholder blue/grey values to the full Cashmire palette
+(warm neutrals, Fraunces/IBM Plex Mono/DM Sans typography, soft radii,
+dark mode) specified in
+`docs/specs/issue-104-cashmire-design-system.md`. A new
+`frontend/src/lib/styles/base.css` is introduced for true document-wide
+defaults — `html`/`body` background and font, heading font/color, link
+color, `code`/`pre` font, a `focus-visible` fallback — imported once from
+`+layout.svelte` alongside `tokens.css`. The same reasoning that justified
+`tokens.css` applies here, one layer up: once every screen shares one
+typeface per role and one background, repeating `font-family`/
+`background`/`color` in each component's own `<style>` block is exactly
+the duplication a global stylesheet exists to prevent. `base.css` defines
+no component-specific class and no layout/structure — points 2–5 are
+untouched, and anything beyond these seven document-wide rules still
+belongs in the owning component.
+
+Fraunces/IBM Plex Mono/DM Sans are self-hosted
+(`frontend/static/fonts/*.woff2`, referenced by `frontend/src/lib/styles/fonts.css`),
+not loaded from Google Fonts — decision `0002` point 5 requires a
+privacy-page update for any "third-party service ... hosted fonts," and
+`/privacy`'s own spec requires zero third-party network requests
+(`docs/specs/issue-63-privacy-page.md` AC-7). Self-hosting the same
+open-license files keeps both true without touching `/privacy`.
+
+**What is unchanged:** points 2–5 still hold exactly as in the previous
+two amendments. This is again a styling amendment, not a structural one —
+no new route, no new nav entry, no `<main>` added to the layout.
+
+**What is explicitly deferred:** the nav/dashboard slice this amendment
+once deferred landed separately (see the amendment immediately above) and
+is not part of this change — this amendment only repoints colors/typography
+on top of it. Macro cashmere photography, line illustration, and a chart
+color palette from the design brief are also deferred: no asset-sourcing
+pipeline exists for the former, and no chart or budget/expense screen
+exists yet to consume the latter. See
+`docs/specs/issue-104-cashmire-design-system.md` §3.5 for the full list and
+reasoning.

@@ -85,23 +85,31 @@ export class ApiError extends Error {
   }
 }
 
-/** HTTP methods Django's CSRF middleware never checks. */
-const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS", "TRACE"]);
+/**
+ * HTTP methods Django's CSRF protection treats as unsafe — matches
+ * `CsrfViewMiddleware`'s own safe-method list (GET/HEAD/OPTIONS/TRACE are
+ * exempt), not an arbitrary subset of this app's verbs.
+ */
+const CSRF_PROTECTED_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 /**
- * Read one cookie's value out of `document.cookie`. Returns `null` when
- * absent, or when there is no `document` (this module is written to run
- * client-side only, per the root `+layout.js`'s `ssr = false`, but this
- * guard keeps it from throwing if that ever changes).
- *
+ * Reads a cookie's raw value by name, or `null` if unset or if there is no
+ * `document` (SSR). Used to read the `csrftoken` cookie Django issues —
+ * see docs/decisions/auth-strategy.md's CSRF section: "The frontend must
+ * obtain the `csrftoken` cookie and send its value in `X-CSRFToken` for
+ * state-changing requests."
  * @param {string} name
  * @returns {string | null}
  */
-function readCookie(name) {
+function getCookie(name) {
   if (typeof document === "undefined") return null;
-  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = document.cookie.match(new RegExp(`(?:^|; )${escaped}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]) : null;
+  const prefix = `${name}=`;
+  for (const part of document.cookie.split("; ")) {
+    if (part.startsWith(prefix)) {
+      return decodeURIComponent(part.slice(prefix.length));
+    }
+  }
+  return null;
 }
 
 /**
@@ -146,26 +154,9 @@ function isJsonEncodable(body) {
 export async function apiFetch(path, options = {}) {
   const { body, headers, ...rest } = options;
   const url = apiUrl(path);
-  const method = String(rest.method ?? "GET").toUpperCase();
 
   /** @type {Record<string, string>} */
   const requestHeaders = { Accept: "application/json" };
-
-  // CSRF (docs/decisions/0003-session-cookie-auth-strategy.md point 5): DRF's
-  // `SessionAuthentication` enforces Django's CSRF check on any unsafe-method
-  // request once a session user is authenticated, and the `csrftoken` cookie
-  // is deliberately not `HttpOnly` so this can read it. This is a no-op (the
-  // header is simply omitted) until some backend route actually issues that
-  // cookie — at the time this was written there is no CSRF-bootstrap route,
-  // a gap the decision names but leaves for "the first issue that adds an
-  // authenticated mutation" (this one) to flag, not to also fix on the
-  // backend.
-  if (!SAFE_METHODS.has(method)) {
-    const csrfToken = readCookie("csrftoken");
-    if (csrfToken) {
-      requestHeaders["X-CSRFToken"] = csrfToken;
-    }
-  }
 
   /** @type {BodyInit | undefined} */
   let requestBody;
@@ -176,6 +167,14 @@ export async function apiFetch(path, options = {}) {
     // FormData, Blob, string, etc: passed through untouched, no
     // Content-Type set — the platform (or the caller) decides it.
     requestBody = /** @type {BodyInit} */ (body);
+  }
+
+  const method = (rest.method ?? "GET").toUpperCase();
+  if (CSRF_PROTECTED_METHODS.has(method)) {
+    const csrfToken = getCookie("csrftoken");
+    if (csrfToken) {
+      requestHeaders["X-CSRFToken"] = csrfToken;
+    }
   }
 
   // Caller's headers win over the defaults above.
