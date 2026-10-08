@@ -1639,3 +1639,60 @@ directly.
 
 **Final decision.** Issue #145 is implemented and validated in an isolated
 Docker environment. No schema or migration changes were required.
+
+## 2026-10-08 — Add registration abuse protection and prevent email enumeration (Issue #146)
+
+**Objective.** Add bounded protection against registration abuse and prevent
+the public registration API from confirming whether an email or username is
+already in use.
+
+**Agent/role used.** Copilot-assisted backend and frontend implementation.
+
+**What was delegated.** Nothing — implementation and validation were done
+directly.
+
+**Decision confirmed with the user.** Use the same HTTP 202 response for a
+valid new registration and a duplicate email/username, remove automatic
+login after registration, and require the user to sign in separately. Reuse
+the login policy's limit of five requests per minute per IP in a separate
+registration throttle scope.
+
+**Reasoning.**
+- A duplicate-only 400 or a success-only 201/user resource exposes whether
+  the email exists through response status or body.
+- Keeping automatic login exposes the same distinction through whether the
+  response sets an authenticated session cookie.
+- Returning the same neutral 202 body for both states, without an account
+  resource or session, removes those direct response signals. This does not
+  claim to eliminate timing analysis or distributed abuse.
+- Email verification was not added because the application has no email
+  delivery infrastructure; adding it would expand this issue into a
+  separate infrastructure and product change.
+- Five attempts per minute per IP is a small MVP baseline, deliberately
+  documented as shared by users behind a NAT and bypassable by distributed
+  sources.
+
+**Changes.**
+- Added a `register` `ScopedRateThrottle` scope at `5/min`.
+- Kept independent field/password validation errors while suppressing
+  uniqueness-specific responses for duplicate emails and usernames.
+- Returned the same generic response after both new-user creation and
+  duplicate-key races; unrelated database integrity errors still propagate.
+- Updated the registration page to display a neutral sign-in next step,
+  removed the auto-login/redirect assumption, and added an actionable
+  message for HTTP 429.
+- Updated API/MVP documentation, session and rate-limit decisions, and
+  added decision 0006 to record the policy, rationale, limitations, and
+  consequences.
+
+**How the team verified it.**
+- Registration endpoint tests in isolated Docker: **14 passed**, including
+  equal responses for new/existing emails, unchanged password validation,
+  absence of a session cookie, distinct login/register throttle budgets,
+  and HTTP 429 after the registration limit.
+- Full Django API suite in isolated Docker: **226 tests passed**.
+- Registration-page Vitest suite in Docker: **8 tests passed**.
+- `git diff --check`: passed.
+- The isolated database project uses an alternate host port and is removed
+  after validation; existing Docker services and their database are not
+  modified.

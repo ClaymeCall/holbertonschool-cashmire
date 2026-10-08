@@ -194,11 +194,11 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "api.exceptions.sanitized_exception_handler",
-    # "login" scope used by LoginView's ScopedRateThrottle (issue #23,
-    # AC-3) — per-IP, intentionally minimal. See
-    # docs/decisions/0004-login-rate-limiting.md.
+    # Separate per-IP limits for login and registration. These are
+    # intentionally minimal MVP abuse controls; see decisions 0004 and 0006.
     "DEFAULT_THROTTLE_RATES": {
         "login": "5/min",
+        "register": "5/min",
     },
 }
 

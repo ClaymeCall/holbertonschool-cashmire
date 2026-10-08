@@ -2,7 +2,7 @@ from calendar import monthrange
 from datetime import date
 from decimal import Decimal
 
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 from drf_spectacular.utils import extend_schema
@@ -26,6 +26,8 @@ from .models import Budget, Category, Expense
 from .serializers import LoginSerializer, RegisterSerializer, UserSerializer
 from .services.budget_consumption import calculate_consumption_batch
 
+User = get_user_model()
+
 
 @api_view(["GET"])
 def health(request):
@@ -35,27 +37,60 @@ def health(request):
 class RegisterView(generics.CreateAPIView):
     """POST /api/auth/register/ — docs/api-design.md §2.1, issue #22.
 
-    Unauthenticated (anyone may register). On success also establishes a
-    session via `login()`, per docs/mvp-scope.md §3.1 ("inscription
-    immédiate") and decision 0003 (session-cookie auth, no token issued) —
-    matching what register/+page.svelte already assumes: it redirects to
-    `/` on a successful response with nothing to store itself.
+    Registration attempts are throttled per IP. Valid new registrations
+    and requests for an already-used email/username return the same neutral
+    202 response, so the endpoint does not confirm account existence.
+    Registration deliberately does not establish a session; the user can
+    sign in after seeing that neutral response.
     """
 
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "register"
 
-    def perform_create(self, serializer):
-        user = serializer.save()
-        login(self.request, user)
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user_data = serializer.validated_data
+
+        if self._registration_conflict_exists(user_data):
+            return self._neutral_response()
+
+        try:
+            with transaction.atomic():
+                serializer.save()
+        except IntegrityError:
+            # A concurrent registration may have won the uniqueness race
+            # after the checks above. Only translate a real email/username
+            # collision; let unrelated database integrity failures surface.
+            if self._registration_conflict_exists(user_data):
+                return self._neutral_response()
+            raise
+
+        return self._neutral_response()
+
+    @staticmethod
+    def _registration_conflict_exists(user_data):
+        conflicts = Q(email=user_data["email"])
+        if user_data.get("username"):
+            conflicts |= Q(username=user_data["username"])
+        return User.objects.filter(conflicts).exists()
+
+    @staticmethod
+    def _neutral_response():
+        return Response(
+            {"detail": "If registration can be completed, sign in to continue."},
+            status=status.HTTP_202_ACCEPTED,
+        )
 
 
 class LoginView(generics.GenericAPIView):
     """POST /api/auth/login/ — docs/api-design.md §2.2, issue #23.
 
     Response shape deviates from §2.2 as documented: no `token` field —
-    decision 0003 is session-cookie auth, established here via `login()`
-    exactly as it is in RegisterView. The 200 body is the user resource
+    decision 0003 is session-cookie auth, established here via `login()`.
+    The 200 body is the user resource
     (`UserSerializer`), not `{"token": ..., "user": {...}}`.
 
     AC-2 (no user-existence leakage): `authenticate()` returns `None` for

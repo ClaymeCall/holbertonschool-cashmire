@@ -123,7 +123,10 @@ Ressources scoped par utilisateur : `Expense`, `Budget`, `Category`.
 
 **Authentification :** Non requise
 
-**Description :** Créer un nouveau compte utilisateur.
+**Description :** Créer un nouveau compte utilisateur, sans établir de
+session. L'inscription et la soumission d'une adresse déjà utilisée
+renvoient la même réponse neutre afin de ne pas confirmer l'existence d'un
+compte. Après cette réponse, l'utilisateur peut essayer de se connecter.
 
 **Corps de requête (application/json) :**
 ```json
@@ -137,29 +140,31 @@ Ressources scoped par utilisateur : `Expense`, `Budget`, `Category`.
 ```
 
 **Champs de requête :**
-- `email` (string, requis) : Adresse e-mail unique. Doit être valide (format RFC 5322).
+- `email` (string, requis) : Adresse e-mail valide (format RFC 5322).
 - `username` (string, requis) : Nom d'utilisateur unique. 3–150 caractères.
 - `password` (string, requis) : Mot de passe en clair (sera hashé côté serveur). Minimum 8 caractères recommandé.
 - `first_name` (string, optionnel) : Prénom. Maximum 150 caractères.
 - `last_name` (string, optionnel) : Nom de famille. Maximum 150 caractères.
 
-**Réponse 201 Created :**
+**Réponse 202 Accepted :**
 ```json
 {
-  "id": 1,
-  "email": "alice@example.com",
-  "username": "alice_wonderland",
-  "first_name": "Alice",
-  "last_name": "Wonderland",
-  "created_at": "2026-10-06T14:30:45Z"
+  "detail": "If registration can be completed, sign in to continue."
 }
 ```
 
-**Erreurs possibles :**
-- `400 Bad Request` — Validation échouée
-  - Message : `"email": "Adresse e-mail invalide"` ou `"password": "Minimum 8 caractères"`
-- `409 Conflict` — Email ou username déjà utilisé
-  - Message : `"error": "CONFLICT", "message": "Email ou username déjà utilisé"`
+Cette réponse et son code sont identiques pour une nouvelle adresse valide
+et une adresse déjà utilisée. Un nom d'utilisateur déjà utilisé produit
+également cette réponse. Les validations indépendantes de l'existence d'un
+compte (format de l'adresse, champs requis, règles de mot de passe)
+continuent de renvoyer `400 Bad Request` avec leurs erreurs de champ.
+
+La route est limitée à **5 tentatives par minute et par IP** et renvoie
+`429 Too Many Requests` lorsque la limite est dépassée. Cette limite MVP est
+partagée par les utilisateurs derrière une même IP et ne protège pas contre
+un attaquant distribué; voir les décisions 0004 et 0006. La réponse 202 ne
+crée pas de session : le client ne doit pas marquer l'utilisateur comme
+connecté ni attendre un objet utilisateur dans le corps.
 
 ---
 
@@ -944,7 +949,7 @@ Pas de corps. Code 204.
 | AC-15 | Pagination (ou absence) | ✓ Section 1.7 : MVP sans pagination, futur avec `?limit=50&offset=0` |
 | AC-16 | Contraintes de validation | ✓ Chaque route énonce ses validations (amount > 0, period_end >= period_start, UNIQUE(user, name)) |
 | AC-17 | Timestamps ISO 8601 | ✓ Section 1.4 : format `"2026-10-06T14:30:45Z"`, fuseau UTC |
-| AC-18 | POST retourne 201 Created | ✓ Register, login, expenses, budgets, categories : tous 201 |
+| AC-18 | Codes des POST | ✓ Les créations de ressources renvoient 201 ; l'inscription renvoie 202 neutre (décision 0006) et la connexion 200 |
 | AC-19 | PATCH retourne 200 OK | ✓ Tous les PATCH : 200 OK avec ressource modifiée |
 | AC-20 | DELETE retourne 204 No Content | ✓ Tous les DELETE : 204, pas de corps |
 

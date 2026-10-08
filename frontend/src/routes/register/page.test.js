@@ -6,11 +6,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/svelte";
 
-const gotoMock = vi.fn();
-vi.mock("$app/navigation", () => ({
-  goto: (...args) => gotoMock(...args),
-}));
-
 import RegisterPage from "./+page.svelte";
 
 /**
@@ -50,7 +45,6 @@ async function submit() {
 
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn());
-  gotoMock.mockClear();
 });
 
 afterEach(() => {
@@ -104,8 +98,15 @@ describe("register page (#28)", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("T-5 (AC-2): submits email and password (not the confirmation) to the registration API and redirects on success", async () => {
-    fetch.mockResolvedValue(fakeResponse({ status: 201, body: "{}" }));
+  it("T-5 (AC-2): submits email and password and shows the same neutral follow-up on 202", async () => {
+    fetch.mockResolvedValue(
+      fakeResponse({
+        status: 202,
+        body: JSON.stringify({
+          detail: "If registration can be completed, sign in to continue.",
+        }),
+      }),
+    );
     render(RegisterPage);
 
     await fillFields({
@@ -125,31 +126,49 @@ describe("register page (#28)", () => {
       password: "a-strong-password",
     });
 
-    await vi.waitFor(() => expect(gotoMock).toHaveBeenCalledWith("/"));
+    expect((await screen.findByRole("status")).textContent).toMatch(
+      /if registration can be completed, you can now sign in/i,
+    );
+    expect(screen.getByRole("link", { name: /go to sign in/i }).getAttribute("href")).toBe(
+      "/login",
+    );
   });
 
-  it("T-6 (AC-2): a 400 response's field errors are surfaced to the user", async () => {
+  it("T-6 (AC-2): non-enumerating validation errors are surfaced to the user", async () => {
     fetch.mockResolvedValue(
       fakeResponse({
         status: 400,
         body: JSON.stringify({
-          email: ["This field must be unique."],
+          password: ["This password is too short."],
         }),
       }),
     );
     render(RegisterPage);
 
     await fillFields({
-      email: "taken@example.com",
+      email: "new@example.com",
       password: "a-strong-password",
       passwordConfirm: "a-strong-password",
     });
     await submit();
 
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toMatch(/email/i);
-    expect(alert.textContent).toMatch(/must be unique/i);
-    expect(gotoMock).not.toHaveBeenCalled();
+    expect(alert.textContent).toMatch(/password/i);
+    expect(alert.textContent).toMatch(/too short/i);
+  });
+
+  it("shows an actionable retry message when registration is throttled", async () => {
+    fetch.mockResolvedValue(fakeResponse({ status: 429, body: "{}" }));
+    render(RegisterPage);
+
+    await fillFields({
+      email: "new@example.com",
+      password: "a-strong-password",
+      passwordConfirm: "a-strong-password",
+    });
+    await submit();
+
+    expect((await screen.findByRole("alert")).textContent).toMatch(/wait a minute/i);
   });
 
   it("T-7: a network failure (API unreachable) shows a generic, non-technical error", async () => {
@@ -165,6 +184,5 @@ describe("register page (#28)", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toMatch(/couldn't reach cashmire/i);
-    expect(gotoMock).not.toHaveBeenCalled();
   });
 });

@@ -72,12 +72,15 @@ Si l'utilisateur a franchi le seuil d'alerte à 80 % ou le dépasse complètemen
 
 **En périmètre** :
 - Création de compte : inscription avec adresse email et mot de passe ;
+- Après inscription, l'utilisateur se connecte séparément. La réponse
+  d'inscription reste neutre afin de ne pas révéler si l'adresse existe
+  déjà (issue #146, décision 0006) ;
 - Connexion : validation des identifiants et établissement d'une session ;
 - Déconnexion : fermeture sécurisée de la session ;
 - Validation des mots de passe : application des validateurs Django (longueur minimale, forces, etc.).
 
 **À confirmer par l'équipe** :
-- Vérification d'email avant activation (recommandation : non pour le MVP, inscrit dans le backlog post-MVP) ;
+- Vérification d'email avant activation (non pour le MVP, inscrit dans le backlog post-MVP) ;
 - Réinitialisation de mot de passe (recommandation : « Contacter le support » pour le MVP, feature post-MVP).
 
 **Modèle de données** (informationnel) :
@@ -91,7 +94,9 @@ Si l'utilisateur a franchi le seuil d'alerte à 80 % ou le dépasse complètemen
 **Sécurité** :
 - Mots de passe toujours hashés, jamais stockés en texte brut ;
 - Protection CSRF sur les formulaires ;
-- Rate limiting sur les endpoints de login (limites : *à confirmer par l'équipe*) ;
+- Rate limiting de 5 requêtes/minute/IP sur login et inscription ; les
+  limites partagées par IP et l'absence de protection contre les attaques
+  distribuées sont documentées dans les décisions 0004 et 0006 ;
 - Aucun mot de passe ne sort dans les logs ou les réponses API.
 
 **Accessibilité** :
