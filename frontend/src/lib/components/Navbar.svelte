@@ -119,7 +119,42 @@
 
 <header style="--texture-photo: url({textureTile})">
   <div class="header-row">
-    <a class="brand" href="/">Cashmire</a>
+    <a class="brand" href="/" aria-label="Cashmire">
+      <!-- logo_assets/cashmire-assets/svg/icon-ui-currentcolor.svg, inlined
+           (rather than referenced via <img>/background-image) so its
+           `currentColor` strokes actually track this link's text color,
+           including the hover transition — an <img> src would freeze the
+           colors baked into the file instead. No visible "Cashmire" text
+           next to it (by request) — the link's own aria-label carries the
+           accessible name instead, same pattern as the icon-only
+           menu-toggle button below. -->
+      <svg
+        class="brand-mark"
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="-65 -58 128 128"
+        role="img"
+        aria-hidden="true"
+      >
+        <defs>
+          <mask id="brand-mark-coin" maskUnits="userSpaceOnUse" x="-90" y="-70" width="180" height="150">
+            <rect x="-90" y="-70" width="180" height="150" fill="#fff" />
+            <circle cx="16" cy="6" r="47" fill="#000" />
+          </mask>
+        </defs>
+        <g mask="url(#brand-mark-coin)" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+          <ellipse cx="-26" cy="-2" rx="30" ry="10" />
+          <path d="M-56 -2 V34 M4 -2 V34 M-56 10 A30 10 0 0 0 4 10M-56 22 A30 10 0 0 0 4 22M-56 34 A30 10 0 0 0 4 34" />
+        </g>
+        <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="16" cy="6" r="38" stroke-width="6" />
+          <path d="M36.68 -11.36 A27 27 0 1 0 36.68 23.36" stroke="currentColor" stroke-width="9" stroke-linecap="butt" />
+          <g fill="currentColor" stroke="none">
+            <circle cx="8" cy="-2" r="4.5" /><circle cx="24" cy="-2" r="4.5" />
+            <circle cx="8" cy="14" r="4.5" /><circle cx="24" cy="14" r="4.5" />
+          </g>
+        </g>
+      </svg>
+    </a>
     <button
       type="button"
       class="menu-toggle"
@@ -194,16 +229,23 @@
   }
 
   .brand {
-    display: inline-block;
-    font-family: var(--font-heading);
-    font-size: 1.3rem;
-    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
     color: var(--color-heading);
     transition: color var(--motion-duration) var(--motion-ease);
   }
 
   .brand:hover {
     color: var(--color-camel-deep);
+  }
+
+  /* No more "Cashmire" text next to it, so the mark carries the whole
+     brand lockup on its own — sized up accordingly. Still within
+     logo_assets README's "simplified, use at 24-64px" range for icon-ui. */
+  .brand-mark {
+    width: 2.5rem;
+    height: 2.5rem;
+    flex-shrink: 0;
   }
 
   .menu-toggle {
