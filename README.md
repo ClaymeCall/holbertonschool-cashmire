@@ -39,6 +39,18 @@ with the quick start above). The API is available at
 `http://127.0.0.1:8000/`; its health endpoint is
 `http://127.0.0.1:8000/api/health/`.
 
+### Run backend tests
+
+With the `db` service available, run the complete API suite—including
+registration, login, logout, and protected current-user route tests—with:
+
+```bash
+docker compose run --rm api python manage.py test api
+```
+
+This single command works from the repository root and is suitable for local
+verification or CI.
+
 ### Run the API locally (without the `api` container)
 
 Install Python 3.12 and Docker Compose. Copy `.env.example` to `.env` (in

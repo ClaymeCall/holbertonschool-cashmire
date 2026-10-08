@@ -839,6 +839,30 @@ existing read-only `UserSerializer`.
 implementation, anonymous access returns 401, and `GET /api/auth/me/` returns
 only the authenticated user's public fields.
 
+## 2026-10-08 — Document and verify auth route tests (Issue #31)
+
+**Objective.** Ensure registration, login, logout, and the protected
+current-user route have automated happy-path and failure-case coverage, and
+document one command to run the API suite.
+
+**Main proposal.** Reuse the existing auth-route test modules, which already
+cover successful registration/login/logout, duplicate registration email,
+missing fields, wrong credentials, unauthenticated access, session handling,
+CSRF enforcement, and `/api/auth/me/` identity responses. Document a single
+suite command in the README instead of duplicating tests.
+
+**How the change was verified.**
+- Ran `docker compose -p cashmire-issue31-verify run --rm api python
+  manage.py test api`: all 111 API tests passed, including all four auth
+  route suites.
+- Ran `python manage.py check`: no system-check issues.
+- Removed only the isolated Compose verification resources.
+- `git diff --check` passes.
+
+**Final decision.** The existing automated tests satisfy the route and
+failure-case coverage in issue #31. The README now documents one command for
+running the complete API suite locally or in CI.
+
 ## 2026-10-07 — QA & Security review of Budget Create Endpoint (Issue #46)
 
 **Objective.** Closes #46 (QA review). Verify the Budget create endpoint implementation against 
