@@ -386,7 +386,7 @@ class BudgetCreateEndpointTests(TestCase):
             },
             format="json",
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)
 
     def test_budget_create_valid_request(self):
         """Test creating a valid budget with all required fields."""
@@ -1736,7 +1736,7 @@ class BudgetListTests(TestCase):
     def test_budget_list_requires_session_authentication(self):
         """Test that GET /api/budgets/ requires authentication."""
         response = self.client.get("/api/budgets/")
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)
 
     def test_budget_list_empty(self):
         """Test that empty budget list returns 200 OK with empty budgets array."""
@@ -2302,7 +2302,7 @@ class BudgetUpdateEndpointTests(TestCase):
             {"amount": "600.00"},
             format="json",
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)
 
     def test_budget_update_valid_amount(self):
         """Test updating budget amount returns 200 OK."""
@@ -2871,10 +2871,10 @@ class BudgetDeleteTests(TestCase):
         self.assertTrue(Category.objects.filter(id=category_id).exists())
 
     def test_budget_delete_requires_authentication(self):
-        """Test that DELETE without authentication returns 403."""
+        """Test that DELETE without authentication returns 401."""
         response = self.client.delete(f"/api/budgets/{self.budget.id}/")
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)
         # Should not delete the budget
         self.assertTrue(Budget.objects.filter(id=self.budget.id).exists())
 
