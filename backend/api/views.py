@@ -666,20 +666,29 @@ def _budget_create_post(request):
 
 
 @extend_schema(
+    methods=["PATCH"],
     request=BudgetSerializer,
     responses=BudgetWithConsumptionSerializer,
     description="Update an existing budget for the authenticated user",
 )
-@api_view(["PATCH"])
+@extend_schema(
+    methods=["DELETE"],
+    responses={status.HTTP_204_NO_CONTENT: None},
+    description="Delete an existing budget for the authenticated user",
+)
+@api_view(["PATCH", "DELETE"])
 @authentication_classes([SessionAuthentication])
 @permission_classes([IsAuthenticated])
 def budget_update_patch(request, budget_id):
     """
-    Handle PATCH on /api/budgets/{budget_id}/.
+    Handle PATCH and DELETE on /api/budgets/{budget_id}/.
 
-    Update an existing budget for the authenticated user. All fields are optional.
+    PATCH: Update an existing budget for the authenticated user. All fields are optional.
     Validates ownership, uniqueness constraint, and re-validates all fields.
     Returns 200 OK with updated budget including consumption data.
+
+    DELETE: Delete an existing budget for the authenticated user.
+    Returns 204 No Content on success.
     """
     # Retrieve budget and check ownership
     try:
@@ -690,6 +699,11 @@ def budget_update_patch(request, budget_id):
             status=status.HTTP_404_NOT_FOUND,
         )
 
+    if request.method == "DELETE":
+        budget.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    # PATCH handling
     # Validate partial update with BudgetSerializer (all fields optional for PATCH)
     serializer = BudgetSerializer(budget, data=request.data, partial=True)
 
