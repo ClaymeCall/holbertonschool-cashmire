@@ -1,6 +1,6 @@
 # Contrat API REST — Cashmire
 
-- **Dernière mise à jour :** 2026-10-06
+- **Dernière mise à jour :** 2026-10-08
 - **Auteur :** Spécification issue #7 (contrat API initial)
 - **Public cible :** Développeurs frontend (SvelteKit), clients API externes
 - **Statut du document :** Proposé, à relire par un autre membre de l'équipe. Source de vérité pour les routes API une fois approuvé.
@@ -10,6 +10,9 @@
 > Swagger (`/api/docs/`, schéma brut sur `/api/schema/`) deviennent la
 > référence à jour sur l'état réel de l'API. Ce document garde sa valeur
 > de contrat de conception, mais en cas d'écart, Swagger UI fait foi.
+>
+> L'interface et le schéma sont publics uniquement en développement
+> (`DJANGO_DEBUG=true`). Ils répondent 404 lorsque `DJANGO_DEBUG=false`.
 
 ---
 

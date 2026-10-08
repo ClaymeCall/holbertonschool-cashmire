@@ -39,6 +39,11 @@ with the quick start above). The API is available at
 `http://127.0.0.1:8000/`; its health endpoint is
 `http://127.0.0.1:8000/api/health/`.
 
+The OpenAPI schema (`/api/schema/`) and interactive Swagger UI
+(`/api/docs/`) are available publicly only when `DJANGO_DEBUG=true`.
+Both endpoints return 404 when debug mode is disabled; this does not replace
+the authentication and authorization checks on application API routes.
+
 ### Run backend tests
 
 With the `db` service available, run the complete API suite—including
