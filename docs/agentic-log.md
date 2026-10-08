@@ -1486,3 +1486,27 @@ performed directly.
 **Final decision.** The audited backend has no identified SQL string-building
 path. The regression test and issue-specific audit record are in place; no
 application behavior changed.
+
+## 2026-10-08 — Audit des routes API (Issue #57)
+
+**Objective.** Passer en revue chaque route pour la validation, les contrôles
+de propriété et les réponses d'erreur, et enregistrer le résultat.
+
+**Agent/role used.** Revue directe assistée par Claude Code (lecture de
+`views.py`, `serializers.py`, `auth.py`, `settings.py`, des tests).
+
+**What was delegated.** La lecture du code et la rédaction de la checklist;
+le tri des écarts reste à l'équipe.
+
+**How the team verified it.**
+- Chaque route de `backend/api/urls.py` est dans la checklist de
+  `docs/reviews/issue-57-route-audit.md`.
+- Le critère « pas de stack trace » est rattaché à `sanitized_exception_handler`
+  (#62), `DEBUG=false` par défaut et `api.tests.test_errors`.
+
+**Accepted / modified / rejected.**
+- Accepted: aucune route sans contrôle de propriété ou de validation.
+- Reported, not fixed: 5 écarts (G1 à G5), dont G1 (403 au lieu de 401 pour un
+  anonyme sur categories / expenses / budgets), à transformer en issues.
+
+**Final decision.** Audit enregistré; aucune modification de code.
