@@ -45,25 +45,25 @@
 
   <div class="prose">
     <p>API status: <code>{status}</code></p>
-
-    {#if authState.status === "authenticated"}
-      <section class="preview" aria-labelledby="expenses-preview-heading">
-        <div class="preview-header">
-          <h2 id="expenses-preview-heading">Recent expenses</h2>
-          <a href="/expenses">View all <ArrowRight size={14} /></a>
-        </div>
-        <ExpensesList limit={PREVIEW_LIMIT} />
-      </section>
-
-      <section class="preview" aria-labelledby="budgets-preview-heading">
-        <div class="preview-header">
-          <h2 id="budgets-preview-heading">Your budgets</h2>
-          <a href="/budgets">View all <ArrowRight size={14} /></a>
-        </div>
-        <BudgetsList limit={PREVIEW_LIMIT} />
-      </section>
-    {/if}
   </div>
+
+  {#if authState.status === "authenticated"}
+    <section class="preview" aria-labelledby="expenses-preview-heading">
+      <div class="preview-header">
+        <h2 id="expenses-preview-heading">Recent expenses</h2>
+        <a href="/expenses">View all <ArrowRight size={14} /></a>
+      </div>
+      <ExpensesList limit={PREVIEW_LIMIT} />
+    </section>
+
+    <section class="preview" aria-labelledby="budgets-preview-heading">
+      <div class="preview-header">
+        <h2 id="budgets-preview-heading">Your budgets</h2>
+        <a href="/budgets">View all <ArrowRight size={14} /></a>
+      </div>
+      <BudgetsList limit={PREVIEW_LIMIT} />
+    </section>
+  {/if}
 </main>
 
 <style>
@@ -97,6 +97,16 @@
   }
 
   main {
+    /* Without an explicit `width`, `main` only shrink-to-fits its content
+       instead of actually reaching `max-width` (`body`'s flex stretch
+       doesn't take effect here — SvelteKit wraps `{@render children()}` in
+       a `display: contents` node, which apparently breaks it for a subtree
+       this deep). Plain flowing text happened to fill the available width
+       anyway, so this went unnoticed — but it's fatal for the `auto-fit`
+       grids below: an auto-fit grid can't compute how many columns fit
+       without a definite container width, so it was silently collapsing
+       to one column. */
+    width: 100%;
     max-width: 1100px;
     margin: 0 auto;
     padding: var(--space-2xl) var(--space-xl) var(--space-3xl);
@@ -144,5 +154,20 @@
     gap: 0.25rem;
     font-size: var(--font-size-sm);
     color: var(--color-primary);
+  }
+
+  /* ExpensesList/BudgetsList (lib/components/) default to a single stacked
+     column — the right call on their own routes, where the list is the
+     whole page and can run to any length. Here it's always exactly
+     PREVIEW_LIMIT items in the wide `main` column, so reflow them into a
+     card grid instead of leaving the extra width empty; collapses to one
+     column with no media query, same `auto-fit` pattern as `.dashboard`'s
+     chart grid. `ul.` (not just `.`) deliberately outranks the component's
+     own same-specificity `.expense-list`/`.budget-list` rule regardless of
+     which stylesheet Vite happens to inject first. */
+  :global(.preview ul.expense-list),
+  :global(.preview ul.budget-list) {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   }
 </style>
