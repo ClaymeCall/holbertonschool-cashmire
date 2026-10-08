@@ -16,6 +16,12 @@
   import TextField from "$lib/components/TextField.svelte";
   import FormError from "$lib/components/FormError.svelte";
 
+  // Firefox has no native `<input type="month">` picker and silently falls
+  // back to a plain text box (no format hint, no browser-level validation),
+  // so `month` can arrive as arbitrary text there — validate the shape
+  // ourselves instead of trusting the browser.
+  const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+
   /**
    * @typedef {Object} Props
    * @property {"create" | "edit"} mode
@@ -58,7 +64,11 @@
   function clientValidationErrors() {
     const errors = [];
     if (!categoryId) errors.push("Choose a category.");
-    if (!month) errors.push("Choose a month.");
+    if (!month) {
+      errors.push("Choose a month.");
+    } else if (!MONTH_PATTERN.test(month)) {
+      errors.push("Enter the month as YYYY-MM (e.g. 2026-10).");
+    }
     if (!isValidDecimalString(amount.trim()) || compareDecimal(amount.trim(), "0") <= 0) {
       errors.push("Enter a limit greater than 0 (e.g. 500.00).");
     }
@@ -160,6 +170,9 @@
       name="month"
       label="Month"
       type="month"
+      placeholder="YYYY-MM"
+      pattern="\d{4}-(0[1-9]|1[0-2])"
+      hint="The month this budget applies to, e.g. 2026-10. (Your browser may show this as a text field instead of a picker.)"
       bind:value={month}
       disabled={formState === "submitting"}
       required
