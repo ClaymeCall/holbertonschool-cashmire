@@ -1510,3 +1510,48 @@ le tri des écarts reste à l'équipe.
   anonyme sur categories / expenses / budgets), à transformer en issues.
 
 **Final decision.** Audit enregistré; aucune modification de code.
+
+## 2026-10-08 — Return consistent 401 responses for protected API routes (Issue #143)
+
+**Objective.** Align unauthenticated responses from the categories, expenses,
+and budgets endpoints with the session-auth contract already used by
+`/api/auth/me/` and `/api/auth/logout/`, while preserving CSRF rejection as
+HTTP 403.
+
+**Agent/role used.** Copilot-assisted backend and frontend implementation.
+
+**What was delegated.** Nothing — implementation and verification were done
+directly.
+
+**How the team verified it.**
+- Updated protected category, expense-list/detail, and budget-list/detail
+  views to use the shared `SessionCookieAuthentication` class. Anonymous
+  requests now receive 401 and `WWW-Authenticate: Session`.
+- Updated backend regression tests for anonymous category, expense, and
+  budget requests, including expense detail mutations. Confirmed that
+  unauthenticated mutations do not change or delete records.
+- Kept the authenticated-session CSRF regression assertion at 403.
+- Updated `docs/api-design.md` to specify 401 for absent/invalid sessions
+  and reserve 403 for authenticated requests rejected by CSRF.
+- Updated expense and budget form error handling: 401 communicates that a
+  session is required; 403 communicates request/CSRF verification failure.
+  Added frontend regression tests for both outcomes.
+- Ran `docker compose --project-name cashmire-issue143 run --rm api python manage.py test api.tests.test_expenses api.tests.test_budgets api.tests.test_current_user api.tests.test_logout`:
+  all 196 tests passed.
+- Ran the focused frontend Vitest files for expense create/edit and budget
+  create: all 16 tests passed. Vite emitted existing Svelte state-capture
+  warnings in `BudgetForm.svelte`; they are unrelated to this change.
+- Ran `git diff --check`: passed. The isolated Docker project and volume
+  were removed after validation.
+
+**Accepted / modified / rejected.**
+- Accepted: use the project's existing shared session-cookie authenticator
+  rather than introducing a second authentication implementation.
+- Accepted: distinguish 401 authentication failures from 403 CSRF failures
+  in the frontend instead of treating both as a missing login.
+- Rejected: changing authenticated CSRF failures from 403 to 401; that would
+  blur the distinction between missing authentication and a rejected
+  authenticated request.
+
+**Final decision.** Issue #143 is implemented and targeted backend and
+frontend tests pass. No schema or migration changes were needed.

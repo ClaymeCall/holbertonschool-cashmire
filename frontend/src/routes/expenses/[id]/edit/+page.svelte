@@ -98,8 +98,10 @@
         errorMessages = flattenFieldErrors(err.body) ?? [
           "Check the highlighted fields and try again.",
         ];
-      } else if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      } else if (err instanceof ApiError && err.status === 401) {
         errorMessages = ["You need to be logged in to edit an expense."];
+      } else if (err instanceof ApiError && err.status === 403) {
+        errorMessages = ["This request couldn't be verified. Refresh the page and try again."];
       } else if (err instanceof ApiError && err.status === 404) {
         errorMessages = ["This expense or category couldn't be found."];
       } else {

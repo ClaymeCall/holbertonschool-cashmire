@@ -109,4 +109,18 @@ describe("edit expense page (#41)", () => {
 
     await vi.waitFor(() => expect(gotoMock).toHaveBeenCalledWith("/expenses"));
   });
+
+  it("T-4: a 403 response is reported as a rejected request, not missing authentication", async () => {
+    mockApi();
+    render(EditExpensePage);
+    const amount = await screen.findByLabelText(/^amount$/i);
+
+    await fireEvent.input(amount, { target: { value: "30.00" } });
+    fetch.mockResolvedValueOnce(fakeResponse({ status: 403 }));
+    await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toMatch(/couldn't be verified/i);
+    expect(alert.textContent).not.toMatch(/logged in/i);
+  });
 });

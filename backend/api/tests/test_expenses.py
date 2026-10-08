@@ -53,7 +53,7 @@ class CategoryListTests(TestCase):
     def test_category_list_requires_session_authentication(self):
         response = self.client.get("/api/categories/")
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)
 
     def test_authenticated_user_only_sees_their_categories(self):
         self.client.force_login(self.user)
@@ -171,7 +171,7 @@ class ExpenseCreateTests(TestCase):
     def test_create_requires_session_authentication(self):
         response = self.client.post(self.url, self.payload, format="json")
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)
         self.assertEqual(Expense.objects.count(), 0)
 
     def test_authenticated_user_creates_expense_owned_by_the_session_user(self):
@@ -340,7 +340,7 @@ class ExpenseListTests(TestCase):
     def test_list_requires_session_authentication(self):
         response = self.client.get(self.url)
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)
         self.assertEqual(
             response.json(),
             {"detail": "Authentication credentials were not provided."},
@@ -509,6 +509,19 @@ class ExpenseDetailMutationTests(TestCase):
 
     def detail_url(self, expense_id):
         return f"/api/expenses/{expense_id}/"
+
+    def test_detail_mutations_require_authentication(self):
+        patch_response = self.client.patch(
+            self.detail_url(self.expense.pk),
+            {"description": "Unauthenticated update"},
+            format="json",
+        )
+        delete_response = self.client.delete(self.detail_url(self.expense.pk))
+
+        self.assertEqual(patch_response.status_code, 401)
+        self.assertEqual(delete_response.status_code, 401)
+        self.expense.refresh_from_db()
+        self.assertEqual(self.expense.description, "Original")
 
     def test_patch_updates_only_supplied_fields_and_preserves_decimal_precision(self):
         self.client.force_login(self.user)

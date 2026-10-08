@@ -125,4 +125,42 @@ describe("create expense page (#41)", () => {
     expect(alert.textContent).toMatch(/doit être > 0/i);
     expect(gotoMock).not.toHaveBeenCalled();
   });
+
+  it("T-5: a 401 response explains that an authenticated session is required", async () => {
+    mockCategoriesFetch();
+    render(NewExpensePage);
+    await screen.findByLabelText(/^amount$/i);
+
+    await fireEvent.input(screen.getByLabelText(/^amount$/i), {
+      target: { value: "12.50" },
+    });
+    await fireEvent.input(screen.getByLabelText(/^date$/i), {
+      target: { value: "2026-10-06" },
+    });
+    fetch.mockResolvedValueOnce(fakeResponse({ status: 401 }));
+
+    await fireEvent.click(screen.getByRole("button", { name: /add expense/i }));
+
+    expect((await screen.findByRole("alert")).textContent).toMatch(/logged in/i);
+  });
+
+  it("T-6: a 403 response is treated as a rejected request, not missing authentication", async () => {
+    mockCategoriesFetch();
+    render(NewExpensePage);
+    await screen.findByLabelText(/^amount$/i);
+
+    await fireEvent.input(screen.getByLabelText(/^amount$/i), {
+      target: { value: "12.50" },
+    });
+    await fireEvent.input(screen.getByLabelText(/^date$/i), {
+      target: { value: "2026-10-06" },
+    });
+    fetch.mockResolvedValueOnce(fakeResponse({ status: 403 }));
+
+    await fireEvent.click(screen.getByRole("button", { name: /add expense/i }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toMatch(/couldn't be verified/i);
+    expect(alert.textContent).not.toMatch(/logged in/i);
+  });
 });
