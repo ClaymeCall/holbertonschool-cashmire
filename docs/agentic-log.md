@@ -1424,3 +1424,38 @@ performed directly.
 **Final decision.** The audited backend has no identified SQL string-building
 path. The regression test and issue-specific audit record are in place; no
 application behavior changed.
+
+## 2026-10-08 — Add synthetic demo data seed command (Issue #72)
+
+**Objective.** Provide a documented, repeatable development command that
+creates a synthetic account with categories, current-month expenses, and
+budgets, while refusing to seed when Django debug mode is disabled.
+
+**Agent/role used.** Copilot-assisted backend implementation.
+
+**What was delegated.** Nothing — implementation and validation were done
+directly.
+
+**How the change was verified.**
+- Added four management-command tests covering data creation, idempotence,
+  preservation of an existing demo-account password, and rejection when
+  `DEBUG` is false.
+- Ran `api.tests.test_seed_demo_data` in an isolated Docker Compose project:
+  all 4 tests passed.
+- Applied migrations to the isolated database and ran `seed_demo_data` twice:
+  the first run created the synthetic account with 5 categories, 7 expenses,
+  and 5 budgets; the second run reported the existing account and retained
+  those same record counts.
+- Ran `docker compose run --rm api python manage.py test api` in the isolated
+  Docker project: all 218 API tests passed.
+- Ran `git diff --check`: passed.
+
+**Accepted / modified / rejected.**
+- Accepted: keep demo data generation behind an explicit `DEBUG` guard and
+  use ORM `get_or_create`/`update_or_create` operations to make reruns safe.
+- Accepted: document the command and synthetic initial credentials in the
+  README, with a reminder to change the password before sharing the
+  development environment.
+
+**Final decision.** Issue #72's local demo-data workflow is implemented and
+validated. No schema changes were required.
