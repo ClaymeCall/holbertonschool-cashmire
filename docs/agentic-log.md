@@ -415,6 +415,76 @@ in the next cycle if the command proves incorrect.
 - Once approved, Full-Stack Development agent proceeds to implement the 19 routes (auth, expenses, budgets, categories) against the specification, following the same verification process.
 - Review artifacts: `docs/reviews/issue-7-api-contract.md` documents all findings (blockers, non-blockers, verification steps) with section-by-section analysis of all 20 criteria and security checks.
 
+## 2026-10-07 — QA & Security review of Budget Model (Issue #45)
+
+**Objective.** Closes #45 (QA review). Verify the Budget model implementation against its 
+specification (`docs/specs/issue-45-budget-model.md`) across all 14 acceptance criteria (AC-1 through 
+AC-14), focusing on data validation, database constraints, ORM configuration, test coverage, and 
+security.
+
+**Agent/role used.** QA & Security agent (read-only review, no source code edits).
+
+**What was delegated.** Verify Budget model implementation against specification:
+- Confirm model exists in `backend/api/models.py` with all fields and metadata
+- Verify migration `0003_budget.py` creates table with complete structure (fields, constraints, indices)
+- Run test suite (`python manage.py test api.tests.BudgetModelTests`) and verify all tests pass
+- Audit input validation (amount, alert_threshold, period dates) at both Django and database levels
+- Check referential integrity (user CASCADE, category PROTECT)
+- Verify no information leaks or security issues
+- Compare implementation against spec; flag any deviations
+- Document findings in `docs/reviews/issue-45-budget-model.md`
+
+**Main proposal.** All 14 acceptance criteria passed. The implementation is conformant, secure, 
+fully tested (23 tests, 100% pass rate), and ready for merge. One non-blocking finding: Django model 
+uses `check=` parameter instead of `condition=` for CheckConstraint (deprecated in Django 5.0+ but 
+accepted for backward compatibility in 5.1.3). Migration correctly uses `condition=`.
+
+**How the team verified it.**
+- Ran full test suite: `python manage.py test api.tests.BudgetModelTests -v 2` → all 23 tests passed
+- Verified AC-1: Budget model present in models.py with all required fields (user, category, amount, 
+  period_start, period_end, alert_threshold, created_at, updated_at)
+- Verified AC-2: Migration file 0003_budget.py creates table with single CreateModel operation 
+  (modern Django 5.1 style)
+- Verified AC-3: Migration applied without error (test database created and all migrations applied)
+- Verified AC-4: amount is DecimalField(max_digits=10, decimal_places=2) with MinValueValidator(Decimal("0.01"))
+- Verified AC-5: alert_threshold is DecimalField(max_digits=5, decimal_places=2, null=True, 
+  default=Decimal("80.00")) with validators MinValueValidator(0) and MaxValueValidator(100)
+- Verified AC-6: period_start and period_end are DateField with CheckConstraint(period_end >= period_start)
+- Verified AC-7: UniqueConstraint(fields=['user', 'category', 'period_start', 'period_end'])
+- Verified AC-8: ForeignKey to User with on_delete=models.CASCADE (test_user_cascade_delete passed)
+- Verified AC-9: ForeignKey to Category with on_delete=models.PROTECT (test_category_protect_delete passed)
+- Verified AC-10: Two indexes present: idx_budget_user_id on user, idx_budget_user_period on 
+  (user, period_start, period_end)
+- Verified AC-11: DateTimeField(auto_now_add=True) for created_at, DateTimeField(auto_now=True) for updated_at
+- Verified AC-12: CheckConstraint(check=models.Q(amount__gt=0)) preventing zero/negative amounts
+- Verified AC-13 & AC-14: All 23 tests cover required cases:
+  - Valid budget creation (4 tests)
+  - UNIQUE constraint enforcement (1 test)
+  - Amount validation (5 tests covering 0, negative, 0.01, max, precision)
+  - Period validation (3 tests covering end < start, end = start, end > start)
+  - Alert threshold validation (5 tests covering null, 0, 100, negative, > 100)
+  - Referential integrity (3 tests covering cascade/protect)
+  - Timestamps (1 test)
+- Audited security: No SQL injection (Django ORM used throughout), no information leaks in __str__ 
+  method, proper cascading/protection behavior, validators at both ORM and database levels
+- Verified no deviations from spec (acknowledged limitation: category.user_id == budget.user_id 
+  must be validated at application level, as noted in spec section 6)
+
+**Accepted / modified / rejected.**
+- Accepted: All 14 acceptance criteria met. Implementation is conformant to specification.
+- Accepted: One non-blocking finding (check= vs condition=) does not block merge; Django 5.1.3 
+  accepts both for backward compatibility.
+- Rejected: Nothing. The Budget model is ready for merge.
+
+**Final decision.**
+- The Budget model implementation is **approved for merge**. All acceptance criteria satisfied; 
+  23 tests passing; no security issues, no spec deviations, no blockers.
+- **Non-blocking follow-up (future maintenance):** Update CheckConstraint definitions in models.py 
+  to use `condition=` instead of `check=` for consistency with Django 5.1.3 convention 
+  (migration already correct). This is a maintenance task, not a blocker.
+- Review artifacts: `docs/reviews/issue-45-budget-model.md` documents all findings with per-AC 
+  verification, security audit results, and non-blocking recommendations.
+
 ## 2026-10-07 — Complete the authentication strategy documentation (Issue #25)
 
 **Objective.** Close the documentation gap in #25: the session-cookie decision
