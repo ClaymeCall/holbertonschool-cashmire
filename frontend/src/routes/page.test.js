@@ -1,6 +1,6 @@
 // Component tests for the landing page (issue #104 componentization
-// follow-up): the health-status line it always had, plus the logged-in-only
-// expenses/budgets previews that prove ExpensesList/BudgetsList
+// follow-up): the dashboard charts and expenses/budgets previews shown only
+// to logged-in users, which prove ExpensesList/BudgetsList/DashboardCharts
 // (lib/components/) are genuinely reusable outside their own routes.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/svelte";
@@ -61,9 +61,6 @@ function mockApi() {
     "fetch",
     vi.fn(async (url) => {
       const u = String(url);
-      if (u.includes("/api/health/")) {
-        return fakeResponse({ status: 200, body: JSON.stringify({ status: "ok" }) });
-      }
       if (u.includes("/api/categories/")) {
         return fakeResponse({ status: 200, body: JSON.stringify({ categories: CATEGORIES }) });
       }
@@ -84,11 +81,9 @@ describe("landing page (#104 componentization follow-up)", () => {
     setCurrentUser(null);
   });
 
-  it("while anonymous, shows the API status but no dashboard or expenses/budgets previews", async () => {
-    mockApi();
+  it("while anonymous, shows no dashboard or expenses/budgets previews", () => {
     render(HomePage);
 
-    expect(await screen.findByText("ok")).toBeTruthy();
     expect(screen.queryByRole("heading", { name: /spending at a glance/i })).toBeNull();
     expect(screen.queryByRole("heading", { name: /recent expenses/i })).toBeNull();
     expect(screen.queryByRole("heading", { name: /your budgets/i })).toBeNull();

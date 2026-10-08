@@ -5,9 +5,10 @@
   // reusable outside their own /expenses and /budgets routes, not just
   // split out for file-size reasons. Each preview is capped at 3 items and
   // links through to its full route rather than paginating here.
-  import { onMount } from "svelte";
+  //
+  // No API status check here — that's what /health is for (linked from the
+  // footer); this page doesn't need its own redundant copy of it.
   import { ArrowRight } from "@lucide/svelte";
-  import { apiFetch } from "$lib/api";
   import heroImage from "$lib/images/cashmere-hero.webp";
   import { authState } from "$lib/auth.svelte.js";
   import ExpensesList from "$lib/components/ExpensesList.svelte";
@@ -15,17 +16,6 @@
   import DashboardCharts from "$lib/components/DashboardCharts.svelte";
 
   const PREVIEW_LIMIT = 3;
-
-  let status = "checking...";
-
-  onMount(async () => {
-    try {
-      const data = await apiFetch("/api/health/");
-      status = data.status;
-    } catch (err) {
-      status = "unreachable";
-    }
-  });
 </script>
 
 <section class="hero" style="--hero-image: url({heroImage})">
@@ -41,13 +31,7 @@
       <h2 id="dashboard-heading">Your spending at a glance</h2>
       <DashboardCharts />
     </section>
-  {/if}
 
-  <div class="prose">
-    <p>API status: <code>{status}</code></p>
-  </div>
-
-  {#if authState.status === "authenticated"}
     <section class="preview" aria-labelledby="expenses-preview-heading">
       <div class="preview-header">
         <h2 id="expenses-preview-heading">Recent expenses</h2>
@@ -68,10 +52,18 @@
 
 <style>
   .hero {
+    /* The source photo (cashmere-hero.webp) is a pale, high-key wool
+       close-up — light cream throughout, with a near-white bokeh patch in
+       the upper left — so a subtle scrim isn't enough to carry light text
+       at AA contrast anywhere the photo is driving. Darkened well past
+       "subtle" (0.6–0.72, vs. the original 0.45–0.15) and flattened from a
+       top-heavy fade to roughly even top-to-bottom coverage, so contrast
+       doesn't collapse whichever part of the photo sits behind the
+       headline. */
     background-image: linear-gradient(
         180deg,
-        rgba(42, 23, 15, 0.45),
-        rgba(42, 23, 15, 0.15)
+        rgba(42, 23, 15, 0.72),
+        rgba(42, 23, 15, 0.6)
       ),
       var(--hero-image);
     background-size: cover;
@@ -89,11 +81,15 @@
     font-style: italic;
     font-weight: 300;
     color: var(--color-ivory);
+    /* Belt-and-braces on top of the darkened scrim: a soft dark halo keeps
+       the text edges legible even over the photo's brightest spots. */
+    text-shadow: 0 2px 10px rgba(20, 11, 7, 0.7);
   }
 
   .tagline {
     color: var(--color-ivory);
     font-size: 1.1rem;
+    text-shadow: 0 1px 6px rgba(20, 11, 7, 0.7);
   }
 
   main {
@@ -110,11 +106,6 @@
     max-width: 1100px;
     margin: 0 auto;
     padding: var(--space-2xl) var(--space-xl) var(--space-3xl);
-  }
-
-  .prose {
-    max-width: 60ch;
-    margin-inline: auto;
   }
 
   .dashboard {
