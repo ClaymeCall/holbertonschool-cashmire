@@ -1593,3 +1593,49 @@ directly.
 
 **Final decision.** Issue #144 is implemented and validated. No schema or
 migration changes were needed.
+## 2026-10-08 — Require safe Django settings outside development (Issue #145)
+
+**Objective.** Prevent non-debug Django deployments from starting with the
+known development secret key or wildcard/missing allowed hosts, while keeping
+local development setup straightforward.
+
+**Agent/role used.** Copilot-assisted backend configuration hardening.
+
+**What was delegated.** Nothing — implementation and validation were done
+directly.
+
+**How the team verified it.**
+- Settings now use the development secret and wildcard host fallback only
+  when `DJANGO_DEBUG=true`. With debug disabled, missing or known placeholder
+  secrets, weak secrets (under 50 characters or fewer than five distinct
+  characters), missing hostnames, and wildcard hosts raise
+  `ImproperlyConfigured` during startup.
+- Added tests for development placeholders, missing and known insecure
+  secrets, insufficient secret length/character diversity, missing or
+  wildcard hosts, and valid explicit deployment settings.
+- Updated `.env.example` to use explicit local hostnames and documented its
+  development-only secret placeholder. Added README deployment instructions
+  and a command to generate a unique Django secret without storing it in
+  source control.
+- Ran `docker compose --project-name cashmire-issue145 run --rm -e DJANGO_DEBUG=true api python manage.py test api.tests.test_deployment_settings`:
+  all 5 tests passed.
+- Ran the full API suite with the documented development settings:
+  **224 tests passed**.
+- Ran `manage.py check` with valid non-debug secret/hostname settings:
+  no issues reported. Startup checks rejected the development placeholder,
+  wildcard hosts, and an empty allowed-host list; they did not print secret
+  values.
+- Ran `git diff --check`: passed. The isolated Docker database and network
+  were removed after validation. The repository's existing `.env` was not
+  read or modified.
+
+**Accepted / modified / rejected.**
+- Accepted: fail early with a configuration error rather than silently
+  starting a non-debug deployment with unsafe defaults.
+- Accepted: keep local development convenient through explicitly marked
+  placeholders in `.env.example`, while replacing the example wildcard with
+  local hostnames.
+- Rejected: logging the supplied secret or echoing it in validation errors.
+
+**Final decision.** Issue #145 is implemented and validated in an isolated
+Docker environment. No schema or migration changes were required.

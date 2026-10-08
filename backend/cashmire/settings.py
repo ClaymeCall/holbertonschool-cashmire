@@ -2,6 +2,7 @@ import os
 import socket
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,11 +26,59 @@ def _resolve_postgres_host(default_port: str) -> str:
         return "localhost"
 
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-insecure-secret-key")
-
 DEBUG = os.environ.get("DJANGO_DEBUG", "false").lower() == "true"
 
-ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split(",")
+_DEVELOPMENT_SECRET_KEY = "dev-insecure-secret-key"
+_INSECURE_SECRET_KEYS = {_DEVELOPMENT_SECRET_KEY, "change-me"}
+
+
+def _validate_deployment_security(*, debug, secret_key, allowed_hosts):
+    if debug:
+        return
+
+    secret_key = secret_key.strip()
+    if (
+        not secret_key
+        or secret_key in _INSECURE_SECRET_KEYS
+    ):
+        raise ImproperlyConfigured(
+            "Set DJANGO_SECRET_KEY to a unique, non-development value when "
+            "DJANGO_DEBUG=false."
+        )
+
+    if len(secret_key) < 50 or len(set(secret_key)) < 5:
+        raise ImproperlyConfigured(
+            "DJANGO_SECRET_KEY must contain at least 50 characters and "
+            "5 unique characters when DJANGO_DEBUG=false."
+        )
+
+    if not allowed_hosts or "*" in allowed_hosts:
+        raise ImproperlyConfigured(
+            "Set DJANGO_ALLOWED_HOSTS to explicit hostnames when "
+            "DJANGO_DEBUG=false; wildcard hosts are not allowed."
+        )
+
+
+_configured_secret_key = os.environ.get("DJANGO_SECRET_KEY", "").strip()
+SECRET_KEY = _configured_secret_key or (
+    _DEVELOPMENT_SECRET_KEY if DEBUG else ""
+)
+
+_configured_allowed_hosts = os.environ.get("DJANGO_ALLOWED_HOSTS")
+if _configured_allowed_hosts:
+    ALLOWED_HOSTS = [
+        host.strip()
+        for host in _configured_allowed_hosts.split(",")
+        if host.strip()
+    ]
+else:
+    ALLOWED_HOSTS = ["*"] if DEBUG else []
+
+_validate_deployment_security(
+    debug=DEBUG,
+    secret_key=SECRET_KEY,
+    allowed_hosts=ALLOWED_HOSTS,
+)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
