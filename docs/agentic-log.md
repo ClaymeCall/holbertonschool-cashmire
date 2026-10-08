@@ -1517,3 +1517,32 @@ l'objet de l'issue #59.
 **Final decision.** Findings collectés dans
 `docs/reviews/issue-58-qa-security-review.md`. Une revue d'agent est une
 preuve à vérifier, pas une garantie de sécurité.
+
+## 2026-10-08 — Tri des findings QA & Security (Issue #59)
+
+**Objective.** Transformer les findings bruts de la revue #58 en décisions
+(accepté / modifié / rejeté) avec raisons.
+
+**Agent/role used.** Claude Code, en relecture du rapport de l'agent
+QA & Security.
+
+**What was delegated.** Le tri initial proposé et la vérification de quatre
+findings contre le code (B1, N9, N12, N18). Les décisions restent à valider
+par l'équipe.
+
+**How the team verified it.**
+- B1: ratios de contraste recalculés (3,25 / 2,10 / 4,20 / 4,41 sur `#f7f2e9`),
+  identiques au rapport; `color` bien posé sur le `li` dans
+  `BudgetsList.svelte`.
+- N9, N12 et N18 confirmés en lisant `BudgetForm.svelte`,
+  `login/+page.svelte` et `frontend/src/lib/api/budgets.js`.
+- Tests frontend après correction de N18: 134/134.
+
+**Accepted / modified / rejected.**
+- Accepted: B1, N5, N9, N12, N17, N18 et la passe accessibilité (#65).
+- Modified: N1, N2, N4, N6 à N8, N16, N19 (documentés ou reportés).
+- Rejected: N3 et N20, avec raison dans le document de tri.
+- Corrigé: N18 (PR #140).
+
+**Final decision.** Tri proposé dans `docs/reviews/issue-59-qa-findings-triage.md`,
+en attente de validation d'équipe.
