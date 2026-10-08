@@ -1,8 +1,8 @@
 # Entity-Relationship Diagram (ERD) — Cashmire
 
-> **PROPOSITION EN ATTENTE D'APPROBATION**
-> 
-> Ce document décrit l'ERD proposée pour Cashmire après résolution de l'issue #6 (propriété des catégories). Il **ne constitue pas** une décision finale. Avant la rédaction des migrations Django et la création des modèles, cette proposition doit être approuvée par l'équipe. Voir `docs/specs/issue-5-erd.md` pour le détail complet de l'ERD, et `docs/specs/issue-6-category-ownership.md` pour la justification de la décision sur les catégories.
+> **STATUT : IMPLÉMENTÉ**
+>
+> Cet ERD a été implémenté : les modèles et migrations décrits ici sont présents sur `main` (`backend/api/models.py`, `backend/api/migrations/`). Le code fait foi en cas d'écart. Voir `docs/specs/issue-5-erd.md` pour le détail de l'ERD, et `docs/specs/issue-6-category-ownership.md` pour la justification de la décision sur les catégories.
 
 ---
 
@@ -303,19 +303,14 @@ Les indices suggérés ci-dessus sont des recommandations pour les requêtes cou
 
 - **Base de données PostgreSQL :** `settings.py` définit `DATABASES["default"]["ENGINE"] = "django.db.backends.postgresql"`. Cet ERD utilise le dialecte PostgreSQL (`NUMERIC`, `BIGSERIAL`, `TIMESTAMP`, etc.) compatible avec la configuration existante.
 - **DEFAULT_AUTO_FIELD :** Django est configuré avec `DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"` dans `settings.py`. Tous les `id` utilisent `BIGSERIAL` par cohérence.
-- **User par défaut Django :** Pas d'héritage multi-table personnalisé. Utilisation de Django `User` de base pour `USER` (champ `password` au lieu de `password_hash`).
-- **Pas de modèles existants :** `backend/api/` ne contient pas de `models.py` aujourd'hui. Cet ERD propose les quatre premiers modèles du projet.
-- **Migration 0001 vide :** `backend/api/migrations/0001_initial.py` est actuellement vide (`operations = []`). Les vrais modèles seront introduits dans `0002_initial_models.py` ou équivalent.
+- **User personnalisé :** `AUTH_USER_MODEL = "api.User"` (email unique, voir `settings.py`), créé par `0001_initial.py`.
+- **Migrations :** `0001_initial.py` (User), `0002_category.py`, `0003_expense.py`, `0004_budget.py`.
 
 ---
 
 ## Prochaines étapes
 
-1. **Approbation de cette proposition :** Équipe lit et approuve (ou amende) l'ERD et la décision issue #6.
-2. **Création des modèles Django :** `backend/api/models.py` implémente la structure validée.
-3. **Migrations initiales :** `backend/api/migrations/0002_initial_models.py` ou équivalent.
-4. **Implémentation de la seed data :** Signal ou command Django pour créer les catégories par défaut.
-5. **Spécifications API :** Issues futures pour les routes CRUD (GET, POST, PATCH, DELETE).
+Faites : approbation de la proposition, modèles Django (`backend/api/models.py`), migrations `0001` à `0004`, création des catégories par défaut à l'inscription (`backend/api/signals.py`) et routes CRUD (`docs/api-design.md`).
 
 ---
 
@@ -330,4 +325,4 @@ Les indices suggérés ci-dessus sont des recommandations pour les requêtes cou
 
 ---
 
-*Dernière mise à jour : 2026-10-06. Document proposé par Product & Architecture. Issue #6 tranchée. En attente d'approbation avant migrations.*
+*Dernière mise à jour : 2026-10-08. Issue #6 tranchée; modèles et migrations implémentés.*
