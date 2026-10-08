@@ -12,8 +12,8 @@ describe("SpendingTrendChart", () => {
       { date: "2026-10-08", total: "0" },
     ];
     render(SpendingTrendChart, { daily });
-    expect(screen.getByRole("heading", { name: /last 30 days/i })).toBeTruthy();
-    expect(screen.queryByText(/no expenses recorded/i)).toBeNull();
+    expect(screen.getByRole("heading", { name: /30 derniers jours/i })).toBeTruthy();
+    expect(screen.queryByText(/aucune dépense enregistrée/i)).toBeNull();
   });
 
   it("shows an empty state when every day in the window is zero", () => {
@@ -23,6 +23,6 @@ describe("SpendingTrendChart", () => {
       { date: "2026-10-07", total: "0" },
     ];
     render(SpendingTrendChart, { daily });
-    expect(screen.getByText(/no expenses recorded in the last 30 days/i)).toBeTruthy();
+    expect(screen.getByText(/aucune dépense enregistrée au cours des 30 derniers jours/i)).toBeTruthy();
   });
 });

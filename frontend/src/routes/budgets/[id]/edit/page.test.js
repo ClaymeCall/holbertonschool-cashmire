@@ -74,10 +74,10 @@ describe("edit budget page (#53)", () => {
 
     expect(await screen.findByText("Alimentation")).toBeTruthy();
     expect(screen.getByText("2026-10")).toBeTruthy();
-    expect(screen.queryByLabelText(/^category$/i)).toBeNull();
-    expect(screen.queryByLabelText(/^month$/i)).toBeNull();
+    expect(screen.queryByLabelText(/^catégorie$/i)).toBeNull();
+    expect(screen.queryByLabelText(/^mois$/i)).toBeNull();
 
-    const limit = screen.getByLabelText(/^limit$/i);
+    const limit = screen.getByLabelText(/^limite$/i);
     expect(limit.value).toBe("200.00");
   });
 
@@ -85,21 +85,21 @@ describe("edit budget page (#53)", () => {
     mockApi({ budgets: [] });
     render(EditBudgetPage);
 
-    expect(await screen.findByText(/couldn't be found/i)).toBeTruthy();
-    expect(screen.queryByLabelText(/^limit$/i)).toBeNull();
+    expect(await screen.findByText(/introuvable/i)).toBeTruthy();
+    expect(screen.queryByLabelText(/^limite$/i)).toBeNull();
   });
 
   it("T-3: submits a PATCH with only amount/alert_threshold and redirects on success", async () => {
     mockApi();
     render(EditBudgetPage);
-    const limit = await screen.findByLabelText(/^limit$/i);
+    const limit = await screen.findByLabelText(/^limite$/i);
 
     await fireEvent.input(limit, { target: { value: "250.00" } });
 
     fetch.mockResolvedValueOnce(
       fakeResponse({ status: 200, body: JSON.stringify({ id: 1 }) }),
     );
-    await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /enregistrer les modifications/i }));
 
     const patchCall = fetch.mock.calls.find(([, init]) => init?.method === "PATCH");
     expect(patchCall[0]).toBe("http://localhost:8000/api/budgets/1/");

@@ -16,19 +16,19 @@
   // Same icon+text pairing as BudgetsList's STATUS_META — color is never the
   // only signal (docs/mvp-scope.md §3.7).
   const STATUS_META = {
-    ok: { label: "On track", icon: CircleCheck, color: "var(--color-success-border)" },
+    ok: { label: "Sous contrôle", icon: CircleCheck, color: "var(--color-success-border)" },
     warning: {
-      label: "Approaching limit",
+      label: "Proche de la limite",
       icon: TriangleAlert,
       color: "var(--color-warning-border)",
     },
-    full: { label: "Budget reached", icon: CircleAlert, color: "var(--color-full-border)" },
-    exceeded: { label: "Over budget", icon: CircleX, color: "var(--color-error-border)" },
+    full: { label: "Budget atteint", icon: CircleAlert, color: "var(--color-full-border)" },
+    exceeded: { label: "Budget dépassé", icon: CircleX, color: "var(--color-error-border)" },
   };
 
   /** @param {import("$lib/dashboard").BudgetVsSpentRow} row */
   function statusMeta(row) {
-    return STATUS_META[row.status] ?? { label: "Unknown", icon: CircleHelp, color: "var(--color-muted-text)" };
+    return STATUS_META[row.status] ?? { label: "Inconnu", icon: CircleHelp, color: "var(--color-muted-text)" };
   }
 
   const chartData = $derived(
@@ -45,26 +45,26 @@
   );
 
   const series = [
-    { key: "amount", label: "Budgeted", color: "var(--color-border-subtle)" },
+    { key: "amount", label: "Budgété", color: "var(--color-border-subtle)" },
     {
       key: "spent",
-      label: "Spent",
+      label: "Dépensé",
       props: { fill: (/** @type {{ status?: string }} */ d) => statusMeta(d).color },
     },
   ];
 </script>
 
 <div class="chart-card">
-  <h3>Budget vs spent by category</h3>
+  <h3>Budget vs dépenses par catégorie</h3>
   {#if rows.length === 0}
-    <p class="empty">No budgets yet.</p>
+    <p class="empty">Aucun budget pour l'instant.</p>
   {:else}
     <div class="chart">
       <BarChart data={chartData} x="categoryName" {series} seriesLayout="group" />
     </div>
     <ul class="legend">
       {#each visibleStatuses as status (status)}
-        {@const meta = STATUS_META[status] ?? { label: "Unknown", icon: CircleHelp, color: "var(--color-muted-text)" }}
+        {@const meta = STATUS_META[status] ?? { label: "Inconnu", icon: CircleHelp, color: "var(--color-muted-text)" }}
         <li style={`color: ${meta.color}`}>
           <meta.icon size={14} /> {meta.label}
         </li>

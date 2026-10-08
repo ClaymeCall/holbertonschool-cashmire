@@ -19,11 +19,11 @@
 <main>
   <div class="text">
     <p class="status">{$page?.status ?? 404}</p>
-    <h1>Nothing here</h1>
+    <h1>Page introuvable</h1>
     <p>
-      {$page?.error?.message ?? "That page doesn't exist."}
+      {$page?.error?.message ?? "Cette page n'existe pas."}
     </p>
-    <p><a href="/">Back to the Cashmire home page</a></p>
+    <p><a href="/">Retour à la page d'accueil de Cashmire</a></p>
   </div>
   <img
     src={emptyStateImage}

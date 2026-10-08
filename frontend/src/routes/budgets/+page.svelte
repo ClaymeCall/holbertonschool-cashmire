@@ -9,13 +9,13 @@
 
 <svelte:head>
   <title>Budgets · Cashmire</title>
-  <meta name="description" content="Track how your spending compares to the budgets you've set." />
+  <meta name="description" content="Suivez vos dépenses par rapport aux budgets que vous avez définis." />
 </svelte:head>
 
 <main>
   <div class="header-row">
     <h1>Budgets</h1>
-    <a class="button-link" href="/budgets/new"><Plus size={16} /> Add budget</a>
+    <a class="button-link" href="/budgets/new"><Plus size={16} /> Ajouter un budget</a>
   </div>
 
   <BudgetsList />

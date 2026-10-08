@@ -33,9 +33,9 @@
 </script>
 
 <div class="chart-card">
-  <h3>Spending by category this period</h3>
+  <h3>Dépenses par catégorie cette période</h3>
   {#if totals.length === 0}
-    <p class="empty">No expenses recorded yet this period.</p>
+    <p class="empty">Aucune dépense enregistrée cette période.</p>
   {:else}
     <div class="chart">
       <PieChart

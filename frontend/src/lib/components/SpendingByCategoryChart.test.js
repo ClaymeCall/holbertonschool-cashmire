@@ -26,6 +26,6 @@ describe("SpendingByCategoryChart", () => {
 
   it("shows an empty state when there's no spending this period", () => {
     render(SpendingByCategoryChart, { totals: [] });
-    expect(screen.getByText(/no expenses recorded yet/i)).toBeTruthy();
+    expect(screen.getByText(/aucune dépense enregistrée cette période/i)).toBeTruthy();
   });
 });

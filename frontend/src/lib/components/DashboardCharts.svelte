@@ -61,7 +61,7 @@
       budgets = budgetList;
       state = "ready";
     } catch (err) {
-      errorMessage = "Couldn't load your dashboard. Try again in a moment.";
+      errorMessage = "Impossible de charger votre tableau de bord. Réessayez dans un instant.";
       state = "error";
       console.error("Failed to load dashboard data:", err);
     }
@@ -71,10 +71,10 @@
 </script>
 
 {#if state === "loading"}
-  <p role="status">Loading your dashboard…</p>
+  <p role="status">Chargement de votre tableau de bord…</p>
 {:else if state === "error"}
   <FormError messages={errorMessage ? [errorMessage] : []} />
-  <Button type="button" onclick={load}><RefreshCw size={16} /> Retry</Button>
+  <Button type="button" onclick={load}><RefreshCw size={16} /> Réessayer</Button>
 {:else}
   <div class="dashboard-charts">
     <BudgetVsSpentChart rows={budgetRows} />

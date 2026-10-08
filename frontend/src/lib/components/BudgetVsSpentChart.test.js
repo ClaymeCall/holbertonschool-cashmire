@@ -26,12 +26,12 @@ const ROWS = [
 describe("BudgetVsSpentChart", () => {
   it("shows an icon+text status legend, not color alone", async () => {
     render(BudgetVsSpentChart, { rows: ROWS });
-    expect(await screen.findByText("Approaching limit")).toBeTruthy();
-    expect(await screen.findByText("On track")).toBeTruthy();
+    expect(await screen.findByText("Proche de la limite")).toBeTruthy();
+    expect(await screen.findByText("Sous contrôle")).toBeTruthy();
   });
 
   it("shows an empty state when there are no budgets", () => {
     render(BudgetVsSpentChart, { rows: [] });
-    expect(screen.getByText(/no budgets yet/i)).toBeTruthy();
+    expect(screen.getByText(/aucun budget pour l'instant/i)).toBeTruthy();
   });
 });

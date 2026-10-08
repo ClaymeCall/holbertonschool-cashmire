@@ -84,11 +84,11 @@ describe("budget dashboard page (#52)", () => {
     expect(items).toHaveLength(2);
 
     expect(within(items[0]).getByText("Alimentation")).toBeTruthy();
-    expect(within(items[0]).getByText(/45\.00 spent of 200\.00/)).toBeTruthy();
-    expect(within(items[0]).getByText(/on track/i)).toBeTruthy();
+    expect(within(items[0]).getByText(/45\.00 dépensé\(s\) sur 200\.00/)).toBeTruthy();
+    expect(within(items[0]).getByText(/sous contrôle/i)).toBeTruthy();
 
     expect(within(items[1]).getByText("Transport")).toBeTruthy();
-    expect(within(items[1]).getByText(/over budget/i)).toBeTruthy();
+    expect(within(items[1]).getByText(/budget dépassé/i)).toBeTruthy();
   });
 
   it("T-2: the progress bar is an accessible progressbar with a value capped at 100", async () => {
@@ -109,7 +109,7 @@ describe("budget dashboard page (#52)", () => {
     mockApi({ budgets: [] });
     render(BudgetsPage);
 
-    expect(await screen.findByText(/no budgets yet/i)).toBeTruthy();
+    expect(await screen.findByText(/aucun budget pour l'instant/i)).toBeTruthy();
     expect(screen.queryByRole("list")).toBeNull();
   });
 
@@ -118,10 +118,10 @@ describe("budget dashboard page (#52)", () => {
     render(BudgetsPage);
 
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toMatch(/couldn't load your budgets/i);
+    expect(alert.textContent).toMatch(/impossible de charger vos budgets/i);
 
     mockApi();
-    await fireEvent.click(screen.getByRole("button", { name: /retry/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /réessayer/i }));
 
     expect(await screen.findAllByRole("listitem")).toHaveLength(2);
   });

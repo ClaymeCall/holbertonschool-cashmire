@@ -33,16 +33,16 @@
 </script>
 
 <div class="chart-card">
-  <h3>Spending over the last 30 days</h3>
+  <h3>Dépenses des 30 derniers jours</h3>
   {#if !hasSpending}
-    <p class="empty">No expenses recorded in the last 30 days.</p>
+    <p class="empty">Aucune dépense enregistrée au cours des 30 derniers jours.</p>
   {:else}
     <div class="chart">
       <LineChart
         data={chartData}
         x="date"
         y="total"
-        series={[{ key: "total", label: "Spent", color: "var(--color-accent)" }]}
+        series={[{ key: "total", label: "Dépensé", color: "var(--color-accent)" }]}
       />
     </div>
   {/if}

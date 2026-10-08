@@ -54,16 +54,16 @@
   // (see its Icon.svelte), so each link's accessible name still comes from
   // its visible text alone.
   const navLinks = $derived([
-    { href: "/", label: "Home", icon: House },
-    { href: "/expenses", label: "Expenses", icon: Receipt, protected: true },
+    { href: "/", label: "Accueil", icon: House },
+    { href: "/expenses", label: "Dépenses", icon: Receipt, protected: true },
     { href: "/budgets", label: "Budgets", icon: Wallet, protected: true },
     ...(authState.status === "authenticated"
       ? []
       : [
-          { href: "/login", label: "Log in", icon: LogIn },
-          { href: "/register", label: "Register", icon: UserPlus },
+          { href: "/login", label: "Connexion", icon: LogIn },
+          { href: "/register", label: "Inscription", icon: UserPlus },
         ]),
-    { href: "/privacy", label: "Privacy", icon: Shield },
+    { href: "/privacy", label: "Confidentialité", icon: Shield },
   ]);
 
   /**
@@ -125,7 +125,7 @@
       class="menu-toggle"
       aria-expanded={menuOpen}
       aria-controls="main-nav"
-      aria-label={menuOpen ? "Close menu" : "Open menu"}
+      aria-label={menuOpen ? "Fermer le menu" : "Ouvrir le menu"}
       onclick={() => (menuOpen = !menuOpen)}
     >
       <!-- Icon-only: the button's own aria-label above is the accessible
@@ -162,7 +162,7 @@
               }}
             >
               <LogOut size={16} />
-              {loggingOut ? "Logging out…" : "Log out"}
+              {loggingOut ? "Déconnexion…" : "Se déconnecter"}
             </button>
           </li>
         {/if}

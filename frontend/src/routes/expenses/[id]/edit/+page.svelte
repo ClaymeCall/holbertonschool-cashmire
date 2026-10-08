@@ -55,7 +55,7 @@
       date = expense.date;
       formState = "idle";
     } catch (err) {
-      errorMessages = ["Couldn't load this expense. Try again in a moment."];
+      errorMessages = ["Impossible de charger cette dépense. Réessayez dans un instant."];
       formState = "error";
       console.error("Failed to load expense:", err);
     }
@@ -63,11 +63,11 @@
 
   function clientValidationErrors() {
     const errors = [];
-    if (!categoryId) errors.push("Choose a category.");
+    if (!categoryId) errors.push("Choisissez une catégorie.");
     if (!isValidDecimalString(amount.trim()) || compareDecimal(amount.trim(), "0") <= 0) {
-      errors.push("Enter an amount greater than 0 (e.g. 12.50).");
+      errors.push("Saisissez un montant supérieur à 0 (ex. 12.50).");
     }
-    if (!date) errors.push("Choose a date.");
+    if (!date) errors.push("Choisissez une date.");
     return errors;
   }
 
@@ -96,14 +96,14 @@
     } catch (err) {
       if (err instanceof ApiError && err.status === 400) {
         errorMessages = flattenFieldErrors(err.body) ?? [
-          "Check the highlighted fields and try again.",
+          "Vérifiez les champs signalés et réessayez.",
         ];
       } else if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-        errorMessages = ["You need to be logged in to edit an expense."];
+        errorMessages = ["Vous devez être connecté(e) pour modifier une dépense."];
       } else if (err instanceof ApiError && err.status === 404) {
-        errorMessages = ["This expense or category couldn't be found."];
+        errorMessages = ["Cette dépense ou cette catégorie est introuvable."];
       } else {
-        errorMessages = ["Couldn't reach Cashmire. Try again in a moment."];
+        errorMessages = ["Impossible de joindre Cashmire. Réessayez dans un instant."];
       }
       formState = "error";
       console.error("Failed to update expense:", err);
@@ -129,21 +129,21 @@
 </script>
 
 <svelte:head>
-  <title>Edit expense · Cashmire</title>
-  <meta name="description" content="Edit an existing expense." />
+  <title>Modifier la dépense · Cashmire</title>
+  <meta name="description" content="Modifiez une dépense existante." />
 </svelte:head>
 
 <main>
-  <h1>Edit expense</h1>
+  <h1>Modifier la dépense</h1>
 
   {#if formState === "loading"}
-    <p role="status">Loading…</p>
+    <p role="status">Chargement…</p>
   {:else if formState === "not-found"}
-    <p>That expense couldn't be found.</p>
+    <p>Cette dépense est introuvable.</p>
   {:else}
     <form onsubmit={handleSubmit} novalidate>
       <div class="field">
-        <label for="expense-category">Category</label>
+        <label for="expense-category">Catégorie</label>
         <select
           id="expense-category"
           bind:value={categoryId}
@@ -159,7 +159,7 @@
       <TextField
         id="expense-amount"
         name="amount"
-        label="Amount"
+        label="Montant"
         type="text"
         inputmode="decimal"
         placeholder="12.50"
@@ -182,7 +182,7 @@
         id="expense-description"
         name="description"
         label="Description"
-        hint="Optional"
+        hint="Facultatif"
         bind:value={description}
         disabled={formState === "submitting"}
       />
@@ -192,12 +192,12 @@
       {/if}
 
       <Button type="submit" disabled={formState === "submitting"}>
-        {formState === "submitting" ? "Saving…" : "Save changes"}
+        {formState === "submitting" ? "Enregistrement…" : "Enregistrer les modifications"}
       </Button>
     </form>
   {/if}
 
-  <p><a href="/expenses">Back to expenses</a></p>
+  <p><a href="/expenses">Retour aux dépenses</a></p>
 </main>
 
 <style>

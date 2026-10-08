@@ -84,9 +84,9 @@ describe("landing page (#104 componentization follow-up)", () => {
   it("while anonymous, shows no dashboard or expenses/budgets previews", () => {
     render(HomePage);
 
-    expect(screen.queryByRole("heading", { name: /spending at a glance/i })).toBeNull();
-    expect(screen.queryByRole("heading", { name: /recent expenses/i })).toBeNull();
-    expect(screen.queryByRole("heading", { name: /your budgets/i })).toBeNull();
+    expect(screen.queryByRole("heading", { name: /coup d'œil/i })).toBeNull();
+    expect(screen.queryByRole("heading", { name: /dépenses récentes/i })).toBeNull();
+    expect(screen.queryByRole("heading", { name: /vos budgets/i })).toBeNull();
   });
 
   it("while logged in, shows the dashboard charts above the expenses/budgets previews", async () => {
@@ -95,12 +95,12 @@ describe("landing page (#104 componentization follow-up)", () => {
     render(HomePage);
 
     const dashboardHeading = await screen.findByRole("heading", {
-      name: /spending at a glance/i,
+      name: /coup d'œil/i,
     });
-    const expensesHeading = await screen.findByRole("heading", { name: /recent expenses/i });
-    expect(await screen.findByRole("heading", { name: /budget vs spent/i })).toBeTruthy();
-    expect(await screen.findByRole("heading", { name: /spending by category/i })).toBeTruthy();
-    expect(await screen.findByRole("heading", { name: /last 30 days/i })).toBeTruthy();
+    const expensesHeading = await screen.findByRole("heading", { name: /dépenses récentes/i });
+    expect(await screen.findByRole("heading", { name: /budget vs dépenses/i })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: /cette période/i })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: /30 derniers jours/i })).toBeTruthy();
     // DOM order: dashboard comes before the pre-existing previews.
     expect(
       dashboardHeading.compareDocumentPosition(expensesHeading) &
@@ -113,11 +113,11 @@ describe("landing page (#104 componentization follow-up)", () => {
     mockApi();
     render(HomePage);
 
-    const heading = await screen.findByRole("heading", { name: /recent expenses/i });
+    const heading = await screen.findByRole("heading", { name: /dépenses récentes/i });
     const section = /** @type {HTMLElement} */ (heading.closest("section"));
     expect(await within(section).findAllByRole("listitem")).toHaveLength(3);
     expect(
-      within(section).getByRole("link", { name: /view all/i }).getAttribute("href"),
+      within(section).getByRole("link", { name: /voir tout/i }).getAttribute("href"),
     ).toBe("/expenses");
   });
 
@@ -126,12 +126,12 @@ describe("landing page (#104 componentization follow-up)", () => {
     mockApi();
     render(HomePage);
 
-    const heading = await screen.findByRole("heading", { name: /your budgets/i });
+    const heading = await screen.findByRole("heading", { name: /vos budgets/i });
     const section = /** @type {HTMLElement} */ (heading.closest("section"));
     expect(await within(section).findAllByRole("listitem")).toHaveLength(2);
     expect(within(section).getByText("Alimentation")).toBeTruthy();
     expect(
-      within(section).getByRole("link", { name: /view all/i }).getAttribute("href"),
+      within(section).getByRole("link", { name: /voir tout/i }).getAttribute("href"),
     ).toBe("/budgets");
   });
 });

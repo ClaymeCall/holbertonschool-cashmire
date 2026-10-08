@@ -21,29 +21,29 @@
 <section class="hero" style="--hero-image: url({heroImage})">
   <div class="hero-scrim">
     <h1>Cashmire</h1>
-    <p class="tagline">Quiet luxury for your everyday budget.</p>
+    <p class="tagline">Le luxe discret pour votre budget au quotidien.</p>
   </div>
 </section>
 
 <main>
   {#if authState.status === "authenticated"}
     <section class="dashboard" aria-labelledby="dashboard-heading">
-      <h2 id="dashboard-heading">Your spending at a glance</h2>
+      <h2 id="dashboard-heading">Vos finances en un coup d'œil</h2>
       <DashboardCharts />
     </section>
 
     <section class="preview" aria-labelledby="expenses-preview-heading">
       <div class="preview-header">
-        <h2 id="expenses-preview-heading">Recent expenses</h2>
-        <a href="/expenses">View all <ArrowRight size={14} /></a>
+        <h2 id="expenses-preview-heading">Dépenses récentes</h2>
+        <a href="/expenses">Voir tout <ArrowRight size={14} /></a>
       </div>
       <ExpensesList limit={PREVIEW_LIMIT} />
     </section>
 
     <section class="preview" aria-labelledby="budgets-preview-heading">
       <div class="preview-header">
-        <h2 id="budgets-preview-heading">Your budgets</h2>
-        <a href="/budgets">View all <ArrowRight size={14} /></a>
+        <h2 id="budgets-preview-heading">Vos budgets</h2>
+        <a href="/budgets">Voir tout <ArrowRight size={14} /></a>
       </div>
       <BudgetsList limit={PREVIEW_LIMIT} />
     </section>

@@ -79,7 +79,7 @@ describe("expense list page (#40)", () => {
     render(ExpensesPage);
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(
-      screen.getByRole("link", { name: /add expense/i }).getAttribute("href"),
+      screen.getByRole("link", { name: /ajouter une dépense/i }).getAttribute("href"),
     ).toBe("/expenses/new");
   });
 
@@ -93,7 +93,7 @@ describe("expense list page (#40)", () => {
     expect(within(items[0]).getByText("5.00")).toBeTruthy();
     expect(within(items[0]).getByText("Transport")).toBeTruthy();
     expect(
-      within(items[0]).getByRole("link", { name: /edit/i }).getAttribute("href"),
+      within(items[0]).getByRole("link", { name: /modifier/i }).getAttribute("href"),
     ).toBe("/expenses/2/edit");
 
     expect(within(items[1]).getByText("25.50")).toBeTruthy();
@@ -105,7 +105,7 @@ describe("expense list page (#40)", () => {
     mockApi({ expenses: [] });
     render(ExpensesPage);
 
-    expect(await screen.findByText(/no expenses yet/i)).toBeTruthy();
+    expect(await screen.findByText(/aucune dépense pour l'instant/i)).toBeTruthy();
     expect(screen.queryByRole("list")).toBeNull();
   });
 
@@ -114,10 +114,10 @@ describe("expense list page (#40)", () => {
     render(ExpensesPage);
 
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toMatch(/couldn't load your expenses/i);
+    expect(alert.textContent).toMatch(/impossible de charger vos dépenses/i);
 
     mockApi();
-    await fireEvent.click(screen.getByRole("button", { name: /retry/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /réessayer/i }));
 
     expect(await screen.findAllByRole("listitem")).toHaveLength(2);
   });

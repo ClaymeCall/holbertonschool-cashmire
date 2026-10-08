@@ -60,9 +60,9 @@ describe("DashboardCharts", () => {
     const fetchMock = mockApi();
     render(DashboardCharts);
 
-    expect(await screen.findByRole("heading", { name: /budget vs spent/i })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: /spending by category/i })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: /last 30 days/i })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: /budget vs dépenses/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /cette période/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /30 derniers jours/i })).toBeTruthy();
 
     const calledUrls = fetchMock.mock.calls.map(([url]) => String(url));
     expect(calledUrls.filter((u) => u.includes("/api/categories/"))).toHaveLength(1);
@@ -75,10 +75,10 @@ describe("DashboardCharts", () => {
     render(DashboardCharts);
 
     expect(await screen.findByRole("alert")).toBeTruthy();
-    const retry = screen.getByRole("button", { name: /retry/i });
+    const retry = screen.getByRole("button", { name: /réessayer/i });
 
     mockApi();
     retry.click();
-    expect(await screen.findByRole("heading", { name: /budget vs spent/i })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: /budget vs dépenses/i })).toBeTruthy();
   });
 });
