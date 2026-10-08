@@ -1391,3 +1391,37 @@ branch's unique `BudgetConsumptionServiceTests`, folded into
 mandatory human (or agent) follow-up before this is considered merge-ready
 — static review and `py_compile` do not catch Django/DRF wiring or
 migration errors.
+
+## 2026-10-08 — Sanitize API error responses (Issue #62)
+
+**Objective.** Prevent unhandled API exceptions from exposing internal error
+details and ensure debug tracebacks are disabled by default outside local
+development.
+
+**Agent/role used.** Copilot-assisted backend implementation.
+
+**What was delegated.** Nothing — implemented directly.
+
+**How the team verified it.**
+- Added a global DRF exception handler that preserves recognized API errors
+  and returns a fixed generic JSON 500 response for unexpected exceptions.
+- Logged the exception server-side for diagnosis while keeping its details
+  out of the response.
+- Changed the default for `DJANGO_DEBUG` to `false`; `.env.example` retains
+  `true` only for local development.
+- Added a test that triggers a server error containing a simulated database
+  secret with `DEBUG=False`, then checks that the response body contains
+  only the generic error.
+- Ran the error/authentication/registration test modules: 20 tests passed;
+  the full `api` suite passed all 198 tests.
+- Unset `DJANGO_DEBUG` in a one-off container command and confirmed Django
+  reports `DEBUG=False`; `git diff --check` passed.
+
+**Accepted / modified / rejected.**
+- Accepted: use DRF's global exception-handler hook rather than duplicating
+  response wrapping in individual views; existing validation and API errors
+  retain their current response bodies.
+
+**Final decision.** Unexpected API failures now return a generic 500 response
+without stack traces or exception messages; debug mode is opt-in rather than
+the default.

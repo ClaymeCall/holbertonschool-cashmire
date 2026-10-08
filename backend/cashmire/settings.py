@@ -27,7 +27,7 @@ def _resolve_postgres_host(default_port: str) -> str:
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-insecure-secret-key")
 
-DEBUG = os.environ.get("DJANGO_DEBUG", "true").lower() == "true"
+DEBUG = os.environ.get("DJANGO_DEBUG", "false").lower() == "true"
 
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split(",")
 
@@ -144,6 +144,7 @@ REST_FRAMEWORK = {
         "rest_framework.renderers.JSONRenderer",
     ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "EXCEPTION_HANDLER": "api.exceptions.sanitized_exception_handler",
     # "login" scope used by LoginView's ScopedRateThrottle (issue #23,
     # AC-3) — per-IP, intentionally minimal. See
     # docs/decisions/0004-login-rate-limiting.md.
