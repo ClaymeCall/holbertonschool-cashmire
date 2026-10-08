@@ -6,7 +6,7 @@ from django.db import IntegrityError, connection, transaction
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from .models import Category, DEFAULT_CATEGORIES, Expense
+from ..models import Category, DEFAULT_CATEGORIES, Expense
 
 
 User = get_user_model()
