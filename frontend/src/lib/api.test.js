@@ -2,7 +2,7 @@
 //
 // Pure unit tests with a stubbed `globalThis.fetch` — no live server, no
 // backend dependency.
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import {
   API_BASE_URL,
@@ -211,5 +211,65 @@ describe("apiFetch", () => {
     const result = await apiFetch("/api/widgets/1/");
     expect(result.amount).toBe("12.50");
     expect(typeof result.amount).toBe("string");
+  });
+
+  // docs/decisions/0003-session-cookie-auth-strategy.md point 5: an unsafe
+  // request on an authenticated session must carry the CSRF token back as
+  // `X-CSRFToken`, read from the (non-HttpOnly) `csrftoken` cookie.
+  describe("CSRF header (decision 0003, point 5)", () => {
+    afterEach(() => {
+      // jsdom's `document` is shared across this file's tests.
+      document.cookie = "csrftoken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    });
+
+    it("attaches X-CSRFToken on an unsafe method when the cookie is present", async () => {
+      document.cookie = "csrftoken=abc123";
+      const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ status: 204 }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      await apiFetch("/api/expenses/1/", { method: "DELETE" });
+
+      const [, init] = fetchMock.mock.calls[0];
+      expect(init.headers["X-CSRFToken"]).toBe("abc123");
+    });
+
+    it("omits the header on a GET even when the cookie is present", async () => {
+      document.cookie = "csrftoken=abc123";
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(fakeResponse({ status: 200, body: "{}" }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      await apiFetch("/api/expenses/");
+
+      const [, init] = fetchMock.mock.calls[0];
+      expect(init.headers["X-CSRFToken"]).toBeUndefined();
+    });
+
+    it("omits the header on an unsafe method when there is no cookie yet", async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(fakeResponse({ status: 201, body: "{}" }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      await apiFetch("/api/expenses/", { method: "POST", body: { amount: "1.00" } });
+
+      const [, init] = fetchMock.mock.calls[0];
+      expect(init.headers["X-CSRFToken"]).toBeUndefined();
+    });
+
+    it("lets a caller-supplied header win over the cookie-derived one", async () => {
+      document.cookie = "csrftoken=abc123";
+      const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ status: 204 }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      await apiFetch("/api/expenses/1/", {
+        method: "DELETE",
+        headers: { "X-CSRFToken": "caller-value" },
+      });
+
+      const [, init] = fetchMock.mock.calls[0];
+      expect(init.headers["X-CSRFToken"]).toBe("caller-value");
+    });
   });
 });
