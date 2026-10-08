@@ -415,6 +415,76 @@ in the next cycle if the command proves incorrect.
 - Once approved, Full-Stack Development agent proceeds to implement the 19 routes (auth, expenses, budgets, categories) against the specification, following the same verification process.
 - Review artifacts: `docs/reviews/issue-7-api-contract.md` documents all findings (blockers, non-blockers, verification steps) with section-by-section analysis of all 20 criteria and security checks.
 
+## 2026-10-07 — QA & Security review of Budget Model (Issue #45)
+
+**Objective.** Closes #45 (QA review). Verify the Budget model implementation against its 
+specification (`docs/specs/issue-45-budget-model.md`) across all 14 acceptance criteria (AC-1 through 
+AC-14), focusing on data validation, database constraints, ORM configuration, test coverage, and 
+security.
+
+**Agent/role used.** QA & Security agent (read-only review, no source code edits).
+
+**What was delegated.** Verify Budget model implementation against specification:
+- Confirm model exists in `backend/api/models.py` with all fields and metadata
+- Verify migration `0003_budget.py` creates table with complete structure (fields, constraints, indices)
+- Run test suite (`python manage.py test api.tests.BudgetModelTests`) and verify all tests pass
+- Audit input validation (amount, alert_threshold, period dates) at both Django and database levels
+- Check referential integrity (user CASCADE, category PROTECT)
+- Verify no information leaks or security issues
+- Compare implementation against spec; flag any deviations
+- Document findings in `docs/reviews/issue-45-budget-model.md`
+
+**Main proposal.** All 14 acceptance criteria passed. The implementation is conformant, secure, 
+fully tested (23 tests, 100% pass rate), and ready for merge. One non-blocking finding: Django model 
+uses `check=` parameter instead of `condition=` for CheckConstraint (deprecated in Django 5.0+ but 
+accepted for backward compatibility in 5.1.3). Migration correctly uses `condition=`.
+
+**How the team verified it.**
+- Ran full test suite: `python manage.py test api.tests.BudgetModelTests -v 2` → all 23 tests passed
+- Verified AC-1: Budget model present in models.py with all required fields (user, category, amount, 
+  period_start, period_end, alert_threshold, created_at, updated_at)
+- Verified AC-2: Migration file 0003_budget.py creates table with single CreateModel operation 
+  (modern Django 5.1 style)
+- Verified AC-3: Migration applied without error (test database created and all migrations applied)
+- Verified AC-4: amount is DecimalField(max_digits=10, decimal_places=2) with MinValueValidator(Decimal("0.01"))
+- Verified AC-5: alert_threshold is DecimalField(max_digits=5, decimal_places=2, null=True, 
+  default=Decimal("80.00")) with validators MinValueValidator(0) and MaxValueValidator(100)
+- Verified AC-6: period_start and period_end are DateField with CheckConstraint(period_end >= period_start)
+- Verified AC-7: UniqueConstraint(fields=['user', 'category', 'period_start', 'period_end'])
+- Verified AC-8: ForeignKey to User with on_delete=models.CASCADE (test_user_cascade_delete passed)
+- Verified AC-9: ForeignKey to Category with on_delete=models.PROTECT (test_category_protect_delete passed)
+- Verified AC-10: Two indexes present: idx_budget_user_id on user, idx_budget_user_period on 
+  (user, period_start, period_end)
+- Verified AC-11: DateTimeField(auto_now_add=True) for created_at, DateTimeField(auto_now=True) for updated_at
+- Verified AC-12: CheckConstraint(check=models.Q(amount__gt=0)) preventing zero/negative amounts
+- Verified AC-13 & AC-14: All 23 tests cover required cases:
+  - Valid budget creation (4 tests)
+  - UNIQUE constraint enforcement (1 test)
+  - Amount validation (5 tests covering 0, negative, 0.01, max, precision)
+  - Period validation (3 tests covering end < start, end = start, end > start)
+  - Alert threshold validation (5 tests covering null, 0, 100, negative, > 100)
+  - Referential integrity (3 tests covering cascade/protect)
+  - Timestamps (1 test)
+- Audited security: No SQL injection (Django ORM used throughout), no information leaks in __str__ 
+  method, proper cascading/protection behavior, validators at both ORM and database levels
+- Verified no deviations from spec (acknowledged limitation: category.user_id == budget.user_id 
+  must be validated at application level, as noted in spec section 6)
+
+**Accepted / modified / rejected.**
+- Accepted: All 14 acceptance criteria met. Implementation is conformant to specification.
+- Accepted: One non-blocking finding (check= vs condition=) does not block merge; Django 5.1.3 
+  accepts both for backward compatibility.
+- Rejected: Nothing. The Budget model is ready for merge.
+
+**Final decision.**
+- The Budget model implementation is **approved for merge**. All acceptance criteria satisfied; 
+  23 tests passing; no security issues, no spec deviations, no blockers.
+- **Non-blocking follow-up (future maintenance):** Update CheckConstraint definitions in models.py 
+  to use `condition=` instead of `check=` for consistency with Django 5.1.3 convention 
+  (migration already correct). This is a maintenance task, not a blocker.
+- Review artifacts: `docs/reviews/issue-45-budget-model.md` documents all findings with per-AC 
+  verification, security audit results, and non-blocking recommendations.
+
 ## 2026-10-07 — Complete the authentication strategy documentation (Issue #25)
 
 **Objective.** Close the documentation gap in #25: the session-cookie decision
@@ -507,6 +577,14 @@ is otherwise unresolved.
 #34. API creation/listing behavior remains out of scope and a human review is
 still required before merge.
 
+## 2026-10-07 — Document database recreation from an empty instance (Issue #19)
+
+**Objective.** Document the exact Docker Compose steps for rebuilding the
+development database from an empty PostgreSQL instance using only committed
+Django migrations, including an explicit warning that resetting the volume
+deletes its data.
+
+**Agent/role used.** Copilot-assisted documentation update. No specialized
 ## 2026-10-07 — Add authenticated expense creation (Issue #35)
 
 **Objective.** Implement `POST /api/expenses/` so an authenticated user can
@@ -573,6 +651,21 @@ agent run is claimed.
 
 **What was delegated.** Nothing.
 
+**How the change was verified.**
+- Started a separate Compose project with a new PostgreSQL volume and applied
+  Django migrations with:
+  `docker compose -p cashmire-issue19-check run --rm api python manage.py migrate`.
+  All built-in and project migrations, including `api.0001_initial`,
+  `api.0002_category`, and `api.0003_expense`, applied successfully without
+  manual SQL.
+- Removed only the isolated verification project's containers, network, and
+  volume afterward. The regular development database was not touched.
+- `git diff --check` passes.
+
+**Final decision.** The README documents the destructive reset warning and
+commands to recreate PostgreSQL and apply all committed migrations from
+empty. The procedure was verified against an isolated fresh database; no
+existing local database was deleted.
 **Main proposal.** Reuse the existing `/api/expenses/` route and
 `ExpenseSerializer`, adding GET alongside POST. Validate optional
 `category_id`, `date_from`, and `date_to` query parameters; always scope the
@@ -679,175 +772,68 @@ the review in `docs/reviews/issue-39-expense-ownership.md`.
 before accessing expense rows. Regression coverage and the reviewed control
 are documented for issue #39.
 
-## 2026-10-07 — Build the expense list and create/edit screens (Issues #40, #41)
+## 2026-10-07 — Integrate session-auth endpoints with main
 
-**Objective.** Give the front-end its first expense screens: a list of the
-current user's expenses and a form to create or edit one, against the
-expense/category endpoints already merged into `main` (#34–#39).
+**Objective.** Bring the registration, login, and logout endpoints from
+`feat/20-user-model` onto current `main`, resolve API-file conflicts, and
+preserve a single discoverable Django test package.
 
-**Agent/role used.** Claude Code-assisted frontend implementation. No
-specialized agent run (`agentic/orchestrator.py`) is claimed.
-
-**What was delegated.** Nothing — implemented directly in this session,
-driven interactively.
-
-**Main proposal.** Add `frontend/src/lib/api/{expenses,categories}.js` as
-thin `apiFetch` wrappers over the documented routes (`docs/api-design.md`
-§3, §5.1) — real calls, not a mock layer, following the same "built against
-the contract" pattern login/register used before their own backend existed.
-Add `/expenses` (list), `/expenses/new` (create) and `/expenses/[id]/edit`
-(edit) routes, each self-contained like `login`/`register` rather than
-sharing one form component. Amounts stay decimal strings end to end;
-`money.js`'s `isValidDecimalString`/`compareDecimal` do the one client-side
-check this form needs (amount > 0) without ever coercing to a float.
+**Main proposal.** Merge current `main` into the auth foundation branch,
+retain both authentication and expense/category routes, and move the existing
+`api/tests.py` coverage into `api/tests/test_expenses.py` beside the
+registration/login/logout modules.
 
 **How the change was verified.**
-- `npm test` in `frontend/`: 103/103 passing, including 17 new tests across
-  the two API wrappers and the three new screens.
-- Manually traced the edit screen's data flow: since
-  `backend/api/urls.py` has no `GET /api/expenses/{id}/` (only list+create
-  combined, and PATCH/PUT/DELETE on the detail route), the edit screen reads
-  its initial values out of the already-fetched, unpaginated list rather
-  than fetching the single resource — the one call the backend actually
-  supports.
+- `docker compose -p cashmire-pr120-foundation run --rm api python manage.py
+  test api`: all 53 API tests pass.
+- `python manage.py check` reports no issues.
+- `python manage.py makemigrations api --check --dry-run` reports no model
+  or migration drift.
+- The isolated Compose resources were removed; the regular development
+  database was not modified.
 
-**Accepted / modified / rejected.**
-- Accepted: no shared `ExpenseForm` component between the create and edit
-  screens, matching how `login`/`register` stayed separate before #104's
-  design-system slice touched them — duplication here is deliberate, not
-  an oversight.
-- Accepted: deleting an expense is left entirely to issue #42 (confirmation
-  flow); the list screen only links to "Edit".
-- Rejected: wiring these routes into the shared nav (`+layout.svelte`) —
-  decision `0001`'s issue-#104 amendment explicitly defers nav/dashboard
-  expansion to that issue, which depends on this one landing first.
+**Final decision.** The auth endpoints and current main functionality
+coexist, and all API tests are discoverable from one `backend/api/tests/`
+package without a shadowing `tests.py` module.
+## 2026-10-07 — Add reusable session authentication and current-user endpoint (Issue #26)
 
-**Final decision.** Issues #40 and #41 are implemented on
-`feat/40-41-expense-screens`, built directly against the real (already
-merged) expense/category API, with no mock layer and no premature shared
-form component.
+**Objective.** Provide a shared DRF session-authentication guard that resolves
+the user from Django's session, returns 401 for anonymous requests, and can be
+reused by function- and class-based protected views.
 
-## 2026-10-07 — Build the budget dashboard and create/edit form (Issues #52, #53)
+**Agent/role used.** Copilot-assisted implementation on the authentication
+stack from issue #24. No specialized agent run is claimed.
 
-**Objective.** Give the front-end a budget dashboard (spent/remaining,
-percentage, status) and a create/edit form, against the budget endpoints
-documented in `docs/api-design.md` §4 — not yet merged into `main` at the
-time this was written (#45, #115/#121-125 open).
+**What was delegated.** Nothing.
 
-**Agent/role used.** Claude Code-assisted frontend implementation. No
-specialized agent run (`agentic/orchestrator.py`) is claimed.
-
-**What was delegated.** Nothing — implemented directly in this session.
-
-**Main proposal.**
-- `frontend/src/lib/api/budgets.js`: real `apiFetch` wrappers over
-  `/api/budgets/`, plus `monthToPeriod`/`periodToMonth` translating the
-  "month/year" picker issue #53 asks for into the `period_start`/
-  `period_end` pair the API actually stores.
-- `frontend/src/lib/components/BudgetForm.svelte`: **one** form reused for
-  both create and edit, per #53's explicit acceptance criterion (unlike
-  #40/#41, where create/edit stayed two separate screens) — category and
-  month are read-only in edit mode, since the API only accepts
-  `amount`/`alert_threshold` on `PATCH` (`docs/api-design.md` §4.4).
-- `routes/budgets/+page.svelte` renders each budget's `status` field
-  exactly as the API returns it (`ok`/`warning`/`full`/`exceeded`,
-  colored + labelled per `docs/decisions/budget-thresholds.md`'s table) —
-  it never recomputes the status, only the percentage-for-the-progress-bar
-  number, which `money.js`'s `percentOf` exists for.
-- Added `--color-success-*`/`--color-full-*` to `tokens.css`: the existing
-  two semantic colors (warning, error) don't cover the decision's
-  four-status table, so this is a concrete, decision-driven extension, not
-  speculative design-system growth.
+**Main proposal.** Add a common `SessionAuthenticatedAPIView` base class and
+`session_authenticated_api_view` decorator, backed by one session
+authentication class and `IsAuthenticated` permission. Use them for the
+logout and current-user views, and expose `GET /api/auth/me/` using the
+existing read-only `UserSerializer`.
 
 **How the change was verified.**
-- `npm test` in `frontend/`: 122/122 passing (19 new, across the API
-  client, the dashboard, and both form screens), including the 409
-  duplicate-budget conflict surfacing a specific message (#53's AC) and
-  the dashboard's progress bar capping its displayed value at 100 while
-  still labelling an over-budget entry as such in text (never color alone,
-  per `docs/mvp-scope.md` §3.7).
-- Unit-tested `monthToPeriod` against a 31-day month, a leap-year February,
-  and a non-leap-year February, since an off-by-one here would silently
-  mis-scope every budget's spending window.
+- Ran `docker compose -p cashmire-issue26-test run --rm api python manage.py
+  test api`: all 27 API tests pass, including anonymous 401, authenticated
+  session user serialization, Basic authentication rejection, and logout
+  CSRF/session behavior.
+- Ran `docker compose -p cashmire-issue26-test run --rm api python manage.py
+  check`: no system-check issues.
+- Called `GET /api/auth/me/` with `curl` and no session; received 401,
+  `WWW-Authenticate: Session`, and the expected JSON error.
+- Generated the OpenAPI schema; the custom session cookie authenticator is
+  described as a cookie security scheme. Existing health/logout serializer
+  generation errors remain outside this issue.
+- Removed only the isolated Compose verification volumes and networks.
 
 **Accepted / modified / rejected.**
-- Accepted: issue #52's text says three statuses (ok/warning/exceeded);
-  followed the later, more specific `budget-thresholds.md` decision's four
-  statuses instead, since it explicitly supersedes that part of
-  `docs/mvp-scope.md` and the issue predates it.
-- Accepted: no delete-budget action on the dashboard — no issue currently
-  asks for one (unlike expenses, which has #42), so it isn't guessed at.
-- Rejected: wiring `/budgets` into the shared nav — left to #104, same as
-  #40/#41's expense routes.
+- Accepted: Use Django sessions, not Basic or JWT, per decision 0003.
+- Modified: Provide both a function-view decorator and a class-view base so
+  future expense and budget endpoints can share the guard without repeating
+  authentication configuration.
+- Rejected: Duplicating user fields or exposing password data; the existing
+  `UserSerializer` defines the response shape.
 
-**Final decision.** Issues #52 and #53 are implemented on
-`feat/52-53-budget-screens` (stacked on `feat/40-41-expense-screens`,
-since both reuse `lib/api/categories.js`), built against the documented
-but not-yet-merged budget API, with one shared create/edit form as the
-issue explicitly requires.
-
-## 2026-10-07 — Unify the front-end into one navigable site (Issue #104)
-
-**Objective.** Stitch #40/#41 (expense screens) and #52/#53 (budget
-screens) into one coherent site: an auth-aware nav, and a home page that
-shows the real budgets/expenses summary instead of the original
-health-check placeholder — entirely against the mocked/not-yet-merged
-APIs, per #104's explicit scope.
-
-**Agent/role used.** Claude Code-assisted frontend implementation. No
-specialized agent run (`agentic/orchestrator.py`) is claimed.
-
-**What was delegated.** Nothing — implemented directly in this session.
-
-**Main proposal.**
-- `frontend/src/lib/stores/auth.js`: an in-memory-only auth-state store,
-  populated by `login`/`register`'s own success handlers and cleared by a
-  new `logout()` (calling `POST /api/auth/logout/`). Deliberately does
-  **not** probe `GET /api/auth/me/` on layout mount — `routes/layout.test.js`'s
-  existing T-4b asserts the shared layout issues zero fetch calls on
-  render, and this keeps that true. Accepted consequence: a hard reload
-  reverts the nav to logged-out until the next login/register.
-- `+layout.svelte`'s nav now renders one of two link sets based on that
-  store (logged-out: Home/Log in/Register/Privacy; logged-in: Dashboard/
-  Expenses/Budgets/Privacy + a `Log out` button), with zero changes to
-  `login`/`register`'s own existing, already-tested submit logic beyond
-  one line each recording that their request succeeded.
-- `routes/+page.svelte` (home) now shows a public landing when logged out,
-  and the real dashboard — each budget's status via a new, shared
-  `BudgetCard` component, plus recent expenses — when logged in, per
-  `docs/mvp-scope.md`'s central journey step 3.
-- `BudgetCard.svelte` factors the budget-card rendering out of
-  `routes/budgets/+page.svelte` (#52) so the home dashboard doesn't
-  duplicate it — the second consumer `docs/decisions/0001`'s design-system
-  amendment said to wait for before introducing a `Card` style.
-- Amended `docs/decisions/0001-shared-app-shell-layout.md` as #104's
-  acceptance criteria require.
-
-**How the change was verified.**
-- `npm test` in `frontend/`: 134/134 passing. Critically, this includes
-  running the **existing, unmodified** `login`/`register`/`layout` test
-  files and confirming zero regressions — in particular that
-  `layout.test.js`'s T-4b (zero fetch calls on render) and the login
-  test's exact-one-fetch-call assertion both still hold after wiring in
-  the auth store.
-- New coverage: nav rendering for both auth states and the logout flow
-  (`layout.test.js`), the home dashboard's logged-out/loading/ready/error/
-  empty states (`routes/page.test.js`), and that `routes/budgets/+page.svelte`'s
-  existing tests still pass unchanged after the `BudgetCard` extraction
-  (same markup, just factored out).
-
-**Accepted / modified / rejected.**
-- Accepted: the reload-resets-to-logged-out limitation, rather than adding
-  a `/api/auth/me/` check that would break the layout's existing
-  zero-fetch-on-render guarantee — flagged in the decision amendment for
-  the team to revisit against #26/#27, not silently worked around.
-- Rejected: wrapping the "Add budget"/"Create an account" calls-to-action
-  in a `<Button>` component — `<Button>` renders a native `<button>`, and
-  a `<button>` nested in an `<a>` (or vice versa) is invalid HTML; kept
-  these as plain anchors styled to match.
-
-**Final decision.** Issue #104's nav/dashboard slice is implemented on
-`feat/104-unify-frontend` (stacked on `feat/52-53-budget-screens`), with
-every MVP screen reachable from the shared nav and the home page replaced
-by the real summary, while explicitly leaving the mock-to-real API swap
-(#92) and the a11y/responsive passes (#64/#65) untouched.
+**Final decision.** Protected endpoints now share one session-authentication
+implementation, anonymous access returns 401, and `GET /api/auth/me/` returns
+only the authenticated user's public fields.
