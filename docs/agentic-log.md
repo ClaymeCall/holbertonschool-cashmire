@@ -507,6 +507,14 @@ is otherwise unresolved.
 #34. API creation/listing behavior remains out of scope and a human review is
 still required before merge.
 
+## 2026-10-07 — Document database recreation from an empty instance (Issue #19)
+
+**Objective.** Document the exact Docker Compose steps for rebuilding the
+development database from an empty PostgreSQL instance using only committed
+Django migrations, including an explicit warning that resetting the volume
+deletes its data.
+
+**Agent/role used.** Copilot-assisted documentation update. No specialized
 ## 2026-10-07 — Add authenticated expense creation (Issue #35)
 
 **Objective.** Implement `POST /api/expenses/` so an authenticated user can
@@ -573,6 +581,21 @@ agent run is claimed.
 
 **What was delegated.** Nothing.
 
+**How the change was verified.**
+- Started a separate Compose project with a new PostgreSQL volume and applied
+  Django migrations with:
+  `docker compose -p cashmire-issue19-check run --rm api python manage.py migrate`.
+  All built-in and project migrations, including `api.0001_initial`,
+  `api.0002_category`, and `api.0003_expense`, applied successfully without
+  manual SQL.
+- Removed only the isolated verification project's containers, network, and
+  volume afterward. The regular development database was not touched.
+- `git diff --check` passes.
+
+**Final decision.** The README documents the destructive reset warning and
+commands to recreate PostgreSQL and apply all committed migrations from
+empty. The procedure was verified against an isolated fresh database; no
+existing local database was deleted.
 **Main proposal.** Reuse the existing `/api/expenses/` route and
 `ExpenseSerializer`, adding GET alongside POST. Validate optional
 `category_id`, `date_from`, and `date_to` query parameters; always scope the
@@ -679,52 +702,68 @@ the review in `docs/reviews/issue-39-expense-ownership.md`.
 before accessing expense rows. Regression coverage and the reviewed control
 are documented for issue #39.
 
-## 2026-10-07 — Fix missing CSRF_TRUSTED_ORIGINS (Issue #130)
+## 2026-10-07 — Integrate session-auth endpoints with main
 
-**Objective.** Fix a backend gap found while manually testing the #104 PR
-stack (#127/#128/#129) end-to-end: every authenticated mutation from the
-real frontend was failing with a Django CSRF "Origin checking failed"
-error, regardless of a correct session cookie and `X-CSRFToken` header.
+**Objective.** Bring the registration, login, and logout endpoints from
+`feat/20-user-model` onto current `main`, resolve API-file conflicts, and
+preserve a single discoverable Django test package.
 
-**Agent/role used.** Claude Code-assisted backend fix. No specialized
-agent run (`agentic/orchestrator.py`) is claimed.
+**Main proposal.** Merge current `main` into the auth foundation branch,
+retain both authentication and expense/category routes, and move the existing
+`api/tests.py` coverage into `api/tests/test_expenses.py` beside the
+registration/login/logout modules.
+
+**How the change was verified.**
+- `docker compose -p cashmire-pr120-foundation run --rm api python manage.py
+  test api`: all 53 API tests pass.
+- `python manage.py check` reports no issues.
+- `python manage.py makemigrations api --check --dry-run` reports no model
+  or migration drift.
+- The isolated Compose resources were removed; the regular development
+  database was not modified.
+
+**Final decision.** The auth endpoints and current main functionality
+coexist, and all API tests are discoverable from one `backend/api/tests/`
+package without a shadowing `tests.py` module.
+## 2026-10-07 — Add reusable session authentication and current-user endpoint (Issue #26)
+
+**Objective.** Provide a shared DRF session-authentication guard that resolves
+the user from Django's session, returns 401 for anonymous requests, and can be
+reused by function- and class-based protected views.
+
+**Agent/role used.** Copilot-assisted implementation on the authentication
+stack from issue #24. No specialized agent run is claimed.
 
 **What was delegated.** Nothing.
 
-**How the gap was found.** While demoing the #104 stack, locally (never
-pushed) integrated the then-unmerged auth (#126) and budget (#115,
-#121-125) backend branches into a throwaway branch to exercise a real
-login → create-budget flow end-to-end. The create request reproducibly
-failed with `"CSRF Failed: Origin checking failed - http://localhost:5173
-does not match any trusted origins."`, isolated via `curl` with/without an
-`Origin` header to confirm it was Django's CSRF middleware's own
-cross-origin check — a different, more specific gap than the
-"no CSRF-bootstrap-route" one `docs/decisions/0003-session-cookie-auth-strategy.md`
-already names, and one that affects endpoints already merged into `main`
-(`/api/expenses/`), not just the unmerged branches used to reproduce it.
-
-**Main proposal.** Add `CSRF_TRUSTED_ORIGINS` to
-`backend/cashmire/settings.py`, reusing the same `DJANGO_CORS_ALLOWED_ORIGINS`
-env var and default `CORS_ALLOWED_ORIGINS` already uses, since both
-describe "the frontend's origin(s)" and have never had reason to differ.
+**Main proposal.** Add a common `SessionAuthenticatedAPIView` base class and
+`session_authenticated_api_view` decorator, backed by one session
+authentication class and `IsAuthenticated` permission. Use them for the
+logout and current-user views, and expose `GET /api/auth/me/` using the
+existing read-only `UserSerializer`.
 
 **How the change was verified.**
-- Reproduced the failure against the real backend via `curl` (session
-  cookie + valid `X-CSRFToken` + `Origin: http://localhost:5173` → 403)
-  before the fix, and confirmed 201 after.
-- Added `CsrfTrustedOriginsTests` to `backend/api/tests.py`, using
-  `APIClient(enforce_csrf_checks=True)` (every other test class in this
-  file uses the default `APIClient()`, which disables CSRF checking
-  entirely — exactly why this gap had zero test coverage until now).
-  Proves the setting is both sufficient (succeeds with it) and necessary
-  (`@override_settings(CSRF_TRUSTED_ORIGINS=[])` reproduces the original
-  403) against the already-merged `/api/expenses/` endpoint.
-- `python manage.py test api`: 31/31 passing (2 new). `python manage.py
-  check`: no issues.
+- Ran `docker compose -p cashmire-issue26-test run --rm api python manage.py
+  test api`: all 27 API tests pass, including anonymous 401, authenticated
+  session user serialization, Basic authentication rejection, and logout
+  CSRF/session behavior.
+- Ran `docker compose -p cashmire-issue26-test run --rm api python manage.py
+  check`: no system-check issues.
+- Called `GET /api/auth/me/` with `curl` and no session; received 401,
+  `WWW-Authenticate: Session`, and the expected JSON error.
+- Generated the OpenAPI schema; the custom session cookie authenticator is
+  described as a cookie security scheme. Existing health/logout serializer
+  generation errors remain outside this issue.
+- Removed only the isolated Compose verification volumes and networks.
 
-**Accepted / modified / rejected.** Nothing modified or rejected — this is
-a one-setting fix plus the regression test that was missing for it.
+**Accepted / modified / rejected.**
+- Accepted: Use Django sessions, not Basic or JWT, per decision 0003.
+- Modified: Provide both a function-view decorator and a class-view base so
+  future expense and budget endpoints can share the guard without repeating
+  authentication configuration.
+- Rejected: Duplicating user fields or exposing password data; the existing
+  `UserSerializer` defines the response shape.
 
-**Final decision.** `CSRF_TRUSTED_ORIGINS` is set on `fix/130-csrf-trusted-origins`,
-closing #130, with regression coverage proving both the failure mode and
-the fix.
+**Final decision.** Protected endpoints now share one session-authentication
+implementation, anonymous access returns 401, and `GET /api/auth/me/` returns
+only the authenticated user's public fields.

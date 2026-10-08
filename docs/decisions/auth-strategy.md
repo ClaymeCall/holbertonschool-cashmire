@@ -1,7 +1,7 @@
 # Authentication strategy: Django session cookies
 
-**Context issue:** #25  
-**Decision record:** [ADR 0003 — Session-cookie authentication](./0003-session-cookie-auth-strategy.md)  
+**Context issue:** #25
+**Decision record:** [ADR 0003 — Session-cookie authentication](./0003-session-cookie-auth-strategy.md)
 **Status:** Proposed; team confirmation is still required
 
 ## Decision
