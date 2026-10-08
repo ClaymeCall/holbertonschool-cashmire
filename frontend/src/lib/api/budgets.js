@@ -1,10 +1,6 @@
 // Budgets API client — issues #52/#53. Thin wrappers over `apiFetch`
-// against the routes documented in `docs/api-design.md` §4. These
-// endpoints are NOT merged into `main` yet (tracked in #45–#50, open PRs
-// #115/#121–125 at the time this was written) — this is built against the
-// documented contract and will fail with a network/404-shaped error until
-// that lands, exactly the pattern `login`/`register` used before #20-#24
-// existed. Nothing here needs changing once it ships.
+// against the routes documented in `docs/api-design.md` §4, now served by
+// `backend/api/views.py` (issues #45–#50).
 //
 // Status rule (`docs/decisions/budget-thresholds.md`, binding): the server
 // computes `status` (`ok` | `warning` | `full` | `exceeded`) from `spent`,

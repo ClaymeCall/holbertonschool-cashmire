@@ -1,14 +1,8 @@
-// Written but not executed — the test tooling (vitest, @testing-library/svelte,
-// jsdom) could not be installed in the environment this file was authored in:
-// `npm` is not available at all (no node/npm binary on PATH), so
-// `npm install` was never attempted to completion. See the PR description /
-// agent report for the exact command and failure, per docs/specs/issue-63-privacy-page.md section 8.4.
-//
-// Revised after review (still unexecuted, same reason as above): T-1 and T-4
-// no longer rely on @testing-library/jest-dom matchers (toHaveAccessibleName,
-// toHaveAttribute), which were used but never installed or imported — see
-// docs/specs/issue-63-privacy-page.md section 8.2, which prefers doing without that dependency. T-3 now
-// normalizes textContent whitespace before matching the allowlist, because
+// T-1 and T-4 do not rely on @testing-library/jest-dom matchers
+// (toHaveAccessibleName, toHaveAttribute), which were used but never
+// installed or imported — see docs/specs/issue-63-privacy-page.md section
+// 8.2, which prefers doing without that dependency. T-3 normalizes
+// textContent whitespace before matching the allowlist, because
 // +page.svelte wraps long sentences across source lines, which otherwise
 // left raw newlines/indentation in textContent and made every single-spaced
 // allowlist phrase fail to match (a false positive that would have flagged
@@ -94,19 +88,12 @@ describe("privacy page (#63)", () => {
         token: "https",
         allow: ["it does not say that traffic is served over tls or https"],
       },
-      {
-        token: "hash",
-        allow: ["it does not say that passwords are hashed (there are no passwords to hash)"],
-      },
-      {
-        token: "password",
-        allow: [
-          "no password",
-          "it does not say that passwords are hashed (there are no passwords to hash)",
-          // Added for #28/#29: the login/register forms now exist in the UI.
-          "will accept an email address and a password if you type them in",
-        ],
-      },
+      // "hash" and "password" are no longer forbidden tokens: accounts and
+      // passwords are real now (#22/#23 registration/login), and password
+      // hashing via Django's AbstractUser is an implemented, verifiable
+      // security measure (decision 0002 point 2 permits claiming it once
+      // implemented) rather than an aspirational claim about a feature that
+      // didn't exist. See the "How we protect data" section.
       { token: "bank", allow: ["no bank connection", "no bank aggregator"] },
     ];
 
