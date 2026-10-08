@@ -1,6 +1,7 @@
 from django.contrib.auth import authenticate, login, logout
 from decimal import Decimal
 
+from django.db import IntegrityError, transaction
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, serializers, status
 from rest_framework.authentication import SessionAuthentication
@@ -18,6 +19,7 @@ from .auth import SessionAuthenticatedAPIView, session_authenticated_api_view
 from .serializers import LoginSerializer, RegisterSerializer, UserSerializer
 
 from .models import Category, Expense
+from .models import Budget, Category
 
 
 @api_view(["GET"])
@@ -363,3 +365,127 @@ def expense_detail_mutation(request, expense_id):
     serializer.is_valid(raise_exception=True)
     updated_expense = serializer.save()
     return Response(ExpenseSerializer(updated_expense).data)
+class BudgetSerializer(serializers.ModelSerializer):
+    user_id = serializers.IntegerField(read_only=True)
+    category_id = serializers.IntegerField()
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    alert_threshold = serializers.DecimalField(
+        max_digits=5, decimal_places=2, allow_null=True, required=False
+    )
+
+    class Meta:
+        model = Budget
+        fields = [
+            "id",
+            "user_id",
+            "category_id",
+            "amount",
+            "period_start",
+            "period_end",
+            "alert_threshold",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "user_id", "created_at", "updated_at"]
+
+    def validate_amount(self, value):
+        from decimal import Decimal
+        if value <= Decimal("0"):
+            raise serializers.ValidationError("Doit être > 0")
+        return value
+
+    def validate_alert_threshold(self, value):
+        from decimal import Decimal
+        if value is not None and (value < Decimal("0") or value > Decimal("100")):
+            raise serializers.ValidationError("Doit être entre 0 et 100")
+        return value
+
+    def validate(self, data):
+        period_start = data.get("period_start")
+        period_end = data.get("period_end")
+        if period_start and period_end and period_end < period_start:
+            raise serializers.ValidationError("period_end doit être >= period_start")
+        return data
+
+
+@extend_schema(
+    request=BudgetSerializer,
+    responses=BudgetSerializer,
+    description="Create a new budget for the authenticated user",
+)
+@api_view(["POST"])
+@authentication_classes([SessionAuthentication])
+@permission_classes([IsAuthenticated])
+def budget_create(request):
+    """
+    Create a new budget for the authenticated user.
+
+    Validation:
+    - category_id must exist and belong to request.user (404 otherwise).
+    - amount must be > 0 (400 otherwise).
+    - period_end must be >= period_start (400 otherwise).
+    - alert_threshold must be between 0 and 100 if provided (400 otherwise).
+    - Duplicate check (user, category, period_start, period_end) returns 409 Conflict.
+    """
+    serializer = BudgetSerializer(data=request.data)
+
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    category_id = serializer.validated_data.get("category_id")
+    period_start = serializer.validated_data.get("period_start")
+    period_end = serializer.validated_data.get("period_end")
+
+    # Validate category exists and belongs to request.user
+    try:
+        category = Category.objects.get(id=category_id, user=request.user)
+    except Category.DoesNotExist:
+        return Response(
+            {"error": "NOT_FOUND", "message": "Catégorie non trouvée"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # Application-level duplicate check (defense in depth)
+    if Budget.objects.filter(
+        user=request.user,
+        category=category,
+        period_start=period_start,
+        period_end=period_end,
+    ).exists():
+        return Response(
+            {
+                "error": "CONFLICT",
+                "message": "Budget déjà existant pour cette période et catégorie",
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    # Create budget with owner = request.user
+    budget_data = {
+        "user": request.user,
+        "category": category,
+        "amount": serializer.validated_data.get("amount"),
+        "period_start": period_start,
+        "period_end": period_end,
+    }
+    # Only set alert_threshold if explicitly provided
+    if "alert_threshold" in serializer.validated_data:
+        budget_data["alert_threshold"] = serializer.validated_data.get("alert_threshold")
+
+    # Wrap in transaction.atomic() and catch IntegrityError for race condition safety
+    try:
+        with transaction.atomic():
+            budget = Budget.objects.create(**budget_data)
+    except IntegrityError:
+        # Race condition: duplicate was created between check and create
+        return Response(
+            {
+                "error": "CONFLICT",
+                "message": "Budget déjà existant pour cette période et catégorie",
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    return Response(
+        BudgetSerializer(budget).data, status=status.HTTP_201_CREATED
+    )
