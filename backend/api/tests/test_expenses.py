@@ -2,16 +2,25 @@ from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
-from django.db.models.deletion import ProtectedError
 from django.db import IntegrityError, connection, transaction
-from django.test import TestCase
+from django.http import HttpRequest
+from django.middleware.csrf import get_token
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
-from .models import Budget, Category, DEFAULT_CATEGORIES, Expense
+from ..models import Category, DEFAULT_CATEGORIES, Expense
 
 
 User = get_user_model()
+
+
+class HealthCheckTests(TestCase):
+    def test_health_check_returns_ok_json(self):
+        response = self.client.get("/api/health/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "ok"})
+        self.assertEqual(response["Content-Type"], "application/json")
 
 
 class CategoryListTests(TestCase):
@@ -630,336 +639,58 @@ class ExpenseDetailMutationTests(TestCase):
         self.assertTrue(Expense.objects.filter(pk=self.other_expense.pk).exists())
 
 
-class BudgetModelTests(TestCase):
+class CsrfTrustedOriginsTests(TestCase):
+    """Regression test for issue #130.
+
+    `APIClient(enforce_csrf_checks=True)` is what actually exercises
+    Django's CSRF middleware — the default `APIClient()` used by every
+    other test class in this file disables CSRF checking entirely, which
+    is exactly why this gap went untested until now. Reproduces the real
+    browser's cross-origin request shape (`Origin` header set to the
+    frontend's origin, session cookie, matching `X-CSRFToken` header) and
+    proves `CSRF_TRUSTED_ORIGINS` is both necessary (second test, with it
+    removed) and sufficient (first test, with the real setting) for an
+    authenticated mutation to succeed.
+    """
+
     def setUp(self):
         self.user = User.objects.create_user(
-            username="budget-owner",
-            email="budget@example.com",
+            username="csrf-owner",
+            email="csrf-owner@example.com",
             password="test-password",
         )
-        self.other_user = User.objects.create_user(
-            username="other-budget-owner",
-            email="other-budget@example.com",
-            password="test-password",
+        self.category = self.user.categories.first()
+        self.client = APIClient(enforce_csrf_checks=True)
+        self.client.force_login(self.user)
+        # No CSRF-bootstrap route exists yet (tracked separately in
+        # docs/decisions/0003-session-cookie-auth-strategy.md) to issue a
+        # real `csrftoken` cookie, so the token is generated directly and
+        # used as both the cookie and the submitted header — exactly what
+        # a real bootstrap route would hand the frontend to echo back.
+        self.csrf_token = get_token(HttpRequest())
+        self.client.cookies["csrftoken"] = self.csrf_token
+
+    def _post_expense(self):
+        return self.client.post(
+            "/api/expenses/",
+            {
+                "category_id": self.category.pk,
+                "amount": "12.50",
+                "date": "2026-10-06",
+            },
+            format="json",
+            HTTP_ORIGIN="http://localhost:5173",
+            HTTP_X_CSRFTOKEN=self.csrf_token,
         )
-        self.category = Category.objects.create(
-            user=self.user,
-            name="Test Category",
-            description="Test category for budget",
-        )
-        self.other_category = Category.objects.create(
-            user=self.user,
-            name="Other Category",
-            description="Another category",
-        )
 
-    def test_create_budget_with_all_fields(self):
-        """Test creating a valid budget with all fields."""
-        budget = Budget.objects.create(
-            user=self.user,
-            category=self.category,
-            amount=Decimal("1000.00"),
-            period_start=date(2026, 1, 1),
-            period_end=date(2026, 1, 31),
-            alert_threshold=Decimal("75.00"),
-        )
-        self.assertEqual(budget.user, self.user)
-        self.assertEqual(budget.category, self.category)
-        self.assertEqual(budget.amount, Decimal("1000.00"))
-        self.assertEqual(budget.alert_threshold, Decimal("75.00"))
+    def test_cross_origin_mutation_succeeds_with_trusted_origin(self):
+        response = self._post_expense()
 
-    def test_create_budget_with_default_alert_threshold(self):
-        """Test creating a budget without alert_threshold uses default 80.00."""
-        budget = Budget.objects.create(
-            user=self.user,
-            category=self.category,
-            amount=Decimal("500.00"),
-            period_start=date(2026, 1, 1),
-            period_end=date(2026, 1, 31),
-        )
-        self.assertEqual(budget.alert_threshold, Decimal("80.00"))
+        self.assertEqual(response.status_code, 201)
 
-    def test_create_budget_with_null_alert_threshold(self):
-        """Test creating a budget with null alert_threshold."""
-        budget = Budget.objects.create(
-            user=self.user,
-            category=self.category,
-            amount=Decimal("500.00"),
-            period_start=date(2026, 1, 1),
-            period_end=date(2026, 1, 31),
-            alert_threshold=None,
-        )
-        self.assertIsNone(budget.alert_threshold)
+    @override_settings(CSRF_TRUSTED_ORIGINS=[])
+    def test_cross_origin_mutation_fails_without_trusted_origin(self):
+        response = self._post_expense()
 
-    def test_create_multiple_budgets_different_categories(self):
-        """Test creating multiple budgets for different categories of same user."""
-        budget1 = Budget.objects.create(
-            user=self.user,
-            category=self.category,
-            amount=Decimal("1000.00"),
-            period_start=date(2026, 1, 1),
-            period_end=date(2026, 1, 31),
-        )
-        budget2 = Budget.objects.create(
-            user=self.user,
-            category=self.other_category,
-            amount=Decimal("500.00"),
-            period_start=date(2026, 1, 1),
-            period_end=date(2026, 1, 31),
-        )
-        self.assertEqual(Budget.objects.filter(user=self.user).count(), 2)
-        self.assertNotEqual(budget1.category, budget2.category)
-
-    def test_create_multiple_budgets_different_periods(self):
-        """Test creating multiple budgets for same category but different periods."""
-        budget1 = Budget.objects.create(
-            user=self.user,
-            category=self.category,
-            amount=Decimal("1000.00"),
-            period_start=date(2026, 1, 1),
-            period_end=date(2026, 1, 31),
-        )
-        budget2 = Budget.objects.create(
-            user=self.user,
-            category=self.category,
-            amount=Decimal("1200.00"),
-            period_start=date(2026, 2, 1),
-            period_end=date(2026, 2, 28),
-        )
-        self.assertEqual(Budget.objects.filter(user=self.user, category=self.category).count(), 2)
-
-    def test_duplicate_budget_rejected(self):
-        """Test that duplicate budgets (same user, category, period) are rejected."""
-        Budget.objects.create(
-            user=self.user,
-            category=self.category,
-            amount=Decimal("1000.00"),
-            period_start=date(2026, 1, 1),
-            period_end=date(2026, 1, 31),
-        )
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            Budget.objects.create(
-                user=self.user,
-                category=self.category,
-                amount=Decimal("1500.00"),
-                period_start=date(2026, 1, 1),
-                period_end=date(2026, 1, 31),
-            )
-
-    def test_amount_zero_rejected(self):
-        """Test that amount = 0 is rejected by validator."""
-        with self.assertRaises(ValidationError):
-            budget = Budget(
-                user=self.user,
-                category=self.category,
-                amount=Decimal("0.00"),
-                period_start=date(2026, 1, 1),
-                period_end=date(2026, 1, 31),
-            )
-            budget.full_clean()
-
-    def test_amount_negative_rejected(self):
-        """Test that negative amount is rejected by validator."""
-        with self.assertRaises(ValidationError):
-            budget = Budget(
-                user=self.user,
-                category=self.category,
-                amount=Decimal("-100.00"),
-                period_start=date(2026, 1, 1),
-                period_end=date(2026, 1, 31),
-            )
-            budget.full_clean()
-
-    def test_amount_positive_minimum(self):
-        """Test that amount = 0.01 (minimum positive) is accepted."""
-        budget = Budget.objects.create(
-            user=self.user,
-            category=self.category,
-            amount=Decimal("0.01"),
-            period_start=date(2026, 1, 1),
-            period_end=date(2026, 1, 31),
-        )
-        self.assertEqual(budget.amount, Decimal("0.01"))
-
-    def test_amount_maximum(self):
-        """Test that maximum amount (99999999.99) is stored correctly."""
-        budget = Budget.objects.create(
-            user=self.user,
-            category=self.category,
-            amount=Decimal("99999999.99"),
-            period_start=date(2026, 1, 1),
-            period_end=date(2026, 1, 31),
-        )
-        self.assertEqual(budget.amount, Decimal("99999999.99"))
-
-    def test_amount_decimal_precision(self):
-        """Test that amount maintains decimal precision (not rounded)."""
-        budget = Budget.objects.create(
-            user=self.user,
-            category=self.category,
-            amount=Decimal("123.45"),
-            period_start=date(2026, 1, 1),
-            period_end=date(2026, 1, 31),
-        )
-        # Refresh from DB to ensure no rounding
-        budget.refresh_from_db()
-        self.assertEqual(budget.amount, Decimal("123.45"))
-
-    def test_period_end_before_start_rejected(self):
-        """Test that period_end < period_start is rejected by CheckConstraint."""
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            Budget.objects.create(
-                user=self.user,
-                category=self.category,
-                amount=Decimal("1000.00"),
-                period_start=date(2026, 1, 31),
-                period_end=date(2026, 1, 1),
-            )
-
-    def test_period_end_equals_start(self):
-        """Test that period_end = period_start (single-day budget) is allowed."""
-        budget = Budget.objects.create(
-            user=self.user,
-            category=self.category,
-            amount=Decimal("1000.00"),
-            period_start=date(2026, 1, 15),
-            period_end=date(2026, 1, 15),
-        )
-        self.assertEqual(budget.period_start, budget.period_end)
-
-    def test_period_end_after_start(self):
-        """Test normal period_end > period_start is allowed."""
-        budget = Budget.objects.create(
-            user=self.user,
-            category=self.category,
-            amount=Decimal("1000.00"),
-            period_start=date(2026, 1, 1),
-            period_end=date(2026, 1, 31),
-        )
-        self.assertGreater(budget.period_end, budget.period_start)
-
-    def test_alert_threshold_null_allowed(self):
-        """Test that alert_threshold = null is allowed."""
-        budget = Budget.objects.create(
-            user=self.user,
-            category=self.category,
-            amount=Decimal("1000.00"),
-            period_start=date(2026, 1, 1),
-            period_end=date(2026, 1, 31),
-            alert_threshold=None,
-        )
-        self.assertIsNone(budget.alert_threshold)
-
-    def test_alert_threshold_zero(self):
-        """Test that alert_threshold = 0 is accepted."""
-        budget = Budget.objects.create(
-            user=self.user,
-            category=self.category,
-            amount=Decimal("1000.00"),
-            period_start=date(2026, 1, 1),
-            period_end=date(2026, 1, 31),
-            alert_threshold=Decimal("0"),
-        )
-        self.assertEqual(budget.alert_threshold, Decimal("0"))
-
-    def test_alert_threshold_one_hundred(self):
-        """Test that alert_threshold = 100 is accepted."""
-        budget = Budget.objects.create(
-            user=self.user,
-            category=self.category,
-            amount=Decimal("1000.00"),
-            period_start=date(2026, 1, 1),
-            period_end=date(2026, 1, 31),
-            alert_threshold=Decimal("100"),
-        )
-        self.assertEqual(budget.alert_threshold, Decimal("100"))
-
-    def test_alert_threshold_negative_rejected(self):
-        """Test that alert_threshold < 0 is rejected."""
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            Budget.objects.create(
-                user=self.user,
-                category=self.category,
-                amount=Decimal("1000.00"),
-                period_start=date(2026, 1, 1),
-                period_end=date(2026, 1, 31),
-                alert_threshold=Decimal("-0.01"),
-            )
-
-    def test_alert_threshold_over_hundred_rejected(self):
-        """Test that alert_threshold > 100 is rejected."""
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            Budget.objects.create(
-                user=self.user,
-                category=self.category,
-                amount=Decimal("1000.00"),
-                period_start=date(2026, 1, 1),
-                period_end=date(2026, 1, 31),
-                alert_threshold=Decimal("100.01"),
-            )
-
-    def test_user_cascade_delete(self):
-        """Test that deleting a user deletes their budgets (CASCADE)."""
-        # Create a separate user without categories to avoid cascade conflict
-        # (Design note: User+Category+Budget has cascade conflict, so we test
-        # without Category: User→Budget CASCADE works correctly)
-        test_user = User.objects.create_user(
-            username="cascade-test-user",
-            email="cascade@example.com",
-            password="test-password",
-        )
-        # Use the other_user's category since it doesn't cascade delete with test_user
-        budget = Budget.objects.create(
-            user=test_user,
-            category=self.other_user.categories.first() or self.category,
-            amount=Decimal("1000.00"),
-            period_start=date(2026, 1, 1),
-            period_end=date(2026, 1, 31),
-        )
-        budget_id = budget.id
-        user_id = test_user.id
-
-        # Delete user and verify budgets are cascade deleted
-        test_user.delete()
-
-        with self.assertRaises(Budget.DoesNotExist):
-            Budget.objects.get(id=budget_id)
-
-        with self.assertRaises(User.DoesNotExist):
-            User.objects.get(id=user_id)
-
-    def test_category_protect_delete(self):
-        """Test that deleting a category with budgets is prevented (PROTECT)."""
-        Budget.objects.create(
-            user=self.user,
-            category=self.category,
-            amount=Decimal("1000.00"),
-            period_start=date(2026, 1, 1),
-            period_end=date(2026, 1, 31),
-        )
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            self.category.delete()
-
-    def test_category_delete_without_budgets(self):
-        """Test that deleting a category without budgets succeeds."""
-        unused_category = Category.objects.create(
-            user=self.user,
-            name="Unused Category",
-        )
-        unused_category_id = unused_category.id
-        unused_category.delete()
-        with self.assertRaises(Category.DoesNotExist):
-            Category.objects.get(id=unused_category_id)
-
-    def test_timestamps_created_at_and_updated_at(self):
-        """Test that created_at and updated_at are set automatically."""
-        budget = Budget.objects.create(
-            user=self.user,
-            category=self.category,
-            amount=Decimal("1000.00"),
-            period_start=date(2026, 1, 1),
-            period_end=date(2026, 1, 31),
-        )
-        self.assertIsNotNone(budget.created_at)
-        self.assertIsNotNone(budget.updated_at)
-        self.assertEqual(budget.created_at.date(), date.today())
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("CSRF Failed", response.json()["detail"])
