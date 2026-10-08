@@ -1869,6 +1869,7 @@ class BudgetListTests(TestCase):
             "spent",
             "remaining",
             "percentage",
+            "status",
             "created_at",
             "updated_at",
         }
@@ -2701,6 +2702,7 @@ class BudgetUpdateEndpointTests(TestCase):
             "spent",
             "remaining",
             "percentage",
+            "status",
             "created_at",
             "updated_at",
         }

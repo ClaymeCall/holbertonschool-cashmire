@@ -6,6 +6,7 @@
   // "loading" state inside this page, and would route failures through
   // SvelteKit's error boundary instead of this component's error state).
   import { onMount } from "svelte";
+  import { CircleCheck, CircleX } from "@lucide/svelte";
 
   /**
    * Body returned by GET /api/health/.
@@ -147,7 +148,7 @@
       <p class="url-line">Calling <code>{requestUrl}</code></p>
     {:else if uiState === "success"}
       <p class="state state-success">
-        <span class="glyph" aria-hidden="true">✓</span>
+        <CircleCheck size={18} />
         <strong>API is reachable</strong>
       </p>
       <p>Reported status: {health.status}</p>
@@ -160,7 +161,7 @@
       <pre>{JSON.stringify(health, null, 2)}</pre>
     {:else if uiState === "error"}
       <p class="state state-error">
-        <span class="glyph" aria-hidden="true">✕</span>
+        <CircleX size={18} />
         <strong>API check failed</strong>
       </p>
       <p>{errorMessage}</p>
@@ -180,39 +181,54 @@
 </main>
 
 <style>
+  /* Adopted onto the shared tokens (issue #104) — previously hardcoded hex,
+     the one screen decision 0001's amendment for #104 did not reach. */
   main {
     max-width: 70ch;
     margin: 0 auto;
-    padding: 1.5rem 1.25rem 3rem;
-    line-height: 1.5;
+    padding: var(--space-2xl) var(--space-xl) var(--space-3xl);
+    line-height: var(--line-height-body);
   }
 
   .state-region {
-    margin: 1.5rem 0;
-    padding: 1rem 1.25rem;
-    border-radius: 4px;
+    margin: var(--space-2xl) 0;
+    padding: var(--space-lg) var(--space-xl);
+    border-radius: var(--radius-md);
     overflow-wrap: anywhere;
   }
 
+  .state-loading,
+  .state-success,
+  .state-error {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-sm);
+  }
+
+  .state-loading :global(svg),
+  .state-success :global(svg),
+  .state-error :global(svg) {
+    flex-shrink: 0;
+  }
+
   .state-loading {
-    color: #3a3a3a;
-    background: #f1f1f1;
-    border-left: 4px solid #8a8a8a;
-    padding: 0.5rem 0.75rem;
+    color: var(--color-text-muted);
+    background: var(--color-oatmeal);
+    border-left: 4px solid var(--color-border-subtle);
   }
 
   .state-success {
-    color: #0b4d1e;
-    background: #e6f4ea;
-    border-left: 4px solid #1a7f37;
-    padding: 0.5rem 0.75rem;
+    color: var(--color-success-text);
+    background: var(--color-success-bg);
+    border-left: 4px solid var(--color-success-border);
   }
 
   .state-error {
-    color: #7a0a0a;
-    background: #fdeaea;
-    border-left: 4px solid #b00020;
-    padding: 0.5rem 0.75rem;
+    color: var(--color-error-text);
+    background: var(--color-error-bg);
+    border-left: 4px solid var(--color-error-border);
   }
 
   .url-line code {
@@ -227,32 +243,34 @@
   pre {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
-    background: #f5f5f5;
-    padding: 0.75rem;
-    border-radius: 4px;
+    background: var(--color-oatmeal);
+    padding: var(--space-md);
+    border-radius: var(--radius-sm);
   }
 
   button {
-    font-size: 1rem;
-    padding: 0.5rem 1rem;
+    font-family: var(--font-body);
+    font-size: var(--font-size-base);
+    font-weight: 500;
+    padding: var(--space-sm) var(--space-xl);
+    border-radius: var(--radius-full);
+    border: 1px solid var(--color-cta-bg);
+    background: var(--color-cta-bg);
+    color: var(--color-cta-text);
     cursor: pointer;
+    transition: background-color var(--motion-duration) var(--motion-ease);
   }
 
-  button:focus-visible,
-  a:focus-visible {
-    outline: 3px solid #0b3d91;
-    outline-offset: 2px;
-  }
-
-  a {
-    color: #0b3d91;
+  button:hover {
+    background: var(--color-mocha);
+    border-color: var(--color-mocha);
   }
 
   .spinner {
     display: inline-block;
     width: 0.9em;
     height: 0.9em;
-    border: 2px solid #8a8a8a;
+    border: 2px solid var(--color-border-subtle);
     border-top-color: transparent;
     border-radius: 50%;
     animation: spin 0.8s linear infinite;

@@ -1,11 +1,24 @@
-// Component tests for the home/dashboard screen (#104).
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/svelte";
-import { currentUser } from "$lib/stores/auth";
+// Component tests for the landing page (issue #104 componentization
+// follow-up): the health-status line it always had, plus the logged-in-only
+// expenses/budgets previews that prove ExpensesList/BudgetsList
+// (lib/components/) are genuinely reusable outside their own routes.
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, within } from "@testing-library/svelte";
 
+import { setCurrentUser } from "$lib/auth.svelte.js";
 import HomePage from "./+page.svelte";
 
-const CATEGORIES = [{ id: 5, name: "Alimentation" }];
+const CATEGORIES = [
+  { id: 5, name: "Alimentation" },
+  { id: 7, name: "Transport" },
+];
+
+const EXPENSES = [
+  { id: 1, category_id: 5, amount: "10.00", description: null, date: "2026-10-01" },
+  { id: 2, category_id: 5, amount: "20.00", description: null, date: "2026-10-02" },
+  { id: 3, category_id: 5, amount: "30.00", description: null, date: "2026-10-03" },
+  { id: 4, category_id: 5, amount: "40.00", description: null, date: "2026-10-04" },
+];
 
 const BUDGETS = [
   {
@@ -19,10 +32,17 @@ const BUDGETS = [
     remaining: "155.00",
     status: "ok",
   },
-];
-
-const EXPENSES = [
-  { id: 1, category_id: 5, amount: "12.50", description: null, date: "2026-10-06" },
+  {
+    id: 2,
+    category_id: 7,
+    amount: "100.00",
+    period_start: "2026-10-01",
+    period_end: "2026-10-31",
+    alert_threshold: "80.00",
+    spent: "20.00",
+    remaining: "80.00",
+    status: "ok",
+  },
 ];
 
 /**
@@ -36,98 +56,67 @@ function fakeResponse({ status, body = "" }) {
   };
 }
 
-/**
- * @param {{ categories?: unknown, budgets?: unknown, expenses?: unknown, budgetsStatus?: number }} opts
- */
-function mockApi({
-  categories = CATEGORIES,
-  budgets = BUDGETS,
-  expenses = EXPENSES,
-  budgetsStatus = 200,
-} = {}) {
+function mockApi() {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url) => {
       const u = String(url);
+      if (u.includes("/api/health/")) {
+        return fakeResponse({ status: 200, body: JSON.stringify({ status: "ok" }) });
+      }
       if (u.includes("/api/categories/")) {
-        return fakeResponse({ status: 200, body: JSON.stringify({ categories }) });
+        return fakeResponse({ status: 200, body: JSON.stringify({ categories: CATEGORIES }) });
+      }
+      if (u.includes("/api/expenses/")) {
+        return fakeResponse({ status: 200, body: JSON.stringify({ expenses: EXPENSES }) });
       }
       if (u.includes("/api/budgets/")) {
-        return fakeResponse({ status: budgetsStatus, body: JSON.stringify({ budgets }) });
+        return fakeResponse({ status: 200, body: JSON.stringify({ budgets: BUDGETS }) });
       }
-      return fakeResponse({ status: 200, body: JSON.stringify({ expenses }) });
+      throw new Error(`Unexpected fetch to ${u}`);
     }),
   );
 }
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.restoreAllMocks();
-  currentUser.set(null);
-});
-
-describe("home / dashboard page (#104)", () => {
-  it("T-1: logged out, shows a public landing with no data fetch", () => {
-    const fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
-
-    render(HomePage);
-
-    expect(screen.getAllByRole("heading", { level: 1 })[0].textContent).toMatch(
-      /cashmire/i,
-    );
-    expect(screen.getByRole("link", { name: /create an account/i })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /log in/i })).toBeTruthy();
-    expect(fetchSpy).not.toHaveBeenCalled();
+describe("landing page (#104 componentization follow-up)", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    setCurrentUser(null);
   });
 
-  it("T-2: logged in, renders the dashboard heading and fetches budgets/expenses/categories", async () => {
-    currentUser.set({ email: "jane@example.com" });
+  it("while anonymous, shows the API status but no expenses/budgets previews", async () => {
     mockApi();
-
     render(HomePage);
 
-    expect(screen.getByRole("heading", { level: 1, name: /dashboard/i })).toBeTruthy();
-    await screen.findByText(/on track/i);
+    expect(await screen.findByText("ok")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: /recent expenses/i })).toBeNull();
+    expect(screen.queryByRole("heading", { name: /your budgets/i })).toBeNull();
   });
 
-  it("T-3: shows each budget's status and recent expenses, newest-first order preserved", async () => {
-    currentUser.set({ email: "jane@example.com" });
+  it("while logged in, previews the 3 most recent expenses with a link to the full list", async () => {
+    setCurrentUser({ id: 1, email: "demo@example.com" });
     mockApi();
-
     render(HomePage);
 
-    const budgetsHeading = await screen.findByRole("heading", { name: /your budgets/i });
-    const budgetsSection = budgetsHeading.closest("section");
-    expect(within(budgetsSection).getByText(/on track/i)).toBeTruthy();
-
-    const expensesHeading = screen.getByRole("heading", { name: /recent expenses/i });
-    const expensesSection = expensesHeading.closest("section");
-    expect(within(expensesSection).getByText("12.50")).toBeTruthy();
+    const heading = await screen.findByRole("heading", { name: /recent expenses/i });
+    const section = /** @type {HTMLElement} */ (heading.closest("section"));
+    expect(await within(section).findAllByRole("listitem")).toHaveLength(3);
+    expect(
+      within(section).getByRole("link", { name: /view all/i }).getAttribute("href"),
+    ).toBe("/expenses");
   });
 
-  it("T-4: empty budgets/expenses show their own empty-state messages", async () => {
-    currentUser.set({ email: "jane@example.com" });
-    mockApi({ budgets: [], expenses: [] });
-
-    render(HomePage);
-
-    expect(await screen.findByText(/no budgets yet/i)).toBeTruthy();
-    expect(screen.getByText(/no expenses yet/i)).toBeTruthy();
-  });
-
-  it("T-5: a failed load shows an error with a working retry", async () => {
-    currentUser.set({ email: "jane@example.com" });
-    mockApi({ budgetsStatus: 500 });
-
-    render(HomePage);
-
-    const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toMatch(/couldn't load your dashboard/i);
-
+  it("while logged in, previews the budgets dashboard with a link to the full list", async () => {
+    setCurrentUser({ id: 1, email: "demo@example.com" });
     mockApi();
-    await fireEvent.click(screen.getByRole("button", { name: /retry/i }));
+    render(HomePage);
 
-    await screen.findByText(/on track/i);
+    const heading = await screen.findByRole("heading", { name: /your budgets/i });
+    const section = /** @type {HTMLElement} */ (heading.closest("section"));
+    expect(await within(section).findAllByRole("listitem")).toHaveLength(2);
+    expect(within(section).getByText("Alimentation")).toBeTruthy();
+    expect(
+      within(section).getByRole("link", { name: /view all/i }).getAttribute("href"),
+    ).toBe("/budgets");
   });
 });

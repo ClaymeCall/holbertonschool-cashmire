@@ -15,8 +15,9 @@
   // rule that is meaningfully client-side; the rest surface through AC-2's
   // server-side validation errors once the backend exists.
   import { goto } from "$app/navigation";
+  import { UserPlus, LoaderCircle } from "@lucide/svelte";
   import { apiFetch, ApiError } from "$lib/api";
-  import { setCurrentUser } from "$lib/stores/auth";
+  import { setCurrentUser } from "$lib/auth.svelte.js";
   import Button from "$lib/components/Button.svelte";
   import TextField from "$lib/components/TextField.svelte";
   import FormError from "$lib/components/FormError.svelte";
@@ -91,16 +92,18 @@
     errorMessages = [];
 
     try {
-      const data = await apiFetch("/api/auth/register/", {
+      const createdUser = await apiFetch("/api/auth/register/", {
         method: "POST",
         body: { email: email.trim(), password },
         credentials: "include",
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
       // Registration also establishes a session per docs/mvp-scope.md §3.1
-      // ("inscription immédiate") — same redirect as a successful login,
-      // and the same nav-state recording (see login/+page.svelte).
-      setCurrentUser(data);
+      // ("inscription immédiate") — same redirect as a successful login.
+      // The response body is already the created user (UserSerializer
+      // shape), so the nav can reflect the logged-in state immediately
+      // without a round trip to /api/auth/me/.
+      setCurrentUser(/** @type {{ id: number, email: string }} */ (createdUser));
       await goto("/");
     } catch (err) {
       if (err instanceof ApiError && err.status === 400) {
@@ -169,7 +172,11 @@
     {/if}
 
     <Button type="submit" disabled={formState === "submitting"}>
-      {formState === "submitting" ? "Creating account…" : "Create account"}
+      {#if formState === "submitting"}
+        <LoaderCircle size={16} class="spin" /> Creating account…
+      {:else}
+        <UserPlus size={16} /> Create account
+      {/if}
     </Button>
   </form>
 
@@ -192,5 +199,21 @@
 
   a {
     color: var(--color-primary);
+  }
+
+  /* `:global` because the LoaderCircle icon's <svg> is rendered inside
+     @lucide/svelte's own Icon.svelte, not this component's template — a
+     plain `.spin` rule here would never match it (Svelte's style scoping
+     only tags elements written directly in this file). Respects
+     prefers-reduced-motion via base.css's blanket
+     `animation-duration: 0.01ms !important` rule. */
+  :global(.spin) {
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 </style>

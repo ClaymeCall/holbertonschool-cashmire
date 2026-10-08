@@ -45,14 +45,27 @@
   }
 
   label {
-    font-weight: 600;
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-mono-label);
+    text-transform: uppercase;
+    color: var(--color-heading);
   }
 
   input {
+    font-family: var(--font-body);
     font-size: var(--font-size-base);
-    padding: var(--space-sm) 0.6rem;
+    padding: var(--space-sm) 0.75rem;
+    background: var(--color-bg);
+    color: var(--color-text);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
+    transition: border-color var(--motion-duration) var(--motion-ease);
+  }
+
+  input:hover {
+    border-color: var(--color-camel-deep);
   }
 
   input:focus-visible {
@@ -63,6 +76,6 @@
   .hint {
     margin: 0;
     font-size: 0.85em;
-    color: var(--color-muted-text);
+    color: var(--color-text-muted);
   }
 </style>

@@ -1,11 +1,28 @@
 /*
- * Shared design tokens — introduced by issue #104 (see the amendment to
- * docs/decisions/0001-shared-app-shell-layout.md).
+ * Cashmire design system — shared tokens (issue #104, "quiet luxury, softly
+ * handled" visual overhaul). Supersedes the placeholder blue/grey tokens
+ * introduced by the earlier #104 slice (see the amendment to
+ * docs/decisions/0001-shared-app-shell-layout.md) with the warm-neutral
+ * cashmere palette, typography and shape rules in
+ * docs/specs/issue-104-cashmire-design-system.md.
  *
- * These are the values already in use across +layout.svelte, login, and
- * register, pulled out under names so every screen references the same
- * token instead of re-typing the same hex codes. No new colors or spacing
- * values are introduced here — this file only names what already existed.
+ * Existing token *names* are kept wherever a component already consumes
+ * them (--color-primary, --color-border, --space-*, --radius-sm, ...) so
+ * this PR does not have to touch every call site just to rename a
+ * variable; only their *values* move to the new palette. New tokens are
+ * added alongside for things the old system had no name for (fonts,
+ * larger radii, motion, shadow, texture, dark mode).
+ *
+ * Two values deliberately do not match the spec's literal hex codes,
+ * because they fail WCAG contrast at 1:1 swap-in:
+ *   - Button fill uses `--color-camel-deep` (#8F5F26), not the spec's
+ *     plain Camel (#C49A6C) — Ivory text on plain Camel is ~2.3:1, well
+ *     under the 4.5:1 AA minimum for normal-size text. #8F5F26 keeps the
+ *     same hue family and clears ~4.9:1.
+ *   - Muted/hint text uses `--color-text-muted` (#7D6854), not plain
+ *     Heather taupe (#A39384, ~2.7:1 on Ivory) — #7D6854 clears ~4.7:1.
+ * Plain Camel and Heather taupe are kept as tokens for decorative, non-text
+ * uses (chart fills, dividers, borders) where the lighter value is correct.
  *
  * :root custom properties are not scoped by Svelte's per-component style
  * isolation, so importing this file from any component makes these
@@ -13,32 +30,83 @@
  */
 
 :root {
-  /* Color */
-  --color-primary: #0b3d91;
-  --color-border: #8a8a8a;
-  --color-border-subtle: #c8c8c8;
-  --color-muted-text: #3a3a3a;
+  /* ---- Palette: cashmere wool ---- */
+  --color-ivory: #f7f2e9;
+  --color-oatmeal: #e9dfcc;
+  --color-camel: #c49a6c;
+  --color-camel-deep: #8f5f26;
+  --color-heather-taupe: #a39384;
+  --color-heather-taupe-deep: #8d7a68;
+  --color-mocha: #6a4e3f;
+  --color-espresso: #2a231f;
 
-  --color-error-text: #7a0a0a;
-  --color-error-bg: #fdeaea;
-  --color-error-border: #b00020;
+  /* ---- Palette: accents ---- */
+  --color-dusty-rose: #d8b4a8;
+  --color-heather-sage: #9aa68c;
 
-  --color-warning-text: #3b2200;
-  --color-warning-bg: #fff6e5;
-  --color-warning-border: #7a4b00;
+  /* ---- Semantic (muted, never neon) ---- */
+  --color-income-text: #2f3f2b;
+  --color-income-bg: #e4eae0;
+  --color-income-border: #6e8f68;
 
-  /* Added for the budget dashboard (#52), per the four-status table in
-     docs/decisions/budget-thresholds.md: `ok` and `full` each need a color
-     distinct from the existing warning/error pair. */
-  --color-success-text: #0b4d1e;
-  --color-success-bg: #e6f4ea;
-  --color-success-border: #1a7f37;
+  --color-overspend-text: #7a2e1d;
+  --color-overspend-bg: #f5e2dc;
+  --color-overspend-border: #b4543c;
 
-  --color-full-text: #5c2e00;
-  --color-full-bg: #fdf0e3;
-  --color-full-border: #b35900;
+  --color-warning-ochre-text: #5c4318;
+  --color-warning-ochre-bg: #f6ead3;
+  --color-warning-ochre-border: #d1a24a;
 
-  /* Spacing */
+  /* ---- Roles consumed by existing components ---- */
+  --color-bg: var(--color-ivory);
+  --color-surface: var(--color-oatmeal);
+  --color-text: var(--color-espresso);
+  --color-text-muted: #7d6854;
+  --color-heading: var(--color-mocha);
+  --color-primary: var(--color-mocha); /* link / heading text color */
+  --color-accent: var(--color-camel); /* decorative accent, charts */
+  --color-cta-bg: var(--color-camel-deep);
+  --color-cta-text: var(--color-ivory);
+  --color-border: var(--color-heather-taupe-deep); /* inputs, functional */
+  --color-border-subtle: var(--color-heather-taupe); /* decorative dividers */
+  --color-muted-text: var(--color-text-muted);
+
+  --color-error-text: var(--color-overspend-text);
+  --color-error-bg: var(--color-overspend-bg);
+  --color-error-border: var(--color-overspend-border);
+
+  --color-warning-text: var(--color-warning-ochre-text);
+  --color-warning-bg: var(--color-warning-ochre-bg);
+  --color-warning-border: var(--color-warning-ochre-border);
+
+  --color-success-text: var(--color-income-text);
+  --color-success-bg: var(--color-income-bg);
+  --color-success-border: var(--color-income-border);
+
+  /* Added for the budget dashboard (#52)'s four-status table
+     (docs/decisions/budget-thresholds.md): `full` needs a color distinct
+     from both `warning` (ochre) and `exceeded`/error (overspend red).
+     Values follow this file's existing dark-text/pale-bg/mid-border
+     pattern for semantic trios rather than the saturated placeholder hex
+     budget-thresholds.md's author used before the #104 palette overhaul
+     landed. WCAG-checked: text-on-bg ~8.0:1 (AAA), border-on-bg ~3.8:1
+     (matches --color-overspend-border's own ~3.9:1). */
+  --color-full-text: #6b3410;
+  --color-full-bg: #f8e4d2;
+  --color-full-border: #a8632a;
+
+  /* ---- Typography ---- */
+  --font-heading: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --font-mono: "IBM Plex Mono", "Geist Mono", ui-monospace, Menlo, monospace;
+  --font-body: "DM Sans", "Instrument Sans", -apple-system, BlinkMacSystemFont,
+    sans-serif;
+
+  --font-size-base: 1rem;
+  --font-size-sm: 0.95rem;
+  --line-height-body: 1.6;
+  --tracking-mono-label: 0.04em;
+
+  /* ---- Spacing ---- */
   --space-xs: 0.25rem;
   --space-sm: 0.5rem;
   --space-md: 0.75rem;
@@ -47,14 +115,45 @@
   --space-2xl: 1.5rem;
   --space-3xl: 3rem;
 
-  /* Shape */
-  --radius-sm: 4px;
+  /* ---- Shape: soft edges ---- */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-full: 999px;
 
-  /* Typography */
-  --font-size-base: 1rem;
-  --font-size-sm: 0.95rem;
+  /* ---- Motion: slow, gentle, never bouncy ---- */
+  --motion-duration: 350ms;
+  --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* Focus ring, per decision 0001's accessibility intent */
+  /* ---- Elevation ---- */
+  --shadow-soft: 0 8px 24px -12px rgba(42, 23, 15, 0.22);
+
+  /* Focus ring, per decision 0001's accessibility intent. Camel-deep, not
+     plain Camel, for the same contrast reason as the button fill above. */
   --focus-ring-width: 3px;
-  --focus-ring-color: var(--color-primary);
+  --focus-ring-color: var(--color-camel-deep);
+
+  /* Tint drawn over the macro-photo weave texture (cashmere-texture-tile.webp)
+     on header/footer so the photo reads at the brief's 3-4% opacity rather
+     than as a visible tiled image — same surface color, mostly opaque. */
+  --texture-overlay-tint: rgba(233, 223, 204, 0.94);
+}
+
+/* Dark mode: automatic (prefers-color-scheme), no theme-switcher UI — decision
+   0001 point 2 still rules out an explicit theme control. Only the handful
+   of roles that actually need to flip are overridden; --color-camel-deep /
+   --color-cta-* stay the same in both modes since button fill/text contrast
+   is self-contained. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #1f1a17;
+    --color-surface: #2a231f;
+    --color-text: var(--color-oatmeal);
+    --color-text-muted: var(--color-heather-sage);
+    --color-heading: var(--color-camel);
+    --color-primary: var(--color-camel);
+    --color-border: var(--color-heather-taupe);
+    --color-border-subtle: #4a3f37;
+    --texture-overlay-tint: rgba(42, 35, 31, 0.94);
+  }
 }
