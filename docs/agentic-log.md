@@ -1486,3 +1486,34 @@ performed directly.
 **Final decision.** The audited backend has no identified SQL string-building
 path. The regression test and issue-specific audit record are in place; no
 application behavior changed.
+
+## 2026-10-08 — Revue QA & Security de l'application (Issue #58)
+
+**Objective.** Faire revoir l'application entière (backend et frontend) par
+l'agent QA & Security pour la sécurité, la validation, l'accessibilité et la
+fiabilité, et rassembler les findings dans un seul document pour le tri
+d'équipe (#59).
+
+**Agent/role used.** QA & Security (`.github/agents/qa-security.md`), lancé
+comme sous-agent de Claude Code (sans clé API pour l'orchestrateur), avec les
+mêmes contraintes: ne modifie aucun source, n'écrit que
+`docs/reviews/issue-58-qa-security-review.md`.
+
+**What was delegated.** L'exécution des tests backend et frontend, la lecture
+du code, la recherche des sinks XSS, des vérifications CSRF / ownership, et
+la rédaction des findings avec sévérité et reproduction.
+
+**How the team verified it.**
+- Le rapport donne les résultats de tests: backend 215/215, frontend
+  vitest 134/134, `npm audit` prod sans vulnérabilité.
+- Rien n'a été confirmé dynamiquement pour le login CSRF et l'énumération
+  d'emails; le document propose des reproductions par `curl`.
+- Non fait par l'agent: `pip-audit`, lint, test navigateur avec axe.
+
+**Accepted / modified / rejected.** Pas encore tranché: le tri des findings
+(1 blocking B1 sur le contraste des cartes budget, 20 non-blocking) est
+l'objet de l'issue #59.
+
+**Final decision.** Findings collectés dans
+`docs/reviews/issue-58-qa-security-review.md`. Une revue d'agent est une
+preuve à vérifier, pas une garantie de sécurité.
