@@ -507,6 +507,14 @@ is otherwise unresolved.
 #34. API creation/listing behavior remains out of scope and a human review is
 still required before merge.
 
+## 2026-10-07 — Document database recreation from an empty instance (Issue #19)
+
+**Objective.** Document the exact Docker Compose steps for rebuilding the
+development database from an empty PostgreSQL instance using only committed
+Django migrations, including an explicit warning that resetting the volume
+deletes its data.
+
+**Agent/role used.** Copilot-assisted documentation update. No specialized
 ## 2026-10-07 — Add authenticated expense creation (Issue #35)
 
 **Objective.** Implement `POST /api/expenses/` so an authenticated user can
@@ -573,6 +581,21 @@ agent run is claimed.
 
 **What was delegated.** Nothing.
 
+**How the change was verified.**
+- Started a separate Compose project with a new PostgreSQL volume and applied
+  Django migrations with:
+  `docker compose -p cashmire-issue19-check run --rm api python manage.py migrate`.
+  All built-in and project migrations, including `api.0001_initial`,
+  `api.0002_category`, and `api.0003_expense`, applied successfully without
+  manual SQL.
+- Removed only the isolated verification project's containers, network, and
+  volume afterward. The regular development database was not touched.
+- `git diff --check` passes.
+
+**Final decision.** The README documents the destructive reset warning and
+commands to recreate PostgreSQL and apply all committed migrations from
+empty. The procedure was verified against an isolated fresh database; no
+existing local database was deleted.
 **Main proposal.** Reuse the existing `/api/expenses/` route and
 `ExpenseSerializer`, adding GET alongside POST. Validate optional
 `category_id`, `date_from`, and `date_to` query parameters; always scope the
