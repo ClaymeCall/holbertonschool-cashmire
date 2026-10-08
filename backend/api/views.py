@@ -1,6 +1,6 @@
-from django.contrib.auth import authenticate, login, logout
 from decimal import Decimal
 
+from django.contrib.auth import authenticate, login, logout
 from django.db import IntegrityError, transaction
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, serializers, status
@@ -16,10 +16,8 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
 from .auth import SessionAuthenticatedAPIView, session_authenticated_api_view
+from .models import Budget, Category, Expense
 from .serializers import LoginSerializer, RegisterSerializer, UserSerializer
-
-from .models import Category, Expense
-from .models import Budget, Category
 
 
 @api_view(["GET"])
@@ -365,6 +363,8 @@ def expense_detail_mutation(request, expense_id):
     serializer.is_valid(raise_exception=True)
     updated_expense = serializer.save()
     return Response(ExpenseSerializer(updated_expense).data)
+
+
 class BudgetSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(read_only=True)
     category_id = serializers.IntegerField()
