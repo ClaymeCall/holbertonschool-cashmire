@@ -85,6 +85,25 @@ export class ApiError extends Error {
   }
 }
 
+/** HTTP methods Django's CSRF middleware never checks. */
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS", "TRACE"]);
+
+/**
+ * Read one cookie's value out of `document.cookie`. Returns `null` when
+ * absent, or when there is no `document` (this module is written to run
+ * client-side only, per the root `+layout.js`'s `ssr = false`, but this
+ * guard keeps it from throwing if that ever changes).
+ *
+ * @param {string} name
+ * @returns {string | null}
+ */
+function readCookie(name) {
+  if (typeof document === "undefined") return null;
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = document.cookie.match(new RegExp(`(?:^|; )${escaped}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 /**
  * @param {unknown} body
  * @returns {boolean} true when `body` should be JSON-encoded by `apiFetch`.
@@ -127,9 +146,26 @@ function isJsonEncodable(body) {
 export async function apiFetch(path, options = {}) {
   const { body, headers, ...rest } = options;
   const url = apiUrl(path);
+  const method = String(rest.method ?? "GET").toUpperCase();
 
   /** @type {Record<string, string>} */
   const requestHeaders = { Accept: "application/json" };
+
+  // CSRF (docs/decisions/0003-session-cookie-auth-strategy.md point 5): DRF's
+  // `SessionAuthentication` enforces Django's CSRF check on any unsafe-method
+  // request once a session user is authenticated, and the `csrftoken` cookie
+  // is deliberately not `HttpOnly` so this can read it. This is a no-op (the
+  // header is simply omitted) until some backend route actually issues that
+  // cookie — at the time this was written there is no CSRF-bootstrap route,
+  // a gap the decision names but leaves for "the first issue that adds an
+  // authenticated mutation" (this one) to flag, not to also fix on the
+  // backend.
+  if (!SAFE_METHODS.has(method)) {
+    const csrfToken = readCookie("csrftoken");
+    if (csrfToken) {
+      requestHeaders["X-CSRFToken"] = csrfToken;
+    }
+  }
 
   /** @type {BodyInit | undefined} */
   let requestBody;

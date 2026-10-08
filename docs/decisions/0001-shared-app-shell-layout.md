@@ -129,3 +129,61 @@ depends on screens from #40/#41/#52/#53 and a session/auth-state mechanism
 the design-system foundation; the nav/dashboard work is a follow-up once
 those land. A `Card` style is likewise not introduced yet, since no screen
 needs one until the budget/expense dashboards exist.
+
+## Amendment — 2026-10-07 (issue #104, nav/dashboard slice)
+
+**What changed:** the deferral above is resolved now that #40/#41 (expense
+screens) and #52/#53 (budget screens) exist.
+
+- **Nav is auth-state-aware.** Logged out, it still shows exactly
+  `Home`/`Log in`/`Register`/`Privacy` (unchanged from #15/#28/#29). Logged
+  in, it shows `Dashboard`/`Expenses`/`Budgets`/`Privacy`, plus a `Log out`
+  control — a `<button>`, not a nav link, since it performs an action
+  rather than navigating. The `/` link's label switches between "Home" and
+  "Dashboard" with the same `href`, matching what that route actually shows
+  for each audience (see below).
+- **`frontend/src/lib/stores/auth.js`** is the "session/auth-state
+  mechanism" the previous amendment named as a dependency. It is an
+  **in-memory-only** Svelte store: nothing is written to `localStorage` or
+  `sessionStorage`, per
+  [`0003`](./0003-session-cookie-auth-strategy.md) point 6 (no client-held
+  token or identity for an XSS payload to read). It is populated only by
+  `login`/`register`'s own existing success handlers (recording that their
+  own request just succeeded — not a new request) and cleared by `logout`
+  calling `POST /api/auth/logout/`. It is **not** populated by probing
+  `GET /api/auth/me/` on layout mount or on navigation — `routes/layout.test.js`'s
+  T-4b ("rendering the layout issues zero fetch calls") already locks in
+  that the shared shell itself never makes a network request, and this
+  amendment keeps that true.
+  - **Known consequence, accepted for this slice:** a hard page reload
+    resets the store to "logged out" even with a still-valid session
+    cookie, until the next login/register. Revisit once #26/#27
+    (current-user dependency) land, if the team decides a `/api/auth/me/`
+    check belongs somewhere (e.g. a route-level `load`, not the shared
+    layout) despite the cost of relaxing T-4b's guarantee.
+- **`/` now shows the real dashboard for a logged-in user** — each budget's
+  consumption/status and recent expenses, per `docs/mvp-scope.md`'s central
+  journey, step 3 — and a public landing (what Cashmire is, links to
+  `/login`/`/register`) for a logged-out visitor, since there is no session
+  to scope personal data to. The `/health` check this page used to run
+  moved to its own route back in #18 and stays reachable from the footer;
+  it is not duplicated here.
+- **`frontend/src/lib/components/BudgetCard.svelte`** is the `Card` style
+  the previous amendment deferred until "the budget/expense dashboards
+  exist" — true as of this amendment, since the home dashboard now needs
+  the exact same budget-card rendering `routes/budgets/+page.svelte`
+  already had. Factored out so both consumers share one implementation
+  rather than drifting apart.
+
+**What is unchanged:** points 2 through 6 and the prior amendments still
+hold — no new global stylesheet, `+layout.js`/`+layout.svelte` still
+coexist, pages still own their own `<main>`, and the layout still adds no
+`<main>` of its own. The nav/button addition is the only structural change
+to `+layout.svelte` itself.
+
+**What is explicitly deferred:** swapping any of this for real backend
+calls (#92 and its dependencies — the budget API in particular is still
+unmerged at the time of this amendment); the responsive layout pass (#64)
+and the accessibility pass (#65), neither of which this amendment should
+regress but whose checklists are owned elsewhere; and the reload-resets-to-
+logged-out limitation named above.
