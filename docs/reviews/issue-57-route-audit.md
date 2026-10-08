@@ -33,7 +33,7 @@ suite. Static review only.
 
 | # | Écart | Gravité | Proposition |
 |---|---|---|---|
-| G1 | Un utilisateur anonyme reçoit **403** sur `categories`, `expenses`, `budgets`, mais **401** sur `auth/me` et `auth/logout`. Ces vues utilisent `SessionAuthentication` au lieu de `SessionCookieAuthentication` (`api/auth.py`). Le frontend traite 401 comme « session expirée » (`auth.svelte.js`). Le 403 est documenté comme « comportement actuel » dans `docs/api-design.md` (route expenses) et assert��� par les tests existants. | Moyenne | Passer ces vues à `SESSION_AUTHENTICATION_CLASSES` et mettre à jour les assertions 403 en 401. |
+| G1 | Un utilisateur anonyme reçoit **403** sur `categories`, `expenses`, `budgets`, mais **401** sur `auth/me` et `auth/logout`. Ces vues utilisent `SessionAuthentication` au lieu de `SessionCookieAuthentication` (`api/auth.py`). Le frontend traite 401 comme « session expirée » (`auth.svelte.js`). Le 403 est documenté comme « comportement actuel » dans `docs/api-design.md` (route expenses) et asserté par les tests existants. | Moyenne | Passer ces vues à `SESSION_AUTHENTICATION_CLASSES` et mettre à jour les assertions 403 en 401. |
 | G2 | `/api/schema/` et `/api/docs/` sont publics (permissions par défaut de drf-spectacular). Aucune donnée utilisateur, mais le contrat complet de l'API est exposé. | Faible | Accepter pour la démo ou restreindre hors `DEBUG`. |
 | G3 | `DJANGO_ALLOWED_HOSTS` vaut `*` et `DJANGO_SECRET_KEY` a une valeur par défaut connue. | Faible (MVP) | Documenter comme limite connue (#74). |
 | G4 | Pas de throttle sur `register`; le message « email already exists » permet de tester l'existence d'un email. | Faible | Accepter pour le MVP et documenter, comme pour le login (décision 0004). |
