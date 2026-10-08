@@ -118,7 +118,7 @@ holbertonschool-cashmire/
 │   ├── README.md                      # How to run the orchestrator
 │   └── [other orchestration code]
 │
-├── docker-compose.yml                 # Local dev environment (db, api, frontend)
+├── compose.yaml                       # Local dev environment (db, api, frontend)
 ├── .env.example                       # Environment variables template (secrets, API keys, URLs)
 ├── .gitignore                         # Excluded: .env, __pycache__, node_modules, .venv, build artifacts
 ├── README.md                          # Quick-start guide and migration hints
