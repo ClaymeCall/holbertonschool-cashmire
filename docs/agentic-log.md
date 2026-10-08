@@ -577,6 +577,14 @@ is otherwise unresolved.
 #34. API creation/listing behavior remains out of scope and a human review is
 still required before merge.
 
+## 2026-10-07 — Document database recreation from an empty instance (Issue #19)
+
+**Objective.** Document the exact Docker Compose steps for rebuilding the
+development database from an empty PostgreSQL instance using only committed
+Django migrations, including an explicit warning that resetting the volume
+deletes its data.
+
+**Agent/role used.** Copilot-assisted documentation update. No specialized
 ## 2026-10-07 — Add authenticated expense creation (Issue #35)
 
 **Objective.** Implement `POST /api/expenses/` so an authenticated user can
@@ -643,6 +651,21 @@ agent run is claimed.
 
 **What was delegated.** Nothing.
 
+**How the change was verified.**
+- Started a separate Compose project with a new PostgreSQL volume and applied
+  Django migrations with:
+  `docker compose -p cashmire-issue19-check run --rm api python manage.py migrate`.
+  All built-in and project migrations, including `api.0001_initial`,
+  `api.0002_category`, and `api.0003_expense`, applied successfully without
+  manual SQL.
+- Removed only the isolated verification project's containers, network, and
+  volume afterward. The regular development database was not touched.
+- `git diff --check` passes.
+
+**Final decision.** The README documents the destructive reset warning and
+commands to recreate PostgreSQL and apply all committed migrations from
+empty. The procedure was verified against an isolated fresh database; no
+existing local database was deleted.
 **Main proposal.** Reuse the existing `/api/expenses/` route and
 `ExpenseSerializer`, adding GET alongside POST. Validate optional
 `category_id`, `date_from`, and `date_to` query parameters; always scope the
@@ -748,6 +771,97 @@ the review in `docs/reviews/issue-39-expense-ownership.md`.
 **Final decision.** The implemented expense endpoints enforce ownership
 before accessing expense rows. Regression coverage and the reviewed control
 are documented for issue #39.
+
+## 2026-10-07 — Integrate session-auth endpoints with main
+
+**Objective.** Bring the registration, login, and logout endpoints from
+`feat/20-user-model` onto current `main`, resolve API-file conflicts, and
+preserve a single discoverable Django test package.
+
+**Main proposal.** Merge current `main` into the auth foundation branch,
+retain both authentication and expense/category routes, and move the existing
+`api/tests.py` coverage into `api/tests/test_expenses.py` beside the
+registration/login/logout modules.
+
+**How the change was verified.**
+- `docker compose -p cashmire-pr120-foundation run --rm api python manage.py
+  test api`: all 53 API tests pass.
+- `python manage.py check` reports no issues.
+- `python manage.py makemigrations api --check --dry-run` reports no model
+  or migration drift.
+- The isolated Compose resources were removed; the regular development
+  database was not modified.
+
+**Final decision.** The auth endpoints and current main functionality
+coexist, and all API tests are discoverable from one `backend/api/tests/`
+package without a shadowing `tests.py` module.
+
+## 2026-10-07 — Add reusable session authentication and current-user endpoint (Issue #26)
+
+**Objective.** Provide a shared DRF session-authentication guard that resolves
+the user from Django's session, returns 401 for anonymous requests, and can be
+reused by function- and class-based protected views.
+
+**Agent/role used.** Copilot-assisted implementation on the authentication
+stack from issue #24. No specialized agent run is claimed.
+
+**What was delegated.** Nothing.
+
+**Main proposal.** Add a common `SessionAuthenticatedAPIView` base class and
+`session_authenticated_api_view` decorator, backed by one session
+authentication class and `IsAuthenticated` permission. Use them for the
+logout and current-user views, and expose `GET /api/auth/me/` using the
+existing read-only `UserSerializer`.
+
+**How the change was verified.**
+- Ran `docker compose -p cashmire-issue26-test run --rm api python manage.py
+  test api`: all 27 API tests pass, including anonymous 401, authenticated
+  session user serialization, Basic authentication rejection, and logout
+  CSRF/session behavior.
+- Ran `docker compose -p cashmire-issue26-test run --rm api python manage.py
+  check`: no system-check issues.
+- Called `GET /api/auth/me/` with `curl` and no session; received 401,
+  `WWW-Authenticate: Session`, and the expected JSON error.
+- Generated the OpenAPI schema; the custom session cookie authenticator is
+  described as a cookie security scheme. Existing health/logout serializer
+  generation errors remain outside this issue.
+- Removed only the isolated Compose verification volumes and networks.
+
+**Accepted / modified / rejected.**
+- Accepted: Use Django sessions, not Basic or JWT, per decision 0003.
+- Modified: Provide both a function-view decorator and a class-view base so
+  future expense and budget endpoints can share the guard without repeating
+  authentication configuration.
+- Rejected: Duplicating user fields or exposing password data; the existing
+  `UserSerializer` defines the response shape.
+
+**Final decision.** Protected endpoints now share one session-authentication
+implementation, anonymous access returns 401, and `GET /api/auth/me/` returns
+only the authenticated user's public fields.
+
+## 2026-10-08 — Document and verify auth route tests (Issue #31)
+
+**Objective.** Ensure registration, login, logout, and the protected
+current-user route have automated happy-path and failure-case coverage, and
+document one command to run the API suite.
+
+**Main proposal.** Reuse the existing auth-route test modules, which already
+cover successful registration/login/logout, duplicate registration email,
+missing fields, wrong credentials, unauthenticated access, session handling,
+CSRF enforcement, and `/api/auth/me/` identity responses. Document a single
+suite command in the README instead of duplicating tests.
+
+**How the change was verified.**
+- Ran `docker compose -p cashmire-issue31-verify run --rm api python
+  manage.py test api`: all 111 API tests passed, including all four auth
+  route suites.
+- Ran `python manage.py check`: no system-check issues.
+- Removed only the isolated Compose verification resources.
+- `git diff --check` passes.
+
+**Final decision.** The existing automated tests satisfy the route and
+failure-case coverage in issue #31. The README now documents one command for
+running the complete API suite locally or in CI.
 
 ## 2026-10-07 — QA & Security review of Budget Create Endpoint (Issue #46)
 
@@ -1211,3 +1325,69 @@ the `tests/` package for exactly this reason.
 one `backend/api/tests/` package and no shadowing `tests.py` module. Running
 the full backend test suite after the rebase remains a human follow-up, the
 same caveat this log has flagged after every prior rebase/merge step.
+
+## 2026-10-08 — Merge `main` into the rebased branch: correct the `test_core.py` detour
+
+**Objective.** The previous entry's rebase (above) replayed this branch onto
+a stale local `main` tip (`bdf9b9b`) that was never actually part of
+`origin/main` — a divergence that predates this session. Merging the real
+`origin/main` (tip `692ef37`) back in surfaced that stale base directly:
+duplicate `RegisterView`/`LoginView`/`LogoutView`/`current_user`
+implementations (byte-identical to main's, just differently ordered) and a
+rename/rename conflict between this branch's `tests/test_core.py` and
+main's own, independently-done `tests/test_budgets.py` +
+`tests/test_expenses.py` split.
+
+**Agent/role used.** Claude Code-assisted conflict resolution. No
+specialized agent run is claimed.
+
+**What was delegated.** Nothing — resolved interactively.
+
+**Main proposal.** Where this branch's code was a verbatim duplicate of
+main's (confirmed by diffing both versions directly, not by inspection),
+take main's copy and delete ours, rather than keep both. Concretely:
+`backend/api/views.py` and `backend/api/urls.py` now match `origin/main`
+exactly (the duplicate `RegisterView`/`LoginView`/`LogoutView`/
+`current_user` block and the duplicate route lines are gone). For tests,
+the previous entry's `test_core.py` is deleted entirely — main's
+`test_expenses.py` already covers everything in it except
+`BudgetConsumptionServiceTests`, which is this branch's one genuinely
+unique contribution (issue #50, not yet on `main` at all: `git grep` found
+no `backend/api/services/` directory on `origin/main`'s tip). That one class
+was appended to main's `test_budgets.py`, fixing its one new import
+(`Expense`, not previously needed by main's budget tests).
+
+**How the change was verified.**
+- Diffed this branch's pre-merge `views.py`/`urls.py` against `origin/main`'s
+  directly (`git show 692ef37:... | diff -`): confirmed the only
+  differences were declaration order and import ordering, not logic —
+  justified taking main's copy outright instead of hand-merging.
+- Diffed every overlapping test class (`HealthCheckTests`, `CategoryListTests`,
+  `ExpenseModelTests`, `ExpenseCreateTests`, `ExpenseListTests`,
+  `ExpenseDetailMutationTests`, `CsrfTrustedOriginsTests`, `BudgetModelTests`,
+  `BudgetCreateEndpointTests`) line-by-line between this branch's old
+  `test_core.py` and main's `test_expenses.py`/`test_budgets.py`: identical
+  apart from trivial blank-line differences — confirming nothing unique was
+  lost by deleting `test_core.py`.
+- `python3 -m py_compile` on the assembled `test_budgets.py` and on
+  `views.py`/`urls.py`.
+- Grepped every resolved file for leftover conflict markers.
+
+**Accepted / modified / rejected.**
+- Accepted: main's canonical "Integrate session-auth endpoints with main"
+  (#26) and "Document and verify auth route tests" (#31) log entries as the
+  authoritative history for that work, superseding this branch's
+  independent reimplementation of the same features.
+- Rejected: keeping `test_core.py` as a third parallel copy of tests that
+  main already has properly split; that would reintroduce the exact
+  module/package shadowing risk the previous entry had just fixed, one
+  layer up (three sources of truth instead of two).
+
+**Final decision.** After this merge, `backend/api/views.py` and
+`backend/api/urls.py` are identical to `origin/main`'s, and
+`backend/api/tests/` contains only `origin/main`'s own test files plus this
+branch's unique `BudgetConsumptionServiceTests`, folded into
+`test_budgets.py`. Running the full backend test suite remains the
+mandatory human (or agent) follow-up before this is considered merge-ready
+— static review and `py_compile` do not catch Django/DRF wiring or
+migration errors.
