@@ -4,8 +4,8 @@
 // frontend/src/routes/privacy/page.test.js: @testing-library/svelte +
 // createRawSnippet for the `children` prop, no @testing-library/jest-dom
 // (not installed — plain DOM assertions instead).
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/svelte";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, within, fireEvent } from "@testing-library/svelte";
 import { createRawSnippet } from "svelte";
 import { writable } from "svelte/store";
 
@@ -22,7 +22,19 @@ vi.mock("$app/stores", () => ({
   page: writable({ url: new URL("http://localhost/") }),
 }));
 
+// Real SvelteKit client-side navigation isn't mounted in this unit-test
+// harness; mocked the same way login/register's tests mock it, so T-7's
+// post-logout `goto("/")` doesn't throw.
+const gotoMock = vi.fn();
+vi.mock("$app/navigation", () => ({
+  goto: (...args) => gotoMock(...args),
+}));
+
 import { page as pageStore } from "$app/stores";
+// Real module, not mocked: `currentUser` is a genuine Svelte store, so
+// writing to it here is exactly what login/register/logout do (see
+// lib/stores/auth.js) — no need to fake the module itself.
+import { currentUser } from "$lib/stores/auth";
 import Layout from "./+layout.svelte";
 
 const childrenSnippet = (html) =>
@@ -34,6 +46,8 @@ describe("app shell layout (#15)", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     pageStore.set({ url: new URL("http://localhost/") });
+    currentUser.set(null);
+    gotoMock.mockClear();
   });
 
   it("T-1 (AC-4): a navigation landmark contains links to / and /privacy", () => {
@@ -122,5 +136,71 @@ describe("app shell layout (#15)", () => {
     render(Layout, { props: { children: childrenSnippet("<div></div>") } });
 
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  // Issue #104: the nav reflects `currentUser`.
+  describe("auth-aware nav (#104)", () => {
+    afterEach(() => {
+      currentUser.set(null);
+    });
+
+    it("T-5: logged out, the nav has Home/Log in/Register/Privacy and no Log out control", () => {
+      render(Layout, { props: { children: childrenSnippet("<div></div>") } });
+
+      const nav = screen.getByRole("navigation", { name: /main/i });
+      const labels = within(nav)
+        .getAllByRole("link")
+        .map((link) => link.textContent.trim());
+
+      expect(labels).toEqual(["Home", "Log in", "Register", "Privacy"]);
+      expect(within(nav).queryByRole("button", { name: /log out/i })).toBeNull();
+    });
+
+    it("T-6: logged in, the nav has Dashboard/Expenses/Budgets/Privacy and a Log out control, with no Login/Register", () => {
+      currentUser.set({ email: "jane@example.com" });
+      render(Layout, { props: { children: childrenSnippet("<div></div>") } });
+
+      const nav = screen.getByRole("navigation", { name: /main/i });
+      const linkLabels = within(nav)
+        .getAllByRole("link")
+        .map((link) => link.textContent.trim());
+
+      expect(linkLabels).toEqual(["Dashboard", "Expenses", "Budgets", "Privacy"]);
+      expect(within(nav).getByRole("button", { name: /log out/i })).toBeTruthy();
+    });
+
+    it("T-7: clicking Log out calls the logout endpoint and clears the store, reverting the nav to logged-out", async () => {
+      currentUser.set({ email: "jane@example.com" });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          status: 204,
+          ok: true,
+          text: () => Promise.resolve(""),
+        }),
+      );
+
+      render(Layout, { props: { children: childrenSnippet("<div></div>") } });
+      const nav = screen.getByRole("navigation", { name: /main/i });
+
+      await fireEvent.click(within(nav).getByRole("button", { name: /log out/i }));
+
+      expect(fetch).toHaveBeenCalledTimes(1);
+      const [url, init] = fetch.mock.calls[0];
+      expect(url).toBe("http://localhost:8000/api/auth/logout/");
+      expect(init.method).toBe("POST");
+
+      await vi.waitFor(() => {
+        expect(
+          within(screen.getByRole("navigation", { name: /main/i })).queryByRole(
+            "button",
+            { name: /log out/i },
+          ),
+        ).toBeNull();
+      });
+      expect(gotoMock).toHaveBeenCalledWith("/");
+
+      vi.unstubAllGlobals();
+    });
   });
 });
