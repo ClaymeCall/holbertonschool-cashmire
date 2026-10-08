@@ -1,10 +1,7 @@
-from calendar import monthrange
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
-from django.db.models.deletion import ProtectedError
 from django.db import IntegrityError, connection, transaction
 from django.http import HttpRequest
 from django.middleware.csrf import get_token
@@ -15,6 +12,15 @@ from ..models import Category, DEFAULT_CATEGORIES, Expense
 
 
 User = get_user_model()
+
+
+class HealthCheckTests(TestCase):
+    def test_health_check_returns_ok_json(self):
+        response = self.client.get("/api/health/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "ok"})
+        self.assertEqual(response["Content-Type"], "application/json")
 
 
 class CategoryListTests(TestCase):

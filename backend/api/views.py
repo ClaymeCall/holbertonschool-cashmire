@@ -3,7 +3,6 @@ from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth import authenticate, login, logout
-
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 from drf_spectacular.utils import extend_schema
@@ -20,9 +19,8 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
 from .auth import SessionAuthenticatedAPIView, session_authenticated_api_view
-from .serializers import LoginSerializer, RegisterSerializer, UserSerializer
-
 from .models import Budget, Category, Expense
+from .serializers import LoginSerializer, RegisterSerializer, UserSerializer
 from .services.budget_consumption import calculate_consumption_batch
 
 
@@ -369,6 +367,8 @@ def expense_detail_mutation(request, expense_id):
     serializer.is_valid(raise_exception=True)
     updated_expense = serializer.save()
     return Response(ExpenseSerializer(updated_expense).data)
+
+
 class BudgetSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(read_only=True)
     category_id = serializers.IntegerField()

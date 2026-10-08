@@ -577,6 +577,14 @@ is otherwise unresolved.
 #34. API creation/listing behavior remains out of scope and a human review is
 still required before merge.
 
+## 2026-10-07 — Document database recreation from an empty instance (Issue #19)
+
+**Objective.** Document the exact Docker Compose steps for rebuilding the
+development database from an empty PostgreSQL instance using only committed
+Django migrations, including an explicit warning that resetting the volume
+deletes its data.
+
+**Agent/role used.** Copilot-assisted documentation update. No specialized
 ## 2026-10-07 — Add authenticated expense creation (Issue #35)
 
 **Objective.** Implement `POST /api/expenses/` so an authenticated user can
@@ -643,6 +651,21 @@ agent run is claimed.
 
 **What was delegated.** Nothing.
 
+**How the change was verified.**
+- Started a separate Compose project with a new PostgreSQL volume and applied
+  Django migrations with:
+  `docker compose -p cashmire-issue19-check run --rm api python manage.py migrate`.
+  All built-in and project migrations, including `api.0001_initial`,
+  `api.0002_category`, and `api.0003_expense`, applied successfully without
+  manual SQL.
+- Removed only the isolated verification project's containers, network, and
+  volume afterward. The regular development database was not touched.
+- `git diff --check` passes.
+
+**Final decision.** The README documents the destructive reset warning and
+commands to recreate PostgreSQL and apply all committed migrations from
+empty. The procedure was verified against an isolated fresh database; no
+existing local database was deleted.
 **Main proposal.** Reuse the existing `/api/expenses/` route and
 `ExpenseSerializer`, adding GET alongside POST. Validate optional
 `category_id`, `date_from`, and `date_to` query parameters; always scope the
@@ -810,6 +833,7 @@ every screen that exists on `main` today, with the remaining #104
 acceptance criteria (nav expansion, auth-aware nav, dashboard home)
 explicitly left open pending #40/#41/#52/#53.
 
+
 ## 2026-10-07 — Integrate session-auth endpoints with main
 
 **Objective.** Bring the registration, login, and logout endpoints from
@@ -833,56 +857,6 @@ registration/login/logout modules.
 **Final decision.** The auth endpoints and current main functionality
 coexist, and all API tests are discoverable from one `backend/api/tests/`
 package without a shadowing `tests.py` module.
-
-## 2026-10-07 — Fix missing CSRF_TRUSTED_ORIGINS (Issue #130)
-
-**Objective.** Fix a backend gap found while manually testing the #104 PR
-stack (#127/#128/#129) end-to-end: every authenticated mutation from the
-real frontend was failing with a Django CSRF "Origin checking failed"
-error, regardless of a correct session cookie and `X-CSRFToken` header.
-
-**Agent/role used.** Claude Code-assisted backend fix. No specialized
-agent run (`agentic/orchestrator.py`) is claimed.
-
-**What was delegated.** Nothing.
-
-**How the gap was found.** While demoing the #104 stack, locally (never
-pushed) integrated the then-unmerged auth (#126) and budget (#115,
-#121-125) backend branches into a throwaway branch to exercise a real
-login → create-budget flow end-to-end. The create request reproducibly
-failed with `"CSRF Failed: Origin checking failed - http://localhost:5173
-does not match any trusted origins."`, isolated via `curl` with/without an
-`Origin` header to confirm it was Django's CSRF middleware's own
-cross-origin check — a different, more specific gap than the
-"no CSRF-bootstrap-route" one `docs/decisions/0003-session-cookie-auth-strategy.md`
-already names, and one that affects endpoints already merged into `main`
-(`/api/expenses/`), not just the unmerged branches used to reproduce it.
-
-**Main proposal.** Add `CSRF_TRUSTED_ORIGINS` to
-`backend/cashmire/settings.py`, reusing the same `DJANGO_CORS_ALLOWED_ORIGINS`
-env var and default `CORS_ALLOWED_ORIGINS` already uses, since both
-describe "the frontend's origin(s)" and have never had reason to differ.
-
-**How the change was verified.**
-- Reproduced the failure against the real backend via `curl` (session
-  cookie + valid `X-CSRFToken` + `Origin: http://localhost:5173` → 403)
-  before the fix, and confirmed 201 after.
-- Added `CsrfTrustedOriginsTests` to `backend/api/tests.py`, using
-  `APIClient(enforce_csrf_checks=True)` (every other test class in this
-  file uses the default `APIClient()`, which disables CSRF checking
-  entirely — exactly why this gap had zero test coverage until now).
-  Proves the setting is both sufficient (succeeds with it) and necessary
-  (`@override_settings(CSRF_TRUSTED_ORIGINS=[])` reproduces the original
-  403) against the already-merged `/api/expenses/` endpoint.
-- `python manage.py test api`: 31/31 passing (2 new). `python manage.py
-  check`: no issues.
-
-**Accepted / modified / rejected.** Nothing modified or rejected — this is
-a one-setting fix plus the regression test that was missing for it.
-
-**Final decision.** `CSRF_TRUSTED_ORIGINS` is set on `fix/130-csrf-trusted-origins`,
-closing #130, with regression coverage proving both the failure mode and
-the fix.
 
 ## 2026-10-07 — Add reusable session authentication and current-user endpoint (Issue #26)
 
@@ -926,6 +900,121 @@ existing read-only `UserSerializer`.
 **Final decision.** Protected endpoints now share one session-authentication
 implementation, anonymous access returns 401, and `GET /api/auth/me/` returns
 only the authenticated user's public fields.
+
+## 2026-10-08 — Document and verify auth route tests (Issue #31)
+
+**Objective.** Ensure registration, login, logout, and the protected
+current-user route have automated happy-path and failure-case coverage, and
+document one command to run the API suite.
+
+**Main proposal.** Reuse the existing auth-route test modules, which already
+cover successful registration/login/logout, duplicate registration email,
+missing fields, wrong credentials, unauthenticated access, session handling,
+CSRF enforcement, and `/api/auth/me/` identity responses. Document a single
+suite command in the README instead of duplicating tests.
+
+**How the change was verified.**
+- Ran `docker compose -p cashmire-issue31-verify run --rm api python
+  manage.py test api`: all 111 API tests passed, including all four auth
+  route suites.
+- Ran `python manage.py check`: no system-check issues.
+- Removed only the isolated Compose verification resources.
+- `git diff --check` passes.
+
+**Final decision.** The existing automated tests satisfy the route and
+failure-case coverage in issue #31. The README now documents one command for
+running the complete API suite locally or in CI.
+
+## 2026-10-07 — QA & Security review of Budget Create Endpoint (Issue #46)
+
+**Objective.** Closes #46 (QA review). Verify the Budget create endpoint implementation against 
+its specification (`docs/specs/issue-46-create-budget-endpoint.md`) across all 15 acceptance criteria 
+(AC-1 through AC-15), focusing on endpoint routing, authentication, input validation, ownership 
+enforcement, duplicate detection, and security.
+
+**Agent/role used.** QA & Security agent (read-only review, no source code edits).
+
+**What was delegated.** Verify Budget endpoint implementation against specification:
+- Confirm endpoint `POST /api/budgets/` exists at the correct route with trailing slash
+- Verify authentication required (SessionAuthentication + IsAuthenticated)
+- Audit input validation (category_id, amount, period_start, period_end, alert_threshold)
+- Verify category ownership check returns 404 for foreign/nonexistent categories
+- Confirm duplicate detection at application level (returns 409 Conflict before DB touch)
+- Verify owner always set to request.user (not from client input)
+- Run test suite (`python manage.py test api.tests.BudgetCreateEndpointTests -v 2`) and verify 
+  all tests pass
+- Audit response serialization (Decimal to JSON string, ISO 8601 timestamps)
+- Check for information leaks in error messages
+- Verify race condition handling for concurrent duplicates
+- Document findings in `docs/reviews/issue-46-create-budget-endpoint.md`
+
+**Main proposal.** 14 of 15 acceptance criteria passed. **1 blocking finding:** `IntegrityError` 
+not caught when a race condition creates duplicate budgets (two concurrent requests bypass the 
+applicative check and both reach the database). Returns 500 Internal Server Error instead of 409 
+Conflict as specified. Requires adding `try/except IntegrityError` around the `Budget.objects.create()` 
+call. Additionally, 2 non-blocking findings: (1) HTTP 403 returned for missing authentication instead 
+of spec's 401 (consistent with category_list and DRF IsAuthenticated behavior, but spec mismatch); 
+(2) duplicate validators in serializer and model (defense in depth, not a bug).
+
+**How the team verified it.**
+- Ran full test suite: `python manage.py test api.tests.BudgetCreateEndpointTests -v 2` 
+  → all 28 tests passed (4.140s)
+- Verified AC-1: Route `POST /api/budgets/` present in `backend/api/urls.py` with trailing slash
+- Verified AC-2: SessionAuthentication + IsAuthenticated decorators present; test confirms 403 for 
+  unauthenticated requests (DRF standard, not 401 per spec — non-blocking finding)
+- Verified AC-3: BudgetSerializer defines all fields (category_id, amount, period_start, period_end, 
+  alert_threshold)
+- Verified AC-4: DecimalField used for amount; test `test_budget_create_amount_serialized_as_string` 
+  confirms JSON serialization as string `"123.45"`, not float
+- Verified AC-5: amount > 0 enforced; `validate_amount()` and MinValueValidator in model both check; 
+  tests verify 0, negative, and 0.01 (minimum) all handled correctly
+- Verified AC-6: DateField validation for YYYY-MM-DD format; `validate()` method checks 
+  period_end >= period_start; tests verify invalid dates, inverted ranges, and single-day budgets
+- Verified AC-7: Category ownership check at line 124 (`Category.objects.get(id=category_id, user=request.user)`) 
+  with DoesNotExist → 404; tests `test_budget_create_nonexistent_category_404` and 
+  `test_budget_create_foreign_category_404` confirm 404 for both missing and foreign categories
+- Verified AC-8: alert_threshold optional, 0–100 if provided; `validate_alert_threshold()` and 
+  model validators both enforce range; tests verify null, 0, 100, and out-of-bounds all correct
+- Verified AC-9: Applicative duplicate check at lines 132–144 (`Budget.objects.filter(...).exists()`) 
+  before create; test `test_budget_create_duplicate_409` confirms 409 Conflict. **However, no try/except 
+  around create() for IntegrityError** — this is the blocking finding.
+- Verified AC-10: Owner always `request.user` (line 148); serializer marks user_id as read-only; 
+  test confirms created budget's user_id matches authenticated user
+- Verified AC-11: 201 Created response includes all fields (id, user_id, category_id, amount, 
+  period_start, period_end, alert_threshold, created_at, updated_at); test verifies all present
+- Verified AC-12: DecimalField serializes amount and alert_threshold as JSON strings; verified 
+  in response
+- Verified AC-13: Timestamps include ISO 8601 format ("T" separator, timezone info); test passes
+- Verified AC-14: 28 comprehensive tests covering all scenarios (authentication, validation, 
+  ownership, duplicates, serialization)
+- Verified AC-15: DB UNIQUE constraint `unique_budget_per_user_category_period` exists in migration 
+  and enforces the constraint. **Constraint is not caught by endpoint code** (blocking finding).
+- Audited security: No SQL injection (Django ORM), no information leaks (generic error messages), 
+  ownership not spoofable, Decimal arithmetic (not float), but race condition vulnerability.
+
+**Accepted / modified / rejected.**
+- Accepted: 14 of 15 acceptance criteria met. Endpoint is functionally conformant to specification 
+  for normal (non-race-condition) operation.
+- Rejected: **1 blocking finding must be fixed:** `IntegrityError` not caught. Add try/except block 
+  around `Budget.objects.create()` to catch `IntegrityError` and return 409 Conflict (as promised 
+  in the spec's "filet de sécurité" section).
+- Accepted: 2 non-blocking findings (403 vs 401 authentication status, duplicate validators) do not 
+  gate merge once the blocking finding is fixed.
+
+**Final decision.**
+- The Budget create endpoint has **1 blocking finding** (IntegrityError handling) that must be fixed 
+  before merge.
+- The fix is minimal (4–6 lines of code): import IntegrityError, wrap create() in try/except, return 
+  409 Conflict on catch.
+- Once fixed, the endpoint is approved for merge. All 28 tests pass; specification is conformant; 
+  no security issues remain.
+- **Critical next action:** Full-Stack Development agent (or human) adds IntegrityError handling 
+  to `backend/api/views.py` lines 158–161, then reruns test suite to confirm fix does not break 
+  any existing tests.
+- Review artifacts: `docs/reviews/issue-46-create-budget-endpoint.md` documents all findings 
+  (blocking, non-blocking, verification steps, OWASP audit, data integrity checks) with reproduction 
+  steps for the race condition.
+
 
 ## 2026-10-07 — Build the expense list and create/edit screens (Issues #40, #41)
 
@@ -1034,92 +1123,366 @@ since both reuse `lib/api/categories.js`), built against the documented
 but not-yet-merged budget API, with one shared create/edit form as the
 issue explicitly requires.
 
-## 2026-10-07 — QA & Security review of Budget Create Endpoint (Issue #46)
+## 2026-10-07 — Unify the front-end into one navigable site (Issue #104)
 
-**Objective.** Closes #46 (QA review). Verify the Budget create endpoint implementation against 
-its specification (`docs/specs/issue-46-create-budget-endpoint.md`) across all 15 acceptance criteria 
-(AC-1 through AC-15), focusing on endpoint routing, authentication, input validation, ownership 
-enforcement, duplicate detection, and security.
+**Objective.** Stitch #40/#41 (expense screens) and #52/#53 (budget
+screens) into one coherent site: an auth-aware nav, and a home page that
+shows the real budgets/expenses summary instead of the original
+health-check placeholder — entirely against the mocked/not-yet-merged
+APIs, per #104's explicit scope.
 
-**Agent/role used.** QA & Security agent (read-only review, no source code edits).
+**Agent/role used.** Claude Code-assisted frontend implementation. No
+specialized agent run (`agentic/orchestrator.py`) is claimed.
 
-**What was delegated.** Verify Budget endpoint implementation against specification:
-- Confirm endpoint `POST /api/budgets/` exists at the correct route with trailing slash
-- Verify authentication required (SessionAuthentication + IsAuthenticated)
-- Audit input validation (category_id, amount, period_start, period_end, alert_threshold)
-- Verify category ownership check returns 404 for foreign/nonexistent categories
-- Confirm duplicate detection at application level (returns 409 Conflict before DB touch)
-- Verify owner always set to request.user (not from client input)
-- Run test suite (`python manage.py test api.tests.BudgetCreateEndpointTests -v 2`) and verify 
-  all tests pass
-- Audit response serialization (Decimal to JSON string, ISO 8601 timestamps)
-- Check for information leaks in error messages
-- Verify race condition handling for concurrent duplicates
-- Document findings in `docs/reviews/issue-46-create-budget-endpoint.md`
+**What was delegated.** Nothing — implemented directly in this session.
 
-**Main proposal.** 14 of 15 acceptance criteria passed. **1 blocking finding:** `IntegrityError` 
-not caught when a race condition creates duplicate budgets (two concurrent requests bypass the 
-applicative check and both reach the database). Returns 500 Internal Server Error instead of 409 
-Conflict as specified. Requires adding `try/except IntegrityError` around the `Budget.objects.create()` 
-call. Additionally, 2 non-blocking findings: (1) HTTP 403 returned for missing authentication instead 
-of spec's 401 (consistent with category_list and DRF IsAuthenticated behavior, but spec mismatch); 
-(2) duplicate validators in serializer and model (defense in depth, not a bug).
+**Main proposal.**
+- `frontend/src/lib/stores/auth.js`: an in-memory-only auth-state store,
+  populated by `login`/`register`'s own success handlers and cleared by a
+  new `logout()` (calling `POST /api/auth/logout/`). Deliberately does
+  **not** probe `GET /api/auth/me/` on layout mount — `routes/layout.test.js`'s
+  existing T-4b asserts the shared layout issues zero fetch calls on
+  render, and this keeps that true. Accepted consequence: a hard reload
+  reverts the nav to logged-out until the next login/register.
+- `+layout.svelte`'s nav now renders one of two link sets based on that
+  store (logged-out: Home/Log in/Register/Privacy; logged-in: Dashboard/
+  Expenses/Budgets/Privacy + a `Log out` button), with zero changes to
+  `login`/`register`'s own existing, already-tested submit logic beyond
+  one line each recording that their request succeeded.
+- `routes/+page.svelte` (home) now shows a public landing when logged out,
+  and the real dashboard — each budget's status via a new, shared
+  `BudgetCard` component, plus recent expenses — when logged in, per
+  `docs/mvp-scope.md`'s central journey step 3.
+- `BudgetCard.svelte` factors the budget-card rendering out of
+  `routes/budgets/+page.svelte` (#52) so the home dashboard doesn't
+  duplicate it — the second consumer `docs/decisions/0001`'s design-system
+  amendment said to wait for before introducing a `Card` style.
+- Amended `docs/decisions/0001-shared-app-shell-layout.md` as #104's
+  acceptance criteria require.
 
-**How the team verified it.**
-- Ran full test suite: `python manage.py test api.tests.BudgetCreateEndpointTests -v 2` 
-  → all 28 tests passed (4.140s)
-- Verified AC-1: Route `POST /api/budgets/` present in `backend/api/urls.py` with trailing slash
-- Verified AC-2: SessionAuthentication + IsAuthenticated decorators present; test confirms 403 for 
-  unauthenticated requests (DRF standard, not 401 per spec — non-blocking finding)
-- Verified AC-3: BudgetSerializer defines all fields (category_id, amount, period_start, period_end, 
-  alert_threshold)
-- Verified AC-4: DecimalField used for amount; test `test_budget_create_amount_serialized_as_string` 
-  confirms JSON serialization as string `"123.45"`, not float
-- Verified AC-5: amount > 0 enforced; `validate_amount()` and MinValueValidator in model both check; 
-  tests verify 0, negative, and 0.01 (minimum) all handled correctly
-- Verified AC-6: DateField validation for YYYY-MM-DD format; `validate()` method checks 
-  period_end >= period_start; tests verify invalid dates, inverted ranges, and single-day budgets
-- Verified AC-7: Category ownership check at line 124 (`Category.objects.get(id=category_id, user=request.user)`) 
-  with DoesNotExist → 404; tests `test_budget_create_nonexistent_category_404` and 
-  `test_budget_create_foreign_category_404` confirm 404 for both missing and foreign categories
-- Verified AC-8: alert_threshold optional, 0–100 if provided; `validate_alert_threshold()` and 
-  model validators both enforce range; tests verify null, 0, 100, and out-of-bounds all correct
-- Verified AC-9: Applicative duplicate check at lines 132–144 (`Budget.objects.filter(...).exists()`) 
-  before create; test `test_budget_create_duplicate_409` confirms 409 Conflict. **However, no try/except 
-  around create() for IntegrityError** — this is the blocking finding.
-- Verified AC-10: Owner always `request.user` (line 148); serializer marks user_id as read-only; 
-  test confirms created budget's user_id matches authenticated user
-- Verified AC-11: 201 Created response includes all fields (id, user_id, category_id, amount, 
-  period_start, period_end, alert_threshold, created_at, updated_at); test verifies all present
-- Verified AC-12: DecimalField serializes amount and alert_threshold as JSON strings; verified 
-  in response
-- Verified AC-13: Timestamps include ISO 8601 format ("T" separator, timezone info); test passes
-- Verified AC-14: 28 comprehensive tests covering all scenarios (authentication, validation, 
-  ownership, duplicates, serialization)
-- Verified AC-15: DB UNIQUE constraint `unique_budget_per_user_category_period` exists in migration 
-  and enforces the constraint. **Constraint is not caught by endpoint code** (blocking finding).
-- Audited security: No SQL injection (Django ORM), no information leaks (generic error messages), 
-  ownership not spoofable, Decimal arithmetic (not float), but race condition vulnerability.
+**How the change was verified.**
+- `npm test` in `frontend/`: 134/134 passing. Critically, this includes
+  running the **existing, unmodified** `login`/`register`/`layout` test
+  files and confirming zero regressions — in particular that
+  `layout.test.js`'s T-4b (zero fetch calls on render) and the login
+  test's exact-one-fetch-call assertion both still hold after wiring in
+  the auth store.
+- New coverage: nav rendering for both auth states and the logout flow
+  (`layout.test.js`), the home dashboard's logged-out/loading/ready/error/
+  empty states (`routes/page.test.js`), and that `routes/budgets/+page.svelte`'s
+  existing tests still pass unchanged after the `BudgetCard` extraction
+  (same markup, just factored out).
 
 **Accepted / modified / rejected.**
-- Accepted: 14 of 15 acceptance criteria met. Endpoint is functionally conformant to specification 
-  for normal (non-race-condition) operation.
-- Rejected: **1 blocking finding must be fixed:** `IntegrityError` not caught. Add try/except block 
-  around `Budget.objects.create()` to catch `IntegrityError` and return 409 Conflict (as promised 
-  in the spec's "filet de sécurité" section).
-- Accepted: 2 non-blocking findings (403 vs 401 authentication status, duplicate validators) do not 
-  gate merge once the blocking finding is fixed.
+- Accepted: the reload-resets-to-logged-out limitation, rather than adding
+  a `/api/auth/me/` check that would break the layout's existing
+  zero-fetch-on-render guarantee — flagged in the decision amendment for
+  the team to revisit against #26/#27, not silently worked around.
+- Rejected: wrapping the "Add budget"/"Create an account" calls-to-action
+  in a `<Button>` component — `<Button>` renders a native `<button>`, and
+  a `<button>` nested in an `<a>` (or vice versa) is invalid HTML; kept
+  these as plain anchors styled to match.
 
-**Final decision.**
-- The Budget create endpoint has **1 blocking finding** (IntegrityError handling) that must be fixed 
-  before merge.
-- The fix is minimal (4–6 lines of code): import IntegrityError, wrap create() in try/except, return 
-  409 Conflict on catch.
-- Once fixed, the endpoint is approved for merge. All 28 tests pass; specification is conformant; 
-  no security issues remain.
-- **Critical next action:** Full-Stack Development agent (or human) adds IntegrityError handling 
-  to `backend/api/views.py` lines 158–161, then reruns test suite to confirm fix does not break 
-  any existing tests.
-- Review artifacts: `docs/reviews/issue-46-create-budget-endpoint.md` documents all findings 
-  (blocking, non-blocking, verification steps, OWASP audit, data integrity checks) with reproduction 
-  steps for the race condition.
+**Final decision.** Issue #104's nav/dashboard slice is implemented on
+`feat/104-unify-frontend` (stacked on `feat/52-53-budget-screens`), with
+every MVP screen reachable from the shared nav and the home page replaced
+by the real summary, while explicitly leaving the mock-to-real API swap
+(#92) and the a11y/responsive passes (#64/#65) untouched.
+
+## 2026-10-07 — Fix missing CSRF_TRUSTED_ORIGINS (Issue #130)
+
+**Objective.** Fix a backend gap found while manually testing the #104 PR
+stack (#127/#128/#129) end-to-end: every authenticated mutation from the
+real frontend was failing with a Django CSRF "Origin checking failed"
+error, regardless of a correct session cookie and `X-CSRFToken` header.
+
+**Agent/role used.** Claude Code-assisted backend fix. No specialized
+agent run (`agentic/orchestrator.py`) is claimed.
+
+**What was delegated.** Nothing.
+
+**How the gap was found.** While demoing the #104 stack, locally (never
+pushed) integrated the then-unmerged auth (#126) and budget (#115,
+#121-125) backend branches into a throwaway branch to exercise a real
+login → create-budget flow end-to-end. The create request reproducibly
+failed with `"CSRF Failed: Origin checking failed - http://localhost:5173
+does not match any trusted origins."`, isolated via `curl` with/without an
+`Origin` header to confirm it was Django's CSRF middleware's own
+cross-origin check — a different, more specific gap than the
+"no CSRF-bootstrap-route" one `docs/decisions/0003-session-cookie-auth-strategy.md`
+already names, and one that affects endpoints already merged into `main`
+(`/api/expenses/`), not just the unmerged branches used to reproduce it.
+
+**Main proposal.** Add `CSRF_TRUSTED_ORIGINS` to
+`backend/cashmire/settings.py`, reusing the same `DJANGO_CORS_ALLOWED_ORIGINS`
+env var and default `CORS_ALLOWED_ORIGINS` already uses, since both
+describe "the frontend's origin(s)" and have never had reason to differ.
+
+**How the change was verified.**
+- Reproduced the failure against the real backend via `curl` (session
+  cookie + valid `X-CSRFToken` + `Origin: http://localhost:5173` → 403)
+  before the fix, and confirmed 201 after.
+- Added `CsrfTrustedOriginsTests` to `backend/api/tests.py`, using
+  `APIClient(enforce_csrf_checks=True)` (every other test class in this
+  file uses the default `APIClient()`, which disables CSRF checking
+  entirely — exactly why this gap had zero test coverage until now).
+  Proves the setting is both sufficient (succeeds with it) and necessary
+  (`@override_settings(CSRF_TRUSTED_ORIGINS=[])` reproduces the original
+  403) against the already-merged `/api/expenses/` endpoint.
+- `python manage.py test api`: 31/31 passing (2 new). `python manage.py
+  check`: no issues.
+
+**Accepted / modified / rejected.** Nothing modified or rejected — this is
+a one-setting fix plus the regression test that was missing for it.
+
+**Final decision.** `CSRF_TRUSTED_ORIGINS` is set on `fix/130-csrf-trusted-origins`,
+closing #130, with regression coverage proving both the failure mode and
+the fix.
+
+## 2026-10-07 — Cover the API health endpoint with a backend test (Issue #17)
+
+**Objective.** Complete issue #17 by adding an automated check for the existing
+`GET /api/health/` endpoint, which must return HTTP 200 and JSON
+`{"status": "ok"}`.
+
+**Agent/role used.** Copilot-assisted implementation. No specialized agent
+run is claimed.
+
+**What was delegated.** Nothing.
+
+**How the change was verified.**
+- Ran `docker compose exec -T api python manage.py test
+  api.tests.HealthCheckTests`: the targeted test passed.
+- Ran `curl.exe --silent --show-error --max-time 5 --include
+  http://127.0.0.1:8000/api/health/`: received HTTP 200,
+  `Content-Type: application/json`, and `{"status":"ok"}`.
+- `git diff --check` passes.
+
+**Final decision.** The existing health route is now covered by a backend
+regression test for its successful JSON response. The endpoint was also
+verified manually over HTTP.
+
+## 2026-10-07 — Document database recreation from an empty instance (Issue #19)
+
+**Objective.** Document the exact Docker Compose steps for rebuilding the
+development database from an empty PostgreSQL instance using only committed
+Django migrations, including an explicit warning that resetting the volume
+deletes its data.
+
+**Agent/role used.** Copilot-assisted documentation update. No specialized
+agent run is claimed.
+
+**What was delegated.** Nothing.
+
+**How the change was verified.**
+- Started a separate Compose project with a new PostgreSQL volume and applied
+  Django migrations with:
+  `docker compose -p cashmire-issue19-check run --rm api python manage.py migrate`.
+  All built-in and project migrations, including `api.0001_initial`,
+  `api.0002_category`, and `api.0003_expense`, applied successfully without
+  manual SQL.
+- Removed only the isolated verification project's containers, network, and
+  volume afterward. The regular development database was not touched.
+- `git diff --check` passes.
+
+**Final decision.** The README documents the destructive reset warning and
+commands to recreate PostgreSQL and apply all committed migrations from
+empty. The procedure was verified against an isolated fresh database; no
+existing local database was deleted.
+
+## 2026-10-07 — Add reusable session authentication and current-user endpoint (Issue #26)
+
+**Objective.** Provide a shared DRF session-authentication guard that resolves
+the user from Django's session, returns 401 for anonymous requests, and can be
+reused by function- and class-based protected views.
+
+**Agent/role used.** Copilot-assisted implementation on the authentication
+stack from issue #24. No specialized agent run is claimed.
+
+**What was delegated.** Nothing.
+
+**Main proposal.** Add a common `SessionAuthenticatedAPIView` base class and
+`session_authenticated_api_view` decorator, backed by one session
+authentication class and `IsAuthenticated` permission. Use them for the
+logout and current-user views, and expose `GET /api/auth/me/` using the
+existing read-only `UserSerializer`.
+
+**How the change was verified.**
+- Ran `docker compose -p cashmire-issue26-test run --rm api python manage.py
+  test api`: all 27 API tests pass, including anonymous 401, authenticated
+  session user serialization, Basic authentication rejection, and logout
+  CSRF/session behavior.
+- Ran `docker compose -p cashmire-issue26-test run --rm api python manage.py
+  check`: no system-check issues.
+- Called `GET /api/auth/me/` with `curl` and no session; received 401,
+  `WWW-Authenticate: Session`, and the expected JSON error.
+- Generated the OpenAPI schema; the custom session cookie authenticator is
+  described as a cookie security scheme. Existing health/logout serializer
+  generation errors remain outside this issue.
+- Removed only the isolated Compose verification volumes and networks.
+
+**Accepted / modified / rejected.**
+- Accepted: Use Django sessions, not Basic or JWT, per decision 0003.
+- Modified: Provide both a function-view decorator and a class-view base so
+  future expense and budget endpoints can share the guard without repeating
+  authentication configuration.
+- Rejected: Duplicating user fields or exposing password data; the existing
+  `UserSerializer` defines the response shape.
+
+**Final decision.** Protected endpoints now share one session-authentication
+implementation, anonymous access returns 401, and `GET /api/auth/me/` returns
+only the authenticated user's public fields.
+
+## 2026-10-08 — Rebase conflict resolution: fix `tests.py`/`tests/` module shadow
+
+**Objective.** Resolve the multi-commit rebase of
+`feat/50-budget-consumption-service` onto `main` (bdf9b9b), replaying
+registration, login, logout, health-check, database-recreation, and
+current-user commits on top of the budget consumption work.
+
+**Agent/role used.** Claude Code-assisted conflict resolution. No
+specialized agent run is claimed.
+
+**What was delegated.** Nothing — resolved interactively, commit by commit.
+
+**Main proposal.** Most conflicts in `docs/agentic-log.md` were pure
+append-only positional conflicts (two branches adding entries at the same
+line): resolved by keeping both sides' entries in chronological order.
+`backend/api/{urls,views}.py` conflicts were resolved the same way —
+additive route/view blocks kept from both sides, with import lines merged
+by hand.
+
+One conflict was not purely cosmetic: resolving the registration commit's
+test-restructuring (`backend/api/tests/` package with
+`test_registration.py`, `test_login.py`, etc.) left both that package and
+the pre-existing `backend/api/tests.py` module on disk simultaneously.
+Python/Django only discovers one of the two when both exist beside each
+other — the package shadows the module — so every test class that lived in
+`tests.py` (health check, categories, expenses, budgets, CSRF trusted
+origins) would have silently stopped running. This was caught by comparing
+against the original (pre-rebase) branch history, where a later merge
+commit's log entry explicitly described moving `tests.py`'s coverage into
+the `tests/` package for exactly this reason.
+
+**How the change was verified.**
+- `git mv backend/api/tests.py backend/api/tests/test_core.py`, then fixed
+  its now-one-level-deeper relative import (`.models` → `..models`); its one
+  other import (`api.services.budget_consumption`) was already absolute and
+  needed no change.
+- `python3 -m py_compile` on every conflict-touched file
+  (`backend/api/{urls,views}.py`, `backend/api/tests/test_core.py`).
+- Grepped for leftover `<<<<<<<`/`=======`/`>>>>>>>`/`|||||||` markers after
+  every resolved file.
+
+**Accepted / modified / rejected.**
+- Accepted: keep both sides for every additive conflict (routes, views, log
+  entries) rather than picking one.
+- Rejected: including the orphaned "Integrate session-auth endpoints with
+  main" log entry inherited from a merge commit (`ac3350c`) that this linear
+  rebase does not replay — its described actions (a `main` merge, "53 API
+  tests pass") don't match what this rebase actually did, so keeping it
+  would have misrepresented the history.
+
+**Final decision.** The rebase completed with all tests discoverable from
+one `backend/api/tests/` package and no shadowing `tests.py` module. Running
+the full backend test suite after the rebase remains a human follow-up, the
+same caveat this log has flagged after every prior rebase/merge step.
+
+## 2026-10-08 — Merge `main` into the rebased branch: correct the `test_core.py` detour
+
+**Objective.** The previous entry's rebase (above) replayed this branch onto
+a stale local `main` tip (`bdf9b9b`) that was never actually part of
+`origin/main` — a divergence that predates this session. Merging the real
+`origin/main` (tip `692ef37`) back in surfaced that stale base directly:
+duplicate `RegisterView`/`LoginView`/`LogoutView`/`current_user`
+implementations (byte-identical to main's, just differently ordered) and a
+rename/rename conflict between this branch's `tests/test_core.py` and
+main's own, independently-done `tests/test_budgets.py` +
+`tests/test_expenses.py` split.
+
+**Agent/role used.** Claude Code-assisted conflict resolution. No
+specialized agent run is claimed.
+
+**What was delegated.** Nothing — resolved interactively.
+
+**Main proposal.** Where this branch's code was a verbatim duplicate of
+main's (confirmed by diffing both versions directly, not by inspection),
+take main's copy and delete ours, rather than keep both. Concretely:
+`backend/api/views.py` and `backend/api/urls.py` now match `origin/main`
+exactly (the duplicate `RegisterView`/`LoginView`/`LogoutView`/
+`current_user` block and the duplicate route lines are gone). For tests,
+the previous entry's `test_core.py` is deleted entirely — main's
+`test_expenses.py` already covers everything in it except
+`BudgetConsumptionServiceTests`, which is this branch's one genuinely
+unique contribution (issue #50, not yet on `main` at all: `git grep` found
+no `backend/api/services/` directory on `origin/main`'s tip). That one class
+was appended to main's `test_budgets.py`, fixing its one new import
+(`Expense`, not previously needed by main's budget tests).
+
+**How the change was verified.**
+- Diffed this branch's pre-merge `views.py`/`urls.py` against `origin/main`'s
+  directly (`git show 692ef37:... | diff -`): confirmed the only
+  differences were declaration order and import ordering, not logic —
+  justified taking main's copy outright instead of hand-merging.
+- Diffed every overlapping test class (`HealthCheckTests`, `CategoryListTests`,
+  `ExpenseModelTests`, `ExpenseCreateTests`, `ExpenseListTests`,
+  `ExpenseDetailMutationTests`, `CsrfTrustedOriginsTests`, `BudgetModelTests`,
+  `BudgetCreateEndpointTests`) line-by-line between this branch's old
+  `test_core.py` and main's `test_expenses.py`/`test_budgets.py`: identical
+  apart from trivial blank-line differences — confirming nothing unique was
+  lost by deleting `test_core.py`.
+- `python3 -m py_compile` on the assembled `test_budgets.py` and on
+  `views.py`/`urls.py`.
+- Grepped every resolved file for leftover conflict markers.
+
+**Accepted / modified / rejected.**
+- Accepted: main's canonical "Integrate session-auth endpoints with main"
+  (#26) and "Document and verify auth route tests" (#31) log entries as the
+  authoritative history for that work, superseding this branch's
+  independent reimplementation of the same features.
+- Rejected: keeping `test_core.py` as a third parallel copy of tests that
+  main already has properly split; that would reintroduce the exact
+  module/package shadowing risk the previous entry had just fixed, one
+  layer up (three sources of truth instead of two).
+
+**Final decision.** After this merge, `backend/api/views.py` and
+`backend/api/urls.py` are identical to `origin/main`'s, and
+`backend/api/tests/` contains only `origin/main`'s own test files plus this
+branch's unique `BudgetConsumptionServiceTests`, folded into
+`test_budgets.py`. Running the full backend test suite remains the
+mandatory human (or agent) follow-up before this is considered merge-ready
+— static review and `py_compile` do not catch Django/DRF wiring or
+migration errors.
+
+## 2026-10-08 — Audit database query safety (Issue #61)
+
+**Objective.** Resolve the SQL injection / unsafe-query audit criteria in #61:
+confirm database access is safe, add a regression test for an injection
+payload, and record the checklist result.
+
+**Agent/role used.** Copilot-assisted backend implementation and audit.
+
+**What was delegated.** Nothing — the backend audit and test change were
+performed directly.
+
+**How the team verified it.**
+- Audited Python application code under `backend/`; no raw SQL execution or
+  dynamically assembled SQL was found. Database reads, filters, creates, and
+  updates use the Django ORM.
+- Added `ExpenseListTests.test_category_filter_rejects_sql_injection_payload`
+  to verify `1 OR 1=1 --` is rejected with HTTP 400 before filtering and no
+  expense data is returned.
+- Ran `docker compose run --rm api python manage.py test api.tests.test_expenses`:
+  all 33 tests passed.
+- Ran `git diff --check`: passed.
+
+**Accepted / modified / rejected.**
+- Accepted: keep database reads and filters in the existing ORM-based
+  implementation; no raw-SQL rewrite was needed because the audit found no
+  unsafe query construction.
+- Accepted: document all three issue checklist items as resolved in
+  `docs/reviews/issue-61-sql-injection.md`.
+
+**Final decision.** The audited backend has no identified SQL string-building
+path. The regression test and issue-specific audit record are in place; no
+application behavior changed.
