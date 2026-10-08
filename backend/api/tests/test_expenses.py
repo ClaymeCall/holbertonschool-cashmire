@@ -462,6 +462,19 @@ class ExpenseListTests(TestCase):
                 self.assertEqual(response.status_code, 400)
                 self.assertIn(field, response.json())
 
+    def test_category_filter_rejects_sql_injection_payload(self):
+        self.create_expense(description="Private expense")
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            self.url,
+            {"category_id": "1 OR 1=1 --"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("category_id", response.json())
+        self.assertNotIn("expenses", response.json())
+
 
 class ExpenseDetailMutationTests(TestCase):
     def setUp(self):
