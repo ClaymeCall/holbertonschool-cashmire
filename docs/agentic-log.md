@@ -1392,36 +1392,35 @@ mandatory human (or agent) follow-up before this is considered merge-ready
 — static review and `py_compile` do not catch Django/DRF wiring or
 migration errors.
 
-## 2026-10-08 — Sanitize API error responses (Issue #62)
+## 2026-10-08 — Audit database query safety (Issue #61)
 
-**Objective.** Prevent unhandled API exceptions from exposing internal error
-details and ensure debug tracebacks are disabled by default outside local
-development.
+**Objective.** Resolve the SQL injection / unsafe-query audit criteria in #61:
+confirm database access is safe, add a regression test for an injection
+payload, and record the checklist result.
 
-**Agent/role used.** Copilot-assisted backend implementation.
+**Agent/role used.** Copilot-assisted backend implementation and audit.
 
-**What was delegated.** Nothing — implemented directly.
+**What was delegated.** Nothing — the backend audit and test change were
+performed directly.
 
 **How the team verified it.**
-- Added a global DRF exception handler that preserves recognized API errors
-  and returns a fixed generic JSON 500 response for unexpected exceptions.
-- Logged the exception server-side for diagnosis while keeping its details
-  out of the response.
-- Changed the default for `DJANGO_DEBUG` to `false`; `.env.example` retains
-  `true` only for local development.
-- Added a test that triggers a server error containing a simulated database
-  secret with `DEBUG=False`, then checks that the response body contains
-  only the generic error.
-- Ran the error/authentication/registration test modules: 20 tests passed;
-  the full `api` suite passed all 198 tests.
-- Unset `DJANGO_DEBUG` in a one-off container command and confirmed Django
-  reports `DEBUG=False`; `git diff --check` passed.
+- Audited Python application code under `backend/`; no raw SQL execution or
+  dynamically assembled SQL was found. Database reads, filters, creates, and
+  updates use the Django ORM.
+- Added `ExpenseListTests.test_category_filter_rejects_sql_injection_payload`
+  to verify `1 OR 1=1 --` is rejected with HTTP 400 before filtering and no
+  expense data is returned.
+- Ran `docker compose run --rm api python manage.py test api.tests.test_expenses`:
+  all 33 tests passed.
+- Ran `git diff --check`: passed.
 
 **Accepted / modified / rejected.**
-- Accepted: use DRF's global exception-handler hook rather than duplicating
-  response wrapping in individual views; existing validation and API errors
-  retain their current response bodies.
+- Accepted: keep database reads and filters in the existing ORM-based
+  implementation; no raw-SQL rewrite was needed because the audit found no
+  unsafe query construction.
+- Accepted: document all three issue checklist items as resolved in
+  `docs/reviews/issue-61-sql-injection.md`.
 
-**Final decision.** Unexpected API failures now return a generic 500 response
-without stack traces or exception messages; debug mode is opt-in rather than
-the default.
+**Final decision.** The audited backend has no identified SQL string-building
+path. The regression test and issue-specific audit record are in place; no
+application behavior changed.

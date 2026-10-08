@@ -2890,3 +2890,363 @@ class BudgetDeleteTests(TestCase):
 
         # Verify second user's budget is still there
         self.assertTrue(Budget.objects.filter(id=other_budget_id).exists())
+
+
+class BudgetConsumptionViaExpenseEndpointsTests(TestCase):
+    """Consumption exposed by GET /api/budgets/ stays correct across expense mutations."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="consumption-owner",
+            email="consumption-owner@example.com",
+            password="correct-horse-battery-staple-42",
+        )
+        self.other_user = User.objects.create_user(
+            username="consumption-other",
+            email="consumption-other@example.com",
+            password="correct-horse-battery-staple-42",
+        )
+        self.category = self.user.categories.first()
+        self.other_category = self.user.categories.exclude(pk=self.category.pk).first()
+        self.other_users_category = self.other_user.categories.first()
+        self.budget = Budget.objects.create(
+            user=self.user,
+            category=self.category,
+            amount=Decimal("500.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        self.expenses_url = "/api/expenses/"
+        self.client = APIClient()
+
+    def post_expense(self, **overrides):
+        """POST /api/expenses/ with a valid default payload; asserts 201; returns expense id."""
+        payload = {
+            "category_id": self.category.pk,
+            "amount": "25.50",
+            "date": "2026-10-15",
+            **overrides,
+        }
+        response = self.client.post(self.expenses_url, payload, format="json")
+        self.assertEqual(response.status_code, 201)
+        return response.json()["id"]
+
+    def expense_url(self, expense_id):
+        return f"/api/expenses/{expense_id}/"
+
+    def get_consumption(self, budget_id):
+        """GET /api/budgets/ (list) and return only the consumption fields of one budget."""
+        response = self.client.get("/api/budgets/")
+        self.assertEqual(response.status_code, 200)
+        budget = next(b for b in response.json()["budgets"] if b["id"] == budget_id)
+        return {
+            "spent": budget["spent"],
+            "remaining": budget["remaining"],
+            "percentage": budget["percentage"],
+        }
+
+    def test_create_expense_in_budget_category_and_period_increases_consumption(self):
+        self.client.force_login(self.user)
+
+        self.post_expense(amount="25.50", date="2026-10-15")
+
+        self.assertEqual(
+            self.get_consumption(self.budget.id),
+            {"spent": "25.50", "remaining": "474.50", "percentage": "5.10"},
+        )
+
+    def test_create_expenses_on_both_period_boundaries_are_counted(self):
+        self.client.force_login(self.user)
+
+        self.post_expense(amount="10.00", date="2026-10-01")
+        self.post_expense(amount="20.00", date="2026-10-31")
+
+        self.assertEqual(
+            self.get_consumption(self.budget.id),
+            {"spent": "30.00", "remaining": "470.00", "percentage": "6.00"},
+        )
+
+    def test_create_expense_outside_period_does_not_change_consumption(self):
+        self.client.force_login(self.user)
+
+        self.post_expense(amount="10.00", date="2026-09-30")
+        self.post_expense(amount="10.00", date="2026-11-01")
+
+        self.assertEqual(
+            self.get_consumption(self.budget.id),
+            {"spent": "0.00", "remaining": "500.00", "percentage": "0.00"},
+        )
+
+    def test_create_expense_in_other_category_does_not_change_consumption(self):
+        self.client.force_login(self.user)
+
+        self.post_expense(
+            category_id=self.other_category.pk, amount="10.00", date="2026-10-15"
+        )
+
+        self.assertEqual(
+            self.get_consumption(self.budget.id),
+            {"spent": "0.00", "remaining": "500.00", "percentage": "0.00"},
+        )
+
+    def test_rejected_expense_mutations_leave_consumption_unchanged(self):
+        self.client.force_login(self.user)
+        expense_id = self.post_expense(amount="25.50", date="2026-10-15")
+        detail_url = self.expense_url(expense_id)
+
+        with self.subTest("POST with category of another user returns 404"):
+            response = self.client.post(
+                self.expenses_url,
+                {
+                    "category_id": self.other_users_category.pk,
+                    "amount": "10.00",
+                    "date": "2026-10-15",
+                },
+                format="json",
+            )
+            self.assertEqual(response.status_code, 404)
+            self.assertEqual(Expense.objects.count(), 1)
+
+        with self.subTest("POST with zero amount returns 400"):
+            response = self.client.post(
+                self.expenses_url,
+                {"category_id": self.category.pk, "amount": "0.00", "date": "2026-10-15"},
+                format="json",
+            )
+            self.assertEqual(response.status_code, 400)
+
+        with self.subTest("PATCH with zero amount returns 400"):
+            response = self.client.patch(detail_url, {"amount": "0.00"}, format="json")
+            self.assertEqual(response.status_code, 400)
+
+        with self.subTest("PATCH with float amount returns 400"):
+            response = self.client.patch(detail_url, {"amount": 12.34}, format="json")
+            self.assertEqual(response.status_code, 400)
+
+        with self.subTest("PATCH with unknown category returns 404"):
+            response = self.client.patch(
+                detail_url, {"category_id": 99999999}, format="json"
+            )
+            self.assertEqual(response.status_code, 404)
+
+        with self.subTest("PUT with missing required fields returns 400"):
+            response = self.client.put(detail_url, {"amount": "40.00"}, format="json")
+            self.assertEqual(response.status_code, 400)
+
+        self.assertEqual(
+            self.get_consumption(self.budget.id),
+            {"spent": "25.50", "remaining": "474.50", "percentage": "5.10"},
+        )
+        self.assertEqual(
+            Expense.objects.get(pk=expense_id).amount, Decimal("25.50")
+        )
+
+    def test_patch_amount_updates_consumption(self):
+        self.client.force_login(self.user)
+        expense_id = self.post_expense(amount="25.50", date="2026-10-15")
+
+        response = self.client.patch(
+            self.expense_url(expense_id), {"amount": "40.00"}, format="json"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            self.get_consumption(self.budget.id),
+            {"spent": "40.00", "remaining": "460.00", "percentage": "8.00"},
+        )
+
+    def test_patch_category_moves_expense_out_of_budget(self):
+        self.client.force_login(self.user)
+        expense_id = self.post_expense(amount="25.50", date="2026-10-15")
+
+        response = self.client.patch(
+            self.expense_url(expense_id),
+            {"category_id": self.other_category.pk},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            self.get_consumption(self.budget.id),
+            {"spent": "0.00", "remaining": "500.00", "percentage": "0.00"},
+        )
+
+    def test_patch_category_back_moves_expense_into_budget(self):
+        self.client.force_login(self.user)
+        expense_id = self.post_expense(amount="25.50", date="2026-10-15")
+        detail_url = self.expense_url(expense_id)
+
+        response = self.client.patch(
+            detail_url, {"category_id": self.other_category.pk}, format="json"
+        )
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.patch(
+            detail_url, {"category_id": self.category.pk}, format="json"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            self.get_consumption(self.budget.id),
+            {"spent": "25.50", "remaining": "474.50", "percentage": "5.10"},
+        )
+
+    def test_patch_date_moves_expense_out_of_period_and_back_on_boundary(self):
+        self.client.force_login(self.user)
+        expense_id = self.post_expense(amount="25.50", date="2026-10-15")
+        detail_url = self.expense_url(expense_id)
+
+        response = self.client.patch(detail_url, {"date": "2026-11-01"}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            self.get_consumption(self.budget.id),
+            {"spent": "0.00", "remaining": "500.00", "percentage": "0.00"},
+        )
+
+        response = self.client.patch(detail_url, {"date": "2026-10-31"}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            self.get_consumption(self.budget.id),
+            {"spent": "25.50", "remaining": "474.50", "percentage": "5.10"},
+        )
+
+    def test_patch_category_moves_expense_between_two_budgets(self):
+        budget_other = Budget.objects.create(
+            user=self.user,
+            category=self.other_category,
+            amount=Decimal("200.00"),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+        )
+        self.client.force_login(self.user)
+        expense_id = self.post_expense(amount="25.50", date="2026-10-15")
+
+        response = self.client.patch(
+            self.expense_url(expense_id),
+            {"category_id": self.other_category.pk},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            self.get_consumption(self.budget.id),
+            {"spent": "0.00", "remaining": "500.00", "percentage": "0.00"},
+        )
+        self.assertEqual(
+            self.get_consumption(budget_other.id),
+            {"spent": "25.50", "remaining": "174.50", "percentage": "12.75"},
+        )
+
+    def test_put_replacement_updates_consumption(self):
+        self.client.force_login(self.user)
+        expense_id = self.post_expense(amount="25.50", date="2026-10-15")
+
+        response = self.client.put(
+            self.expense_url(expense_id),
+            {
+                "category_id": self.category.pk,
+                "amount": "40.05",
+                "date": "2026-10-09",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            self.get_consumption(self.budget.id),
+            {"spent": "40.05", "remaining": "459.95", "percentage": "8.01"},
+        )
+
+    def test_rejected_put_or_patch_on_foreign_expense_does_not_change_consumption(self):
+        foreign_expense = Expense.objects.create(
+            user=self.other_user,
+            category=self.other_users_category,
+            amount=Decimal("80.00"),
+            date=date(2026, 10, 15),
+        )
+        self.client.force_login(self.user)
+        detail_url = self.expense_url(foreign_expense.pk)
+
+        response = self.client.patch(detail_url, {"amount": "30.00"}, format="json")
+        self.assertEqual(response.status_code, 404)
+
+        response = self.client.put(
+            detail_url,
+            {"category_id": self.category.pk, "amount": "30.00", "date": "2026-10-08"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 404)
+
+        self.assertEqual(
+            self.get_consumption(self.budget.id),
+            {"spent": "0.00", "remaining": "500.00", "percentage": "0.00"},
+        )
+        self.assertEqual(
+            Expense.objects.get(pk=foreign_expense.pk).amount, Decimal("80.00")
+        )
+
+    def test_delete_expense_removes_its_contribution(self):
+        self.client.force_login(self.user)
+        first_id = self.post_expense(amount="25.50", date="2026-10-15")
+        second_id = self.post_expense(amount="10.00", date="2026-10-20")
+
+        response = self.client.delete(self.expense_url(first_id))
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(
+            self.get_consumption(self.budget.id),
+            {"spent": "10.00", "remaining": "490.00", "percentage": "2.00"},
+        )
+
+        response = self.client.delete(self.expense_url(second_id))
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(
+            self.get_consumption(self.budget.id),
+            {"spent": "0.00", "remaining": "500.00", "percentage": "0.00"},
+        )
+
+    def test_multiple_small_expenses_are_summed_with_decimal_precision(self):
+        self.client.force_login(self.user)
+
+        self.post_expense(amount="0.10", date="2026-10-02")
+        self.post_expense(amount="0.20", date="2026-10-03")
+
+        self.assertEqual(
+            self.get_consumption(self.budget.id),
+            {"spent": "0.30", "remaining": "499.70", "percentage": "0.06"},
+        )
+
+    def test_expense_over_budget_yields_negative_remaining_and_uncapped_percentage(self):
+        self.client.force_login(self.user)
+
+        self.post_expense(amount="600.00", date="2026-10-15")
+
+        self.assertEqual(
+            self.get_consumption(self.budget.id),
+            {"spent": "600.00", "remaining": "-100.00", "percentage": "120.00"},
+        )
+
+    def test_foreign_expense_mutations_return_404_and_never_touch_budget(self):
+        foreign_expense = Expense.objects.create(
+            user=self.other_user,
+            category=self.other_users_category,
+            amount=Decimal("80.00"),
+            date=date(2026, 10, 15),
+        )
+        self.client.force_login(self.user)
+        detail_url = self.expense_url(foreign_expense.pk)
+
+        response = self.client.patch(detail_url, {"amount": "30.00"}, format="json")
+        self.assertEqual(response.status_code, 404)
+        response = self.client.put(
+            detail_url,
+            {"category_id": self.category.pk, "amount": "30.00", "date": "2026-10-08"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 404)
+        response = self.client.delete(detail_url)
+        self.assertEqual(response.status_code, 404)
+
+        self.assertTrue(Expense.objects.filter(pk=foreign_expense.pk).exists())
+        self.assertEqual(
+            self.get_consumption(self.budget.id),
+            {"spent": "0.00", "remaining": "500.00", "percentage": "0.00"},
+        )
