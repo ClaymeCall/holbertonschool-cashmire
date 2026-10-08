@@ -16,7 +16,7 @@ urlpatterns = [
         views.expense_detail_mutation,
         name="expense-detail-mutation",
     ),
-    path("budgets/", views.budget_create, name="budget-create"),
+    path("budgets/", views.budget_list_create, name="budget-list-create"),
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
         "docs/",
