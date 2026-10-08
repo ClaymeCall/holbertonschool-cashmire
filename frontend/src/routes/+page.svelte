@@ -12,6 +12,7 @@
   import { authState } from "$lib/auth.svelte.js";
   import ExpensesList from "$lib/components/ExpensesList.svelte";
   import BudgetsList from "$lib/components/BudgetsList.svelte";
+  import DashboardCharts from "$lib/components/DashboardCharts.svelte";
 
   const PREVIEW_LIMIT = 3;
 
@@ -35,25 +36,34 @@
 </section>
 
 <main>
-  <p>API status: <code>{status}</code></p>
-
   {#if authState.status === "authenticated"}
-    <section class="preview" aria-labelledby="expenses-preview-heading">
-      <div class="preview-header">
-        <h2 id="expenses-preview-heading">Recent expenses</h2>
-        <a href="/expenses">View all <ArrowRight size={14} /></a>
-      </div>
-      <ExpensesList limit={PREVIEW_LIMIT} />
-    </section>
-
-    <section class="preview" aria-labelledby="budgets-preview-heading">
-      <div class="preview-header">
-        <h2 id="budgets-preview-heading">Your budgets</h2>
-        <a href="/budgets">View all <ArrowRight size={14} /></a>
-      </div>
-      <BudgetsList limit={PREVIEW_LIMIT} />
+    <section class="dashboard" aria-labelledby="dashboard-heading">
+      <h2 id="dashboard-heading">Your spending at a glance</h2>
+      <DashboardCharts />
     </section>
   {/if}
+
+  <div class="prose">
+    <p>API status: <code>{status}</code></p>
+
+    {#if authState.status === "authenticated"}
+      <section class="preview" aria-labelledby="expenses-preview-heading">
+        <div class="preview-header">
+          <h2 id="expenses-preview-heading">Recent expenses</h2>
+          <a href="/expenses">View all <ArrowRight size={14} /></a>
+        </div>
+        <ExpensesList limit={PREVIEW_LIMIT} />
+      </section>
+
+      <section class="preview" aria-labelledby="budgets-preview-heading">
+        <div class="preview-header">
+          <h2 id="budgets-preview-heading">Your budgets</h2>
+          <a href="/budgets">View all <ArrowRight size={14} /></a>
+        </div>
+        <BudgetsList limit={PREVIEW_LIMIT} />
+      </section>
+    {/if}
+  </div>
 </main>
 
 <style>
@@ -87,9 +97,26 @@
   }
 
   main {
-    max-width: 60ch;
+    max-width: 1100px;
     margin: 0 auto;
     padding: var(--space-2xl) var(--space-xl) var(--space-3xl);
+  }
+
+  .prose {
+    max-width: 60ch;
+    margin-inline: auto;
+  }
+
+  .dashboard {
+    margin-bottom: var(--space-2xl);
+  }
+
+  .dashboard h2 {
+    font-family: var(--font-heading);
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--color-heading);
+    margin-bottom: var(--space-md);
   }
 
   .preview {

@@ -84,13 +84,33 @@ describe("landing page (#104 componentization follow-up)", () => {
     setCurrentUser(null);
   });
 
-  it("while anonymous, shows the API status but no expenses/budgets previews", async () => {
+  it("while anonymous, shows the API status but no dashboard or expenses/budgets previews", async () => {
     mockApi();
     render(HomePage);
 
     expect(await screen.findByText("ok")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: /spending at a glance/i })).toBeNull();
     expect(screen.queryByRole("heading", { name: /recent expenses/i })).toBeNull();
     expect(screen.queryByRole("heading", { name: /your budgets/i })).toBeNull();
+  });
+
+  it("while logged in, shows the dashboard charts above the expenses/budgets previews", async () => {
+    setCurrentUser({ id: 1, email: "demo@example.com" });
+    mockApi();
+    render(HomePage);
+
+    const dashboardHeading = await screen.findByRole("heading", {
+      name: /spending at a glance/i,
+    });
+    const expensesHeading = await screen.findByRole("heading", { name: /recent expenses/i });
+    expect(await screen.findByRole("heading", { name: /budget vs spent/i })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: /spending by category/i })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: /last 30 days/i })).toBeTruthy();
+    // DOM order: dashboard comes before the pre-existing previews.
+    expect(
+      dashboardHeading.compareDocumentPosition(expensesHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("while logged in, previews the 3 most recent expenses with a link to the full list", async () => {
