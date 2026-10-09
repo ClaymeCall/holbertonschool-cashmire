@@ -9,6 +9,8 @@ import {
   isValidDecimalString,
   compareDecimal,
   subtractDecimal,
+  addDecimal,
+  sumDecimal,
   percentOf,
   formatAmount,
 } from "./money.js";
@@ -75,6 +77,41 @@ describe("subtractDecimal", () => {
   it("is exact where float subtraction famously isn't", () => {
     // 0.1 - 0.2 in IEEE754 is roughly -0.1 but not clean.
     expect(subtractDecimal("0.3", "0.2")).toBe("0.1");
+  });
+});
+
+describe("addDecimal", () => {
+  it("adds exactly, at the larger of the two operands' scales", () => {
+    expect(addDecimal("400.00", "352.18")).toBe("752.18");
+    expect(addDecimal("10", "3.5")).toBe("13.5");
+  });
+
+  it("handles negative values", () => {
+    expect(addDecimal("50.00", "-75.00")).toBe("-25.00");
+  });
+
+  it("is exact where float addition famously isn't", () => {
+    // 0.1 + 0.2 in IEEE754 is 0.30000000000000004, not a clean "0.3".
+    expect(addDecimal("0.1", "0.2")).toBe("0.3");
+  });
+
+  it("rejects a malformed operand", () => {
+    expect(() => addDecimal("1.2.3", "1")).toThrow(TypeError);
+    expect(() => addDecimal("1", "abc")).toThrow(TypeError);
+  });
+});
+
+describe("sumDecimal", () => {
+  it("sums a list of decimal strings exactly", () => {
+    expect(sumDecimal(["10.00", "20.50", "5.25"])).toBe("35.75");
+  });
+
+  it("returns the additive identity for an empty list", () => {
+    expect(sumDecimal([])).toBe("0");
+  });
+
+  it("rejects a malformed entry", () => {
+    expect(() => sumDecimal(["10.00", "abc"])).toThrow(TypeError);
   });
 });
 

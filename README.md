@@ -22,10 +22,11 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:5173/>. You should see the heading **Cashmire** and
-an `API status` line — see `frontend/README.md` for the full reference,
-including configuration, other npm scripts, and the Docker Compose
-alternative.
+Open <http://localhost:5173/>. You should see the heading **Cashmire**
+with a French tagline, and, once logged in, a dashboard preview of your
+recent expenses and budgets — see `frontend/README.md` for the full
+reference, including configuration, other npm scripts, and the Docker
+Compose alternative.
 
 ## Back-end
 
@@ -39,6 +40,11 @@ with the quick start above). The API is available at
 `http://127.0.0.1:8000/`; its health endpoint is
 `http://127.0.0.1:8000/api/health/`.
 
+The OpenAPI schema (`/api/schema/`) and interactive Swagger UI
+(`/api/docs/`) are available publicly only when `DJANGO_DEBUG=true`.
+Both endpoints return 404 when debug mode is disabled; this does not replace
+the authentication and authorization checks on application API routes.
+
 ### Run backend tests
 
 With the `db` service available, run the complete API suite—including
@@ -50,6 +56,22 @@ docker compose run --rm api python manage.py test api
 
 This single command works from the repository root and is suitable for local
 verification or CI.
+
+### Seed local demo data
+
+With the `db` service running and a development `.env` copied from
+`.env.example` (`DJANGO_DEBUG=true`), create a synthetic demo account with
+sample categories, current-month expenses, and budgets:
+
+```bash
+docker compose run --rm api python manage.py seed_demo_data
+```
+
+For a newly created account, the command prints the initial credentials:
+`demo@cashmire.example` / `CashmireDemo2026!`. The account and amounts are
+synthetic, and repeated runs update the same sample records rather than
+creating duplicates. The command refuses to run when `DJANGO_DEBUG` is
+disabled. Change the demo password before sharing a development environment.
 
 ### Run the API locally (without the `api` container)
 

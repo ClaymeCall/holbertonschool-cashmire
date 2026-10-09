@@ -145,6 +145,33 @@ export function subtractDecimal(a, b) {
 }
 
 /**
+ * `a + b`, exact. Result scale is `max(scale(a), scale(b))`, so
+ * `addDecimal("400.00", "352.18") === "752.18"`.
+ *
+ * @param {string} a
+ * @param {string} b
+ * @returns {string}
+ */
+export function addDecimal(a, b) {
+  const left = parseDecimal(a, "a");
+  const right = parseDecimal(b, "b");
+  const scale = maxScale(left.scale, right.scale);
+  return unitsToString(unitsAtScale(left, scale) + unitsAtScale(right, scale), scale);
+}
+
+/**
+ * Sum a list of decimal strings, exact. An empty list returns `"0"` (the
+ * additive identity) rather than throwing — summing a category/day with no
+ * matching expenses is a normal case callers shouldn't have to special-case.
+ *
+ * @param {string[]} values
+ * @returns {string}
+ */
+export function sumDecimal(values) {
+  return values.reduce((acc, value) => addDecimal(acc, value), "0");
+}
+
+/**
  * `part / whole * 100`, as a string with exactly one decimal place.
  *
  * TRUNCATED toward zero, not rounded — deliberate. With rounding, spending

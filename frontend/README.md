@@ -20,11 +20,13 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:5173/>. You should see the heading **Cashmire** and a
-line reading `API status: ok` when the backend is running, or
-`API status: unreachable` when it is not — either way, the page rendering
-means the front-end is up. The footer link **Privacy & legal** and the
-header nav link **Privacy** both go to <http://localhost:5173/privacy>.
+Open <http://localhost:5173/>. You should see the heading **Cashmire** with
+its French tagline — the page rendering means the front-end is up; it does
+not depend on the backend. The footer link **Confidentialité et mentions
+légales** and the header nav link **Confidentialité** both go to
+<http://localhost:5173/privacy>. The footer's **État de l'API** link goes to
+<http://localhost:5173/health>, which reports whether the backend is
+reachable.
 
 ## Note on the port
 
@@ -34,8 +36,9 @@ choosing `5174`. Free the port rather than looking for another one.
 
 ## Note on the backend
 
-The front-end runs standalone; only the `API status` line on the home page
-needs the backend. Start it with `docker compose up db api` from the repo
+The front-end runs standalone; only pages that call the API (login,
+register, the `/health` status page, the dashboard once logged in, etc.)
+need the backend. Start it with `docker compose up db api` from the repo
 root. `backend/cashmire/settings.py` allows the CORS origin
 `http://localhost:5173` by default, so the front-end dev server can reach
 it without further configuration.

@@ -1487,6 +1487,40 @@ performed directly.
 path. The regression test and issue-specific audit record are in place; no
 application behavior changed.
 
+## 2026-10-08 — Add synthetic demo data seed command (Issue #72)
+
+**Objective.** Provide a documented, repeatable development command that
+creates a synthetic account with categories, current-month expenses, and
+budgets, while refusing to seed when Django debug mode is disabled.
+
+**Agent/role used.** Copilot-assisted backend implementation.
+
+**What was delegated.** Nothing — implementation and validation were done
+directly.
+
+**How the change was verified.**
+- Added four management-command tests covering data creation, idempotence,
+  preservation of an existing demo-account password, and rejection when
+  `DEBUG` is false.
+- Ran `api.tests.test_seed_demo_data` in an isolated Docker Compose project:
+  all 4 tests passed.
+- Applied migrations to the isolated database and ran `seed_demo_data` twice:
+  the first run created the synthetic account with 5 categories, 7 expenses,
+  and 5 budgets; the second run reported the existing account and retained
+  those same record counts.
+- Ran `docker compose run --rm api python manage.py test api` in the isolated
+  Docker project: all 218 API tests passed.
+- Ran `git diff --check`: passed.
+
+**Accepted / modified / rejected.**
+- Accepted: keep demo data generation behind an explicit `DEBUG` guard and
+  use ORM `get_or_create`/`update_or_create` operations to make reruns safe.
+- Accepted: document the command and synthetic initial credentials in the
+  README, with a reminder to change the password before sharing the
+  development environment.
+
+**Final decision.** Issue #72's local demo-data workflow is implemented and
+validated. No schema changes were required.
 ## 2026-10-08 — Audit des routes API (Issue #57)
 
 **Objective.** Passer en revue chaque route pour la validation, les contrôles
@@ -1532,3 +1566,85 @@ faire par chaque membre.
 
 **Final decision.** Document prêt; les cases à cocher de la section 5 restent
 ouvertes.
+## 2026-10-08 — Return consistent 401 responses for protected API routes (Issue #143)
+
+**Objective.** Align unauthenticated responses from the categories, expenses,
+and budgets endpoints with the session-auth contract already used by
+`/api/auth/me/` and `/api/auth/logout/`, while preserving CSRF rejection as
+HTTP 403.
+
+**Agent/role used.** Copilot-assisted backend and frontend implementation.
+
+**What was delegated.** Nothing — implementation and verification were done
+directly.
+
+**How the team verified it.**
+- Updated protected category, expense-list/detail, and budget-list/detail
+  views to use the shared `SessionCookieAuthentication` class. Anonymous
+  requests now receive 401 and `WWW-Authenticate: Session`.
+- Updated backend regression tests for anonymous category, expense, and
+  budget requests, including expense detail mutations. Confirmed that
+  unauthenticated mutations do not change or delete records.
+- Kept the authenticated-session CSRF regression assertion at 403.
+- Updated `docs/api-design.md` to specify 401 for absent/invalid sessions
+  and reserve 403 for authenticated requests rejected by CSRF.
+- Updated expense and budget form error handling: 401 communicates that a
+  session is required; 403 communicates request/CSRF verification failure.
+  Added frontend regression tests for both outcomes.
+- Ran `docker compose --project-name cashmire-issue143 run --rm api python manage.py test api.tests.test_expenses api.tests.test_budgets api.tests.test_current_user api.tests.test_logout`:
+  all 196 tests passed.
+- Ran the focused frontend Vitest files for expense create/edit and budget
+  create: all 16 tests passed. Vite emitted existing Svelte state-capture
+  warnings in `BudgetForm.svelte`; they are unrelated to this change.
+- Ran `git diff --check`: passed. The isolated Docker project and volume
+  were removed after validation.
+
+**Accepted / modified / rejected.**
+- Accepted: use the project's existing shared session-cookie authenticator
+  rather than introducing a second authentication implementation.
+- Accepted: distinguish 401 authentication failures from 403 CSRF failures
+  in the frontend instead of treating both as a missing login.
+- Rejected: changing authenticated CSRF failures from 403 to 401; that would
+  blur the distinction between missing authentication and a rejected
+  authenticated request.
+
+**Final decision.** Issue #143 is implemented and targeted backend and
+frontend tests pass. No schema or migration changes were needed.
+
+## 2026-10-08 — Restrict API documentation to development (Issue #144)
+
+**Objective.** Keep the OpenAPI schema and Swagger UI available to local
+developers while hiding both endpoints outside development, and record the
+access-policy decision.
+
+**Agent/role used.** Copilot-assisted backend and documentation change.
+
+**What was delegated.** Nothing — implementation and verification were done
+directly.
+
+**How the team verified it.**
+- Added a request-time `DEBUG` guard to both `/api/schema/` and `/api/docs/`;
+  they return 404 when debug mode is disabled.
+- Added tests verifying that both documentation endpoints work when
+  `DEBUG=True`, both return 404 when `DEBUG=False`, and an authenticated
+  application route remains available with `DEBUG=False`.
+- Ran `docker compose --project-name cashmire-issue144 run --rm api python manage.py test api.tests.test_api_docs_access`:
+  all 3 tests passed.
+- Ran `docker compose --project-name cashmire-issue144 run --rm api python manage.py check`:
+  no issues reported.
+- Ran `git diff --check`: passed. The isolated Docker database and network
+  were removed after validation.
+- Schema generation emitted existing drf-spectacular warnings/errors about
+  missing serializer/type-hint metadata for health, logout and computed
+  budget fields. They did not fail the tests and are outside this access
+  policy change.
+
+**Accepted / modified / rejected.**
+- Accepted: documentation endpoints are public only when `DJANGO_DEBUG=true`
+  and return 404 otherwise, as explicitly chosen by the user.
+- Accepted: record the policy in ADR 0005, the API contract and README.
+- Rejected: treating this as API authorization; application routes continue
+  to enforce their own authentication and permission checks.
+
+**Final decision.** Issue #144 is implemented and validated. No schema or
+migration changes were needed.

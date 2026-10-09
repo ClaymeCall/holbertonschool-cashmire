@@ -51,13 +51,21 @@ holbertonschool-cashmire/
 │   │   ├── asgi.py / wsgi.py          # ASGI/WSGI entry points
 │   │   └── __init__.py
 │   ├── api/                           # Main API app
-│   │   ├── models.py                  # Database models (User, Expense, Budget, Category)
-│   │   ├── views.py                   # DRF viewsets and views
-│   │   ├── serializers.py             # DRF serializers (created as features are added)
-│   │   ├── urls.py                    # API routes (/api/expenses, etc.)
+│   │   ├── models.py                  # Database models (User, Category, Expense, Budget)
+│   │   ├── views.py                   # DRF views (auth, categories, expenses, budgets)
+│   │   ├── serializers.py             # DRF serializers
+│   │   ├── auth.py                    # Session-cookie auth helpers
+│   │   ├── signals.py                 # post_save: seeds default categories for new users
+│   │   ├── exceptions.py              # Sanitized error-response handling
+│   │   ├── services/                  # Budget consumption and related business logic
+│   │   ├── urls.py                    # API routes (/api/expenses, /api/budgets, etc.)
 │   │   ├── apps.py                    # App config
+│   │   ├── tests/                     # Backend test suite
 │   │   ├── migrations/                # Versioned schema changes (one per model change)
-│   │   │   ├── 0001_initial.py        # Schema foundation (created before models)
+│   │   │   ├── 0001_initial.py        # User model
+│   │   │   ├── 0002_category.py
+│   │   │   ├── 0003_expense.py
+│   │   │   ├── 0004_budget.py
 │   │   │   └── __init__.py
 │   │   └── __init__.py
 │   ├── manage.py                      # Django CLI entry point
@@ -70,13 +78,22 @@ holbertonschool-cashmire/
 │   │   ├── app.html                   # HTML template
 │   │   ├── routes/
 │   │   │   ├── +layout.js             # Root layout config (ssr = false)
-│   │   │   ├── +layout.svelte         # Root layout (app shell with footer)
-│   │   │   ├── +page.svelte           # Home page
-│   │   │   ├── privacy/
-│   │   │   │   ├── +page.svelte       # Privacy/terms page
-│   │   │   │   └── page.test.js       # Privacy page tests (vitest + @testing-library/svelte)
-│   │   │   └── [future routes here]
+│   │   │   ├── +layout.svelte         # Root layout (app shell with navbar/footer)
+│   │   │   ├── +page.svelte           # Home page (dashboard preview when logged in)
+│   │   │   ├── +error.svelte          # Error boundary page
+│   │   │   ├── login/, register/      # Auth pages
+│   │   │   ├── expenses/, budgets/    # CRUD pages for expenses and budgets
+│   │   │   ├── health/                # API health status page
+│   │   │   └── privacy/
+│   │   │       ├── +page.svelte       # Privacy/terms page
+│   │   │       └── page.test.js       # Privacy page tests (vitest + @testing-library/svelte)
 │   │   └── lib/                       # Shared components and utilities
+│   │       ├── api.js, api/           # API client
+│   │       ├── auth.svelte.js         # Auth state (Svelte 5 runes)
+│   │       ├── money.js, dashboard.js # Formatting and chart-data helpers
+│   │       └── components/            # Navbar, Footer, forms, lists, charts (Button, TextField,
+│   │                                   #   ExpensesList, BudgetsList, BudgetForm, DashboardCharts,
+│   │                                   #   SpendingByCategoryChart, SpendingTrendChart, etc.)
 │   ├── package.json                   # Node deps: SvelteKit, Vite, vitest, testing-library
 │   ├── vite.config.js                 # Vite config (jsdom for tests, browser conditions)
 │   ├── svelte.config.js               # SvelteKit config
@@ -499,7 +516,7 @@ Cashmire follows REST conventions:
 
 - **Methods:** `GET`, `POST`, `PUT`, `PATCH`, `DELETE`
 - **Paths:** RESTful (e.g., `/api/expenses`, `/api/expenses/<id>`, `/api/categories`)
-- **Authentication:** TBD (see the spec when created)
+- **Authentication:** Session-cookie auth (Django sessions + CSRF), not client-stored tokens — see [docs/decisions/auth-strategy.md](../docs/decisions/auth-strategy.md)
 - **Response format:** JSON only (configured in Django: `JSONRenderer`)
 - **CORS:** Configured for `http://localhost:5173` in development (see `DJANGO_CORS_ALLOWED_ORIGINS` in `backend/cashmire/settings.py`)
 - **Error responses:** Never leak stack traces, database errors, or configuration values. Return a clean error message and HTTP status.

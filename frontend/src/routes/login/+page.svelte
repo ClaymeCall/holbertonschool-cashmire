@@ -35,7 +35,7 @@
 
   function clientValidationError() {
     if (email.trim() === "" || password === "") {
-      return "Enter your email and password.";
+      return "Entrez votre e-mail et votre mot de passe.";
     }
     return null;
   }
@@ -70,19 +70,19 @@
       if (err instanceof ApiError && err.status === 401) {
         // Clear, non-technical message (AC-2) — never echo the server's
         // own wording, which could leak whether the email exists.
-        errorMessage = "Incorrect email or password.";
+        errorMessage = "E-mail ou mot de passe incorrect.";
       } else if (err instanceof ApiError && err.status === 400) {
-        errorMessage = "Enter your email and password.";
+        errorMessage = "Entrez votre e-mail et votre mot de passe.";
       } else if (
         err &&
         (err.name === "TimeoutError" || err.name === "AbortError")
       ) {
-        errorMessage = "The request timed out. Try again.";
+        errorMessage = "La requête a expiré. Réessayez.";
       } else {
         // Network failure, CORS rejection, 5xx, or the route not existing
         // yet (ApiError with status 0 or a non-2xx the two branches above
         // don't cover) — one generic message, no internal detail leaked.
-        errorMessage = "Couldn't reach Cashmire. Try again in a moment.";
+        errorMessage = "Impossible de joindre Cashmire. Réessayez dans un instant.";
       }
       formState = "error";
       console.error("Login failed:", err);
@@ -91,18 +91,18 @@
 </script>
 
 <svelte:head>
-  <title>Log in · Cashmire</title>
-  <meta name="description" content="Sign in to your Cashmire account." />
+  <title>Connexion · Cashmire</title>
+  <meta name="description" content="Connectez-vous à votre compte Cashmire." />
 </svelte:head>
 
 <main>
-  <h1>Log in</h1>
+  <h1>Connexion</h1>
 
   <form onsubmit={handleSubmit} novalidate>
     <TextField
       id="login-email"
       name="email"
-      label="Email"
+      label="E-mail"
       type="email"
       autocomplete="email"
       bind:value={email}
@@ -113,7 +113,7 @@
     <TextField
       id="login-password"
       name="password"
-      label="Password"
+      label="Mot de passe"
       type="password"
       autocomplete="current-password"
       bind:value={password}
@@ -127,15 +127,15 @@
 
     <Button type="submit" disabled={formState === "submitting"}>
       {#if formState === "submitting"}
-        <LoaderCircle size={16} class="spin" /> Logging in…
+        <LoaderCircle size={16} class="spin" /> Connexion…
       {:else}
-        <LogIn size={16} /> Log in
+        <LogIn size={16} /> Se connecter
       {/if}
     </Button>
   </form>
 
-  <p><a href="/register">Need an account? Register</a></p>
-  <p><a href="/">Back to the Cashmire home page</a></p>
+  <p><a href="/register">Besoin d'un compte ? Inscrivez-vous</a></p>
+  <p><a href="/">Retour à la page d'accueil de Cashmire</a></p>
 </main>
 
 <style>

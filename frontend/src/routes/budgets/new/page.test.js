@@ -48,42 +48,42 @@ describe("create budget page (#53)", () => {
     mockCategoriesFetch();
     render(NewBudgetPage);
 
-    expect(await screen.findByLabelText(/^category$/i)).toBeTruthy();
-    expect(screen.getByLabelText(/^month$/i)).toBeTruthy();
-    expect(screen.getByLabelText(/^limit$/i)).toBeTruthy();
+    expect(await screen.findByLabelText(/^catégorie$/i)).toBeTruthy();
+    expect(screen.getByLabelText(/^mois$/i)).toBeTruthy();
+    expect(screen.getByLabelText(/^limite$/i)).toBeTruthy();
   });
 
   it("T-2: a non-positive limit shows a client-side error and makes no create request", async () => {
     mockCategoriesFetch();
     render(NewBudgetPage);
-    await screen.findByLabelText(/^limit$/i);
+    await screen.findByLabelText(/^limite$/i);
 
-    await fireEvent.input(screen.getByLabelText(/^limit$/i), {
+    await fireEvent.input(screen.getByLabelText(/^limite$/i), {
       target: { value: "0" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /add budget/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /ajouter un budget/i }));
 
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toMatch(/greater than 0/i);
+    expect(alert.textContent).toMatch(/supérieure à 0/i);
     expect(fetch).toHaveBeenCalledTimes(1); // only the categories GET
   });
 
   it("T-3: translates the chosen month into period_start/period_end and redirects on success", async () => {
     mockCategoriesFetch();
     render(NewBudgetPage);
-    await screen.findByLabelText(/^limit$/i);
+    await screen.findByLabelText(/^limite$/i);
 
-    await fireEvent.input(screen.getByLabelText(/^month$/i), {
+    await fireEvent.input(screen.getByLabelText(/^mois$/i), {
       target: { value: "2026-10" },
     });
-    await fireEvent.input(screen.getByLabelText(/^limit$/i), {
+    await fireEvent.input(screen.getByLabelText(/^limite$/i), {
       target: { value: "200.00" },
     });
 
     fetch.mockResolvedValueOnce(
       fakeResponse({ status: 201, body: JSON.stringify({ id: 1 }) }),
     );
-    await fireEvent.click(screen.getByRole("button", { name: /add budget/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /ajouter un budget/i }));
 
     const [, createInit] = fetch.mock.calls[1];
     const body = JSON.parse(createInit.body);
@@ -101,12 +101,12 @@ describe("create budget page (#53)", () => {
   it("T-4: a 409 conflict shows the duplicate-budget message, not a generic failure", async () => {
     mockCategoriesFetch();
     render(NewBudgetPage);
-    await screen.findByLabelText(/^limit$/i);
+    await screen.findByLabelText(/^limite$/i);
 
-    await fireEvent.input(screen.getByLabelText(/^month$/i), {
+    await fireEvent.input(screen.getByLabelText(/^mois$/i), {
       target: { value: "2026-10" },
     });
-    await fireEvent.input(screen.getByLabelText(/^limit$/i), {
+    await fireEvent.input(screen.getByLabelText(/^limite$/i), {
       target: { value: "200.00" },
     });
 
@@ -119,10 +119,46 @@ describe("create budget page (#53)", () => {
         }),
       }),
     );
-    await fireEvent.click(screen.getByRole("button", { name: /add budget/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /ajouter un budget/i }));
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toMatch(/déjà existant/i);
     expect(gotoMock).not.toHaveBeenCalled();
+  });
+
+  it("T-5: a 403 response is reported as a rejected request, not missing authentication", async () => {
+    mockCategoriesFetch();
+    render(NewBudgetPage);
+    await screen.findByLabelText(/^limit$/i);
+
+    await fireEvent.input(screen.getByLabelText(/^month$/i), {
+      target: { value: "2026-10" },
+    });
+    await fireEvent.input(screen.getByLabelText(/^limit$/i), {
+      target: { value: "200.00" },
+    });
+    fetch.mockResolvedValueOnce(fakeResponse({ status: 403 }));
+    await fireEvent.click(screen.getByRole("button", { name: /add budget/i }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toMatch(/couldn't be verified/i);
+    expect(alert.textContent).not.toMatch(/logged in/i);
+  });
+
+  it("T-6: a 401 response explains that an authenticated session is required", async () => {
+    mockCategoriesFetch();
+    render(NewBudgetPage);
+    await screen.findByLabelText(/^limit$/i);
+
+    await fireEvent.input(screen.getByLabelText(/^month$/i), {
+      target: { value: "2026-10" },
+    });
+    await fireEvent.input(screen.getByLabelText(/^limit$/i), {
+      target: { value: "200.00" },
+    });
+    fetch.mockResolvedValueOnce(fakeResponse({ status: 401 }));
+    await fireEvent.click(screen.getByRole("button", { name: /add budget/i }));
+
+    expect((await screen.findByRole("alert")).textContent).toMatch(/logged in/i);
   });
 });
