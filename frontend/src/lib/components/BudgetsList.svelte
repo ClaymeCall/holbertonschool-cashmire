@@ -57,10 +57,10 @@
   // the sole carrier of status either (docs/mvp-scope.md §3.7); the icon
   // is a second, non-color channel reinforcing the same label.
   const STATUS_META = {
-    ok: { label: "On track", className: "status-ok", icon: CircleCheck },
-    warning: { label: "Approaching limit", className: "status-warning", icon: TriangleAlert },
-    full: { label: "Budget reached", className: "status-full", icon: CircleAlert },
-    exceeded: { label: "Over budget", className: "status-exceeded", icon: CircleX },
+    ok: { label: "Sous contrôle", className: "status-ok", icon: CircleCheck },
+    warning: { label: "Proche de la limite", className: "status-warning", icon: TriangleAlert },
+    full: { label: "Budget atteint", className: "status-full", icon: CircleAlert },
+    exceeded: { label: "Budget dépassé", className: "status-exceeded", icon: CircleX },
   };
 
   /**
@@ -69,7 +69,7 @@
   function statusMeta(budget) {
     return (
       STATUS_META[budget.status] ?? {
-        label: "Unknown",
+        label: "Inconnu",
         className: "status-unknown",
         icon: CircleHelp,
       }
@@ -99,7 +99,7 @@
       budgets = budgetList;
       state = "ready";
     } catch (err) {
-      errorMessage = "Couldn't load your budgets. Try again in a moment.";
+      errorMessage = "Impossible de charger vos budgets. Réessayez dans un instant.";
       state = "error";
       console.error("Failed to load budgets:", err);
     }
@@ -109,14 +109,14 @@
 </script>
 
 {#if state === "loading"}
-  <p role="status">Loading your budgets…</p>
+  <p role="status">Chargement de vos budgets…</p>
 {:else if state === "error"}
   <FormError messages={errorMessage ? [errorMessage] : []} />
-  <Button type="button" onclick={load}><RefreshCw size={16} /> Retry</Button>
+  <Button type="button" onclick={load}><RefreshCw size={16} /> Réessayer</Button>
 {:else if visibleBudgets.length === 0}
   <p>
-    No budgets yet. <a href="/budgets/new">Set a monthly limit for a category</a>
-    to start tracking it here.
+    Aucun budget pour l'instant. <a href="/budgets/new">Définissez une limite mensuelle pour une catégorie</a>
+    pour commencer à la suivre ici.
   </p>
 {:else}
   <ul class="budget-list">
@@ -125,13 +125,13 @@
       <li class={meta.className}>
         <div class="budget-header">
           <span class="category">
-            {categoryNames.get(budget.category_id) ?? "Unknown category"}
+            {categoryNames.get(budget.category_id) ?? "Catégorie inconnue"}
           </span>
           <span class="status-label"><meta.icon size={16} /> {meta.label}</span>
         </div>
         <p class="amounts">
-          {formatAmount(budget.spent)} spent of {formatAmount(budget.amount)}
-          ({formatAmount(budget.remaining)} remaining)
+          {formatAmount(budget.spent)} dépensé(s) sur {formatAmount(budget.amount)}
+          ({formatAmount(budget.remaining)} restant(s))
         </p>
         <div
           class="progress-track"
@@ -139,11 +139,11 @@
           aria-valuenow={percentForBar(budget)}
           aria-valuemin="0"
           aria-valuemax="100"
-          aria-label={`${categoryNames.get(budget.category_id) ?? "Budget"} consumption`}
+          aria-label={`Consommation du budget ${categoryNames.get(budget.category_id) ?? ""}`}
         >
           <div class="progress-fill" style={`width: ${percentForBar(budget)}%`}></div>
         </div>
-        <a href={`/budgets/${budget.id}/edit`}><Pencil size={14} /> Edit</a>
+        <a href={`/budgets/${budget.id}/edit`}><Pencil size={14} /> Modifier</a>
       </li>
     {/each}
   </ul>

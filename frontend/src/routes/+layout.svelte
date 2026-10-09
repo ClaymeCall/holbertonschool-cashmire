@@ -7,6 +7,16 @@
   // composes them with each page's content and the document-wide
   // stylesheets. No global stylesheet beyond those, no theme switcher —
   // styling stays component-scoped (decision 0001 point 6).
+  //
+  // `layerchart/core.css` is a non-Tailwind consumer's required import (see
+  // the file itself): it just declares LayerChart's `@layer theme, base,
+  // components, utilities;` order up front. Without it, that order falls to
+  // whatever sequence Vite happens to bundle LayerChart's component
+  // <style> blocks in, which is why axis lines/grid and the hover tooltip
+  // had inconsistent, sometimes full-opacity-instead-of-muted colors before
+  // this import existed — a later-loaded `base`-layer rule was silently
+  // outranking an earlier-intended `components`-layer one.
+  import "layerchart/core.css";
   import "$lib/styles/tokens.css";
   import "$lib/styles/fonts.css";
   import "$lib/styles/base.css";

@@ -111,7 +111,7 @@ describe("app shell layout (#15, auth-aware nav follow-up)", () => {
     render(Layout, { props: { children: childrenSnippet("<div></div>") } });
 
     const nav = screen.getByRole("navigation", { name: /main/i });
-    within(nav).getByRole("link", { name: "Expenses" }).click();
+    within(nav).getByRole("link", { name: "Dépenses" }).click();
     expect(gotoMock).toHaveBeenCalledWith("/login");
 
     gotoMock.mockClear();
@@ -124,7 +124,7 @@ describe("app shell layout (#15, auth-aware nav follow-up)", () => {
     render(Layout, { props: { children: childrenSnippet("<div></div>") } });
 
     const nav = screen.getByRole("navigation", { name: /main/i });
-    within(nav).getByRole("link", { name: "Expenses" }).click();
+    within(nav).getByRole("link", { name: "Dépenses" }).click();
     within(nav).getByRole("link", { name: "Budgets" }).click();
 
     expect(gotoMock).not.toHaveBeenCalledWith("/login");
@@ -162,7 +162,7 @@ describe("app shell layout (#15, auth-aware nav follow-up)", () => {
     // "Privacy" link to the same destination, so an unscoped query would
     // match both.
     const footer = screen.getByRole("contentinfo");
-    const link = within(footer).getByRole("link", { name: /privacy/i });
+    const link = within(footer).getByRole("link", { name: /confidentialité/i });
     expect(link.getAttribute("href")).toBe("/privacy");
   });
 
@@ -220,7 +220,7 @@ describe("app shell layout (#15, auth-aware nav follow-up)", () => {
     expect(hrefs).toContain("/privacy");
 
     expect(
-      within(nav).getByRole("button", { name: /log out/i }),
+      within(nav).getByRole("button", { name: /se déconnecter/i }),
     ).not.toBeNull();
   });
 
@@ -229,7 +229,7 @@ describe("app shell layout (#15, auth-aware nav follow-up)", () => {
     render(Layout, { props: { children: childrenSnippet("<div></div>") } });
 
     const nav = screen.getByRole("navigation", { name: /main/i });
-    const logoutButton = within(nav).getByRole("button", { name: /log out/i });
+    const logoutButton = within(nav).getByRole("button", { name: /se déconnecter/i });
 
     const fetchMock = stubCurrentUserFetch({ status: 204 });
     logoutButton.click();
@@ -238,7 +238,7 @@ describe("app shell layout (#15, auth-aware nav follow-up)", () => {
       expect(
         within(screen.getByRole("navigation", { name: /main/i })).queryByRole(
           "button",
-          { name: /log out/i },
+          { name: /se déconnecter/i },
         ),
       ).toBeNull();
     });

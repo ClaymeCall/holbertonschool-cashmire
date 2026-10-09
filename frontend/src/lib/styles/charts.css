@@ -1,0 +1,30 @@
+/*
+ * Color aliases for LayerChart's own component styles (axis strokes, grid
+ * lines, the hover crosshair/highlight, and the hover tooltip — see e.g.
+ * node_modules/layerchart/dist/components/tooltip/Tooltip.svelte and
+ * Axis/Axis.base.svelte). Those components color themselves via
+ * `color-mix(in oklab, var(--color-surface-content, currentColor) N%, ...)`
+ * and `light-dark(var(--color-surface-100, white), var(--color-surface-300,
+ * black))`. Left undefined, those fall back to `currentColor` (whatever's
+ * inherited at that SVG node, not necessarily this app's text color) and to
+ * a `light-dark()` pair that never actually flips to its dark branch (this
+ * app never sets the `color-scheme` property, so `light-dark()` always
+ * resolves its first/light argument) — that mismatch, not a deliberate
+ * design choice, is what made axis text, grid lines, and the hover tooltip
+ * low-contrast, especially in dark mode.
+ *
+ * Aliased onto this app's own tokens.css custom properties (not a separate
+ * palette) so they keep tracking light/dark mode exactly like everything
+ * else — `--color-text` and `--color-surface` already flip under
+ * tokens.css's `@media (prefers-color-scheme: dark)` block, so these do too
+ * without any `color-scheme`/`light-dark()` involvement.
+ *
+ * :root custom properties aren't scoped by Svelte, so importing this file
+ * from any component makes these variables available document-wide — same
+ * note as tokens.css's own header.
+ */
+:root {
+  --color-surface-content: var(--color-text);
+  --color-surface-100: var(--color-surface);
+  --color-surface-300: var(--color-surface);
+}

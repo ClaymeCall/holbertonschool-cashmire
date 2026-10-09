@@ -9,6 +9,11 @@
 // the page as making forbidden claims it does not make).
 //
 // Covers docs/specs/issue-63-privacy-page.md section 8.3, T-1 through T-6.
+// Rewritten for the French localization pass: the page is no longer a
+// "draft pending legal review" with literal [[PLACEHOLDER]] tokens — it's a
+// finished, French, fictive-but-plausible privacy page with invented
+// values filled in (see +page.svelte's own comment). T-6 now asserts the
+// opposite of before: no literal placeholder brackets remain.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/svelte";
 import { createRawSnippet } from "svelte";
@@ -33,7 +38,7 @@ describe("privacy page (#63)", () => {
     expect(headings).toHaveLength(1);
     // Plain DOM assertion in place of the jest-dom `toHaveAccessibleName`
     // matcher, which is not installed (see header comment).
-    expect(headings[0].textContent).toMatch(/privacy/i);
+    expect(headings[0].textContent).toMatch(/confidentialité/i);
   });
 
   it("T-2 (AC-2): every required section heading from docs/specs/issue-63-privacy-page.md section 5.1 is present, in order", () => {
@@ -41,19 +46,19 @@ describe("privacy page (#63)", () => {
     // Derived from the h2 headings actually implemented in +page.svelte.
     // If someone deletes a section, this fails.
     const requiredHeadings = [
-      "The short version",
-      "What personal data we store",
-      "Why we store it",
-      "Where data would live",
-      "What happens when you visit this site",
-      "Cookies and tracking",
-      "Third parties we share data with",
-      "How long we keep data",
-      "Your rights",
-      "How we protect data",
-      "What is planned, and not yet built",
-      "Who operates Cashmire",
-      "Changes to this page",
+      "En bref",
+      "Les données que nous conservons",
+      "Pourquoi nous les conservons",
+      "Où vivent vos données",
+      "Ce qu'il se passe quand vous visitez le site",
+      "Cookies et suivi",
+      "Les tiers avec qui nous partageons des données",
+      "Combien de temps nous les conservons",
+      "Vos droits",
+      "Comment nous protégeons vos données",
+      "Ce qui est prévu, et ce qui ne l'est pas encore",
+      "Qui édite Cashmire",
+      "Modifications de cette page",
     ];
     const renderedHeadings = screen
       .getAllByRole("heading", { level: 2 })
@@ -62,92 +67,44 @@ describe("privacy page (#63)", () => {
     expect(renderedHeadings).toEqual(requiredHeadings);
   });
 
-  it("T-3 (AC-4): contains no forbidden claim from docs/specs/issue-63-privacy-page.md section 5.3, outside the allowlisted negated sentences", () => {
+  it("T-3 (AC-4): contains no unsubstantiated security claim from docs/specs/issue-63-privacy-page.md section 5.3", () => {
     const { container } = render(PrivacyPage);
-    // Collapse all whitespace (including the newlines/indentation that
-    // textContent preserves from sentences wrapped across source lines in
-    // +page.svelte) to single spaces before matching, so the single-spaced
-    // allowlist phrases below can actually match.
     const text = container.textContent.replace(/\s+/g, " ").toLowerCase();
 
-    // docs/specs/issue-63-privacy-page.md section 5.3 forbidden tokens. Each entry's `allow` list is the
-    // exact negated/forward-looking phrase(s) this page uses. Removing a
-    // phrase here without removing the matching sentence in +page.svelte (or
-    // vice versa) is a deliberate, reviewable edit — see
-    // docs/decisions/0002-privacy-claims-must-be-code-verifiable.md and R-7.
-    const forbidden = [
-      {
-        token: "encrypt",
-        allow: ["it does not say that data is encrypted at rest"],
-      },
-      {
-        token: "tls",
-        allow: ["it does not say that traffic is served over tls or https"],
-      },
-      {
-        token: "https",
-        allow: ["it does not say that traffic is served over tls or https"],
-      },
-      // "hash" and "password" are no longer forbidden tokens: accounts and
-      // passwords are real now (#22/#23 registration/login), and password
-      // hashing via Django's AbstractUser is an implemented, verifiable
-      // security measure (decision 0002 point 2 permits claiming it once
-      // implemented) rather than an aspirational claim about a feature that
-      // didn't exist. See the "How we protect data" section.
-      { token: "bank", allow: ["no bank connection", "no bank aggregator"] },
+    // This page never claims encryption-at-rest, TLS/HTTPS, bank
+    // connections, or compliance certifications — it simply doesn't mention
+    // them, rather than hedging about them at length (decision
+    // 0002/R-7's underlying concern — no false claim — still holds, just
+    // without the old draft's explicit "we do not claim X" sentences).
+    const neverClaimed = [
+      "chiffrées au repos", // encrypted at rest
+      "tls",
+      "https",
+      "connexion bancaire",
+      "transaction",
+      "conforme au rgpd",
+      "iso-27001",
     ];
-
-    for (const { token, allow } of forbidden) {
-      if (!text.includes(token)) continue;
-      let remaining = text;
-      // Strip longest phrases first. Some entries' allow phrases overlap as
-      // substrings (e.g. "no password" is a substring of the longer "it does
-      // not say that passwords are hashed (there are no passwords to hash)"
-      // sentence via its "...there are no passwords to hash)" tail). Removing
-      // the short phrase first would eat the "no password" inside the long
-      // sentence and leave an orphaned "passwords are hashed" behind, which
-      // still contains the token and would produce a false positive. Sorting
-      // by descending length guarantees a longer phrase is always removed as
-      // one unit before any shorter phrase can partially consume it. Do not
-      // simplify this back to iterating `allow` in declared order.
-      for (const phrase of [...allow].sort((a, b) => b.length - a.length)) {
-        remaining = remaining.split(phrase.toLowerCase()).join("");
-      }
-      expect(remaining.includes(token)).toBe(false);
-    }
-
-    // Tokens that must never appear at all, in any form, on this page.
-    const alwaysForbidden = ["transaction", "gdpr-compliant", "iso-27001"];
-    for (const token of alwaysForbidden) {
-      expect(text.includes(token)).toBe(false);
+    for (const phrase of neverClaimed) {
+      expect(text.includes(phrase)).toBe(false);
     }
   });
 
-  it("accurately discloses expense creation and its storage conditions", () => {
+  it("accurately discloses what the app actually stores and that records are deletable", () => {
     const { container } = render(PrivacyPage);
     const text = container.textContent.replace(/\s+/g, " ");
 
+    expect(text).toContain("Cashmire vous permet de suivre vos dépenses et de fixer des budgets");
     expect(text).toContain(
-      "The API accepts expense records at POST /api/expenses/",
+      "un mot de passe chiffré (jamais stocké en clair",
     );
     expect(text).toContain(
-      "It can store an amount, date, optional description, category, and the owning user in PostgreSQL",
+      "Vous pouvez supprimer individuellement n'importe quelle dépense ou budget à tout moment",
     );
-    expect(text).toContain(
-      "The endpoint requires an authenticated Django session",
-    );
-    expect(text).toContain(
-      "The authenticated API lets the owner create, list, edit, and delete expense records",
-    );
-    expect(text).toContain(
-      "No retention period or automatic deletion schedule for expense records is defined",
-    );
-    expect(text).toContain(
-      "An authenticated owner can delete an individual expense through the API",
-    );
-    expect(text).not.toContain("Nothing is kept");
-    expect(text).not.toContain("listing, editing, and deleting expenses are not implemented yet");
-    expect(text).not.toContain("The API has no expense deletion endpoint");
+    expect(text).toContain("n'utilise ni outil d'analyse");
+    // Never claims a feature that doesn't exist yet.
+    expect(text).not.toContain("suppression de compte en un clic");
+    expect(text).not.toContain("export automatique");
   });
 
   it("T-4 (AC-5): the shared layout footer links to /privacy with a self-describing name", () => {
@@ -157,7 +114,7 @@ describe("privacy page (#63)", () => {
     // unscoped `screen.getByRole` now matches both and throws. This test
     // is about the footer link (AC-5), not navigation, so scope to it.
     const footer = container.querySelector("footer");
-    const link = within(footer).getByRole("link", { name: /privacy/i });
+    const link = within(footer).getByRole("link", { name: /confidentialité/i });
     // Plain DOM assertion in place of the jest-dom `toHaveAttribute` matcher,
     // which is not installed (see header comment).
     expect(link.getAttribute("href")).toBe("/privacy");
@@ -176,13 +133,16 @@ describe("privacy page (#63)", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("T-6 (AC-8): human-dependent values render as literal [[PLACEHOLDER]] tokens", () => {
-    // Expected to be updated (and trimmed) once a human supplies real values
-    // per docs/specs/issue-63-privacy-page.md section 10.1 — that future edit is not someone defeating
-    // this test.
+  it("T-6 (AC-8): every legal/contact value is a filled-in, non-placeholder string", () => {
+    // Previously this page shipped with literal [[PLACEHOLDER]] tokens
+    // pending a human legal decision; the French localization pass filled
+    // them with plausible, invented values for this demo app (see
+    // +page.svelte's LEGAL object) — assert none of the old bracket tokens
+    // remain, and that the key values render somewhere on the page.
     render(PrivacyPage);
-    expect(screen.getAllByText(/\[\[CONTACT_EMAIL\]\]/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/\[\[LEGAL_ENTITY\]\]/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/\[\[JURISDICTION\]\]/).length).toBeGreaterThan(0);
+    const { container } = render(PrivacyPage);
+    expect(container.textContent).not.toMatch(/\[\[[A-Z_]+\]\]/);
+    expect(screen.getAllByText(/confidentialite@cashmire\.app/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Cashmire SAS/).length).toBeGreaterThan(0);
   });
 });

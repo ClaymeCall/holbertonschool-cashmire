@@ -60,9 +60,9 @@
       if (!response.ok) {
         // §6.2 — a response arrived but response.ok is false.
         httpStatus = response.status;
-        let message = `The API responded with HTTP ${response.status} ${response.statusText} at ${requestUrl}.`;
+        let message = `L'API a répondu avec HTTP ${response.status} ${response.statusText} à l'adresse ${requestUrl}.`;
         if (response.status === 404) {
-          message += ` The health endpoint is at /api/health/. Check that VITE_API_URL points at the Cashmire API and does not already include the /api prefix.`;
+          message += ` Le point de terminaison de santé se trouve à /api/health/. Vérifiez que VITE_API_URL pointe vers l'API Cashmire et n'inclut pas déjà le préfixe /api.`;
         }
         errorMessage = message;
         uiState = "error";
@@ -76,7 +76,7 @@
         body = await response.json();
       } catch {
         httpStatus = response.status;
-        errorMessage = `The API at ${requestUrl} returned HTTP ${response.status} but the response body could not be read as JSON.`;
+        errorMessage = `L'API à ${requestUrl} a renvoyé HTTP ${response.status} mais le corps de la réponse n'a pas pu être lu comme du JSON.`;
         uiState = "error";
         return;
       }
@@ -88,7 +88,7 @@
         typeof body.status !== "string"
       ) {
         httpStatus = response.status;
-        errorMessage = `The API at ${requestUrl} returned HTTP ${response.status} but the response body did not contain a status field.`;
+        errorMessage = `L'API à ${requestUrl} a renvoyé HTTP ${response.status} mais le corps de la réponse ne contenait pas de champ status.`;
         uiState = "error";
         return;
       }
@@ -102,9 +102,9 @@
       // (browser gives JS no status code and no body for that case by
       // design), and an aborted request.
       if (err && (err.name === "TimeoutError" || err.name === "AbortError")) {
-        errorMessage = `The API at ${requestUrl} did not respond within ${TIMEOUT_MS / 1000} seconds.`;
+        errorMessage = `L'API à ${requestUrl} n'a pas répondu dans un délai de ${TIMEOUT_MS / 1000} secondes.`;
       } else {
-        errorMessage = `Could not reach the API at ${requestUrl}. The request never completed — the API may not be running, the URL may be wrong, or the browser origin may not be allowed by the API's CORS configuration.`;
+        errorMessage = `Impossible de joindre l'API à ${requestUrl}. La requête ne s'est jamais terminée — il se peut que l'API ne soit pas démarrée, que l'URL soit incorrecte, ou que l'origine du navigateur ne soit pas autorisée par la configuration CORS de l'API.`;
       }
       httpStatus = null;
       uiState = "error";
@@ -125,59 +125,59 @@
 </script>
 
 <svelte:head>
-  <title>API health · Cashmire</title>
+  <title>État de l'API · Cashmire</title>
   <meta
     name="description"
-    content="Checks whether the Cashmire API is reachable and reports what it returned."
+    content="Vérifie si l'API Cashmire est accessible et affiche ce qu'elle a renvoyé."
   />
 </svelte:head>
 
 <main>
-  <h1>API health check</h1>
+  <h1>Contrôle de l'état de l'API</h1>
   <p>
-    This page calls the Cashmire API's health endpoint and reports what came
-    back.
+    Cette page interroge le point de terminaison de santé de l'API Cashmire
+    et affiche la réponse obtenue.
   </p>
 
   <div class="state-region" role="status">
     {#if uiState === "loading"}
       <p class="state state-loading">
         <span class="spinner" aria-hidden="true"></span>
-        Checking the API…
+        Interrogation de l'API…
       </p>
-      <p class="url-line">Calling <code>{requestUrl}</code></p>
+      <p class="url-line">Appel de <code>{requestUrl}</code></p>
     {:else if uiState === "success"}
       <p class="state state-success">
         <CircleCheck size={18} />
-        <strong>API is reachable</strong>
+        <strong>L'API est accessible</strong>
       </p>
-      <p>Reported status: {health.status}</p>
+      <p>Statut signalé : {health.status}</p>
       <p>HTTP {httpStatus}</p>
-      <p class="url-line">Called <code>{requestUrl}</code></p>
+      <p class="url-line">URL appelée : <code>{requestUrl}</code></p>
       <p class="caveat">
-        This confirms the API answered; it does not check the database or any
-        other subsystem.
+        Cela confirme que l'API a répondu ; cela ne vérifie ni la base de
+        données, ni aucun autre sous-système.
       </p>
       <pre>{JSON.stringify(health, null, 2)}</pre>
     {:else if uiState === "error"}
       <p class="state state-error">
         <CircleX size={18} />
-        <strong>API check failed</strong>
+        <strong>Échec du contrôle de l'API</strong>
       </p>
       <p>{errorMessage}</p>
-      <p class="url-line">Called <code>{requestUrl}</code></p>
+      <p class="url-line">URL appelée : <code>{requestUrl}</code></p>
       <p>
         {#if httpStatus !== null}
           HTTP {httpStatus}
         {:else}
-          No response received.
+          Aucune réponse reçue.
         {/if}
       </p>
-      <button type="button" onclick={retry}>Retry</button>
+      <button type="button" onclick={retry}>Réessayer</button>
     {/if}
   </div>
 
-  <p><a href="/">Back to the Cashmire home page</a></p>
+  <p><a href="/">Retour à la page d'accueil de Cashmire</a></p>
 </main>
 
 <style>

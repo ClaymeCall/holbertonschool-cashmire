@@ -142,7 +142,8 @@ function isJsonEncodable(body) {
  * - Default `method` is `GET`.
  * - `Accept: application/json` is set on every request.
  * - `credentials` defaults to the `fetch` default (i.e. is NOT forced to
- *   `"include"`) — there is no cookie auth yet, see §4.3.4.
+ *   `"include"`). Callers using the session-cookie API must pass
+ *   `credentials: "include"` explicitly.
  * - No retry, no caching, no timeout, no interceptor chain. A timeout can be
  *   added by the caller via `AbortSignal` (the `signal` option is forwarded
  *   unchanged).

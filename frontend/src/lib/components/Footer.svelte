@@ -8,8 +8,8 @@
 </script>
 
 <footer style="--texture-photo: url({textureTile})">
-  <a href="/privacy"><Shield size={14} /> Privacy &amp; legal</a>
-  <a href="/health"><Activity size={14} /> API health</a>
+  <a href="/privacy"><Shield size={14} /> Confidentialité et mentions légales</a>
+  <a href="/health"><Activity size={14} /> État de l'API</a>
 </footer>
 
 <style>

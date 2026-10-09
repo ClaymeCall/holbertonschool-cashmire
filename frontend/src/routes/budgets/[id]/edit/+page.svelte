@@ -56,19 +56,19 @@
 </script>
 
 <svelte:head>
-  <title>Edit budget · Cashmire</title>
-  <meta name="description" content="Adjust an existing monthly budget." />
+  <title>Modifier le budget · Cashmire</title>
+  <meta name="description" content="Ajustez un budget mensuel existant." />
 </svelte:head>
 
 <main>
-  <h1>Edit budget</h1>
+  <h1>Modifier le budget</h1>
 
   {#if state === "loading"}
-    <p role="status">Loading…</p>
+    <p role="status">Chargement…</p>
   {:else if state === "not-found"}
-    <p>That budget couldn't be found.</p>
+    <p>Ce budget est introuvable.</p>
   {:else if state === "error"}
-    <p role="alert">Couldn't load this budget. Try again in a moment.</p>
+    <p role="alert">Impossible de charger ce budget. Réessayez dans un instant.</p>
   {:else}
     <BudgetForm
       mode="edit"
@@ -77,12 +77,12 @@
       initialMonth={periodToMonth(budget.period_start)}
       initialAmount={budget.amount}
       initialAlertThreshold={budget.alert_threshold}
-      submitLabel="Save changes"
+      submitLabel="Enregistrer les modifications"
       onsubmit={handleUpdate}
     />
   {/if}
 
-  <p><a href="/budgets">Back to budgets</a></p>
+  <p><a href="/budgets">Retour aux budgets</a></p>
 </main>
 
 <style>

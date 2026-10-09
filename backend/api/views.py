@@ -7,7 +7,6 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, serializers, status
-from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import (
     api_view,
     authentication_classes,
@@ -18,7 +17,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
-from .auth import SessionAuthenticatedAPIView, session_authenticated_api_view
+from .auth import (
+    SESSION_AUTHENTICATION_CLASSES,
+    SessionAuthenticatedAPIView,
+    session_authenticated_api_view,
+)
 from .models import Budget, Category, Expense
 from .serializers import LoginSerializer, RegisterSerializer, UserSerializer
 from .services.budget_consumption import calculate_consumption_batch
@@ -272,7 +275,7 @@ class ExpenseListSerializer(serializers.Serializer):
 
 @extend_schema(responses=CategoryListSerializer)
 @api_view(["GET"])
-@authentication_classes([SessionAuthentication])
+@authentication_classes(SESSION_AUTHENTICATION_CLASSES)
 @permission_classes([IsAuthenticated])
 def category_list(request):
     categories = Category.objects.filter(user=request.user)
@@ -291,7 +294,7 @@ def category_list(request):
     responses={status.HTTP_201_CREATED: ExpenseSerializer},
 )
 @api_view(["GET", "POST"])
-@authentication_classes([SessionAuthentication])
+@authentication_classes(SESSION_AUTHENTICATION_CLASSES)
 @permission_classes([IsAuthenticated])
 def expenses(request):
     if request.method == "GET":
@@ -349,7 +352,7 @@ def get_user_expense_or_404(expense_id, user):
     responses={status.HTTP_204_NO_CONTENT: None},
 )
 @api_view(["PATCH", "PUT", "DELETE"])
-@authentication_classes([SessionAuthentication])
+@authentication_classes(SESSION_AUTHENTICATION_CLASSES)
 @permission_classes([IsAuthenticated])
 def expense_detail_mutation(request, expense_id):
     expense = get_user_expense_or_404(expense_id, request.user)
@@ -482,7 +485,7 @@ class BudgetListSerializer(serializers.Serializer):
     description="List budgets or create a new budget for the authenticated user",
 )
 @api_view(["GET", "POST"])
-@authentication_classes([SessionAuthentication])
+@authentication_classes(SESSION_AUTHENTICATION_CLASSES)
 @permission_classes([IsAuthenticated])
 def budget_list_create(request):
     """
@@ -691,7 +694,7 @@ def _budget_create_post(request):
     description="Delete an existing budget for the authenticated user",
 )
 @api_view(["PATCH", "DELETE"])
-@authentication_classes([SessionAuthentication])
+@authentication_classes(SESSION_AUTHENTICATION_CLASSES)
 @permission_classes([IsAuthenticated])
 def budget_update_patch(request, budget_id):
     """

@@ -43,27 +43,27 @@
 </script>
 
 <svelte:head>
-  <title>Add budget · Cashmire</title>
-  <meta name="description" content="Set a monthly spending limit for a category." />
+  <title>Ajouter un budget · Cashmire</title>
+  <meta name="description" content="Définissez une limite de dépenses mensuelle pour une catégorie." />
 </svelte:head>
 
 <main>
-  <h1>Add budget</h1>
+  <h1>Ajouter un budget</h1>
 
   {#if state === "loading"}
-    <p role="status">Loading…</p>
+    <p role="status">Chargement…</p>
   {:else if state === "error"}
-    <p role="alert">Couldn't load categories. Try again in a moment.</p>
+    <p role="alert">Impossible de charger les catégories. Réessayez dans un instant.</p>
   {:else}
     <BudgetForm
       mode="create"
       {categories}
-      submitLabel="Add budget"
+      submitLabel="Ajouter un budget"
       onsubmit={handleCreate}
     />
   {/if}
 
-  <p><a href="/budgets">Back to budgets</a></p>
+  <p><a href="/budgets">Retour aux budgets</a></p>
 </main>
 
 <style>

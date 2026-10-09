@@ -585,6 +585,26 @@ Django migrations, including an explicit warning that resetting the volume
 deletes its data.
 
 **Agent/role used.** Copilot-assisted documentation update. No specialized
+agent run is claimed.
+
+**What was delegated.** Nothing.
+
+**How the change was verified.**
+- Started a separate Compose project with a new PostgreSQL volume and applied
+  Django migrations with:
+  `docker compose -p cashmire-issue19-check run --rm api python manage.py migrate`.
+  All built-in and project migrations, including `api.0001_initial`,
+  `api.0002_category`, and `api.0003_expense`, applied successfully without
+  manual SQL.
+- Removed only the isolated verification project's containers, network, and
+  volume afterward. The regular development database was not touched.
+- `git diff --check` passes.
+
+**Final decision.** The README documents the destructive reset warning and
+commands to recreate PostgreSQL and apply all committed migrations from
+empty. The procedure was verified against an isolated fresh database; no
+existing local database was deleted.
+
 ## 2026-10-07 — Add authenticated expense creation (Issue #35)
 
 **Objective.** Implement `POST /api/expenses/` so an authenticated user can
@@ -651,21 +671,6 @@ agent run is claimed.
 
 **What was delegated.** Nothing.
 
-**How the change was verified.**
-- Started a separate Compose project with a new PostgreSQL volume and applied
-  Django migrations with:
-  `docker compose -p cashmire-issue19-check run --rm api python manage.py migrate`.
-  All built-in and project migrations, including `api.0001_initial`,
-  `api.0002_category`, and `api.0003_expense`, applied successfully without
-  manual SQL.
-- Removed only the isolated verification project's containers, network, and
-  volume afterward. The regular development database was not touched.
-- `git diff --check` passes.
-
-**Final decision.** The README documents the destructive reset warning and
-commands to recreate PostgreSQL and apply all committed migrations from
-empty. The procedure was verified against an isolated fresh database; no
-existing local database was deleted.
 **Main proposal.** Reuse the existing `/api/expenses/` route and
 `ExpenseSerializer`, adding GET alongside POST. Validate optional
 `category_id`, `date_from`, and `date_to` query parameters; always scope the
@@ -1262,77 +1267,6 @@ run is claimed.
 regression test for its successful JSON response. The endpoint was also
 verified manually over HTTP.
 
-## 2026-10-07 — Document database recreation from an empty instance (Issue #19)
-
-**Objective.** Document the exact Docker Compose steps for rebuilding the
-development database from an empty PostgreSQL instance using only committed
-Django migrations, including an explicit warning that resetting the volume
-deletes its data.
-
-**Agent/role used.** Copilot-assisted documentation update. No specialized
-agent run is claimed.
-
-**What was delegated.** Nothing.
-
-**How the change was verified.**
-- Started a separate Compose project with a new PostgreSQL volume and applied
-  Django migrations with:
-  `docker compose -p cashmire-issue19-check run --rm api python manage.py migrate`.
-  All built-in and project migrations, including `api.0001_initial`,
-  `api.0002_category`, and `api.0003_expense`, applied successfully without
-  manual SQL.
-- Removed only the isolated verification project's containers, network, and
-  volume afterward. The regular development database was not touched.
-- `git diff --check` passes.
-
-**Final decision.** The README documents the destructive reset warning and
-commands to recreate PostgreSQL and apply all committed migrations from
-empty. The procedure was verified against an isolated fresh database; no
-existing local database was deleted.
-
-## 2026-10-07 — Add reusable session authentication and current-user endpoint (Issue #26)
-
-**Objective.** Provide a shared DRF session-authentication guard that resolves
-the user from Django's session, returns 401 for anonymous requests, and can be
-reused by function- and class-based protected views.
-
-**Agent/role used.** Copilot-assisted implementation on the authentication
-stack from issue #24. No specialized agent run is claimed.
-
-**What was delegated.** Nothing.
-
-**Main proposal.** Add a common `SessionAuthenticatedAPIView` base class and
-`session_authenticated_api_view` decorator, backed by one session
-authentication class and `IsAuthenticated` permission. Use them for the
-logout and current-user views, and expose `GET /api/auth/me/` using the
-existing read-only `UserSerializer`.
-
-**How the change was verified.**
-- Ran `docker compose -p cashmire-issue26-test run --rm api python manage.py
-  test api`: all 27 API tests pass, including anonymous 401, authenticated
-  session user serialization, Basic authentication rejection, and logout
-  CSRF/session behavior.
-- Ran `docker compose -p cashmire-issue26-test run --rm api python manage.py
-  check`: no system-check issues.
-- Called `GET /api/auth/me/` with `curl` and no session; received 401,
-  `WWW-Authenticate: Session`, and the expected JSON error.
-- Generated the OpenAPI schema; the custom session cookie authenticator is
-  described as a cookie security scheme. Existing health/logout serializer
-  generation errors remain outside this issue.
-- Removed only the isolated Compose verification volumes and networks.
-
-**Accepted / modified / rejected.**
-- Accepted: Use Django sessions, not Basic or JWT, per decision 0003.
-- Modified: Provide both a function-view decorator and a class-view base so
-  future expense and budget endpoints can share the guard without repeating
-  authentication configuration.
-- Rejected: Duplicating user fields or exposing password data; the existing
-  `UserSerializer` defines the response shape.
-
-**Final decision.** Protected endpoints now share one session-authentication
-implementation, anonymous access returns 401, and `GET /api/auth/me/` returns
-only the authenticated user's public fields.
-
 ## 2026-10-08 — Rebase conflict resolution: fix `tests.py`/`tests/` module shadow
 
 **Objective.** Resolve the multi-commit rebase of
@@ -1487,6 +1421,40 @@ performed directly.
 path. The regression test and issue-specific audit record are in place; no
 application behavior changed.
 
+## 2026-10-08 — Add synthetic demo data seed command (Issue #72)
+
+**Objective.** Provide a documented, repeatable development command that
+creates a synthetic account with categories, current-month expenses, and
+budgets, while refusing to seed when Django debug mode is disabled.
+
+**Agent/role used.** Copilot-assisted backend implementation.
+
+**What was delegated.** Nothing — implementation and validation were done
+directly.
+
+**How the change was verified.**
+- Added four management-command tests covering data creation, idempotence,
+  preservation of an existing demo-account password, and rejection when
+  `DEBUG` is false.
+- Ran `api.tests.test_seed_demo_data` in an isolated Docker Compose project:
+  all 4 tests passed.
+- Applied migrations to the isolated database and ran `seed_demo_data` twice:
+  the first run created the synthetic account with 5 categories, 7 expenses,
+  and 5 budgets; the second run reported the existing account and retained
+  those same record counts.
+- Ran `docker compose run --rm api python manage.py test api` in the isolated
+  Docker project: all 218 API tests passed.
+- Ran `git diff --check`: passed.
+
+**Accepted / modified / rejected.**
+- Accepted: keep demo data generation behind an explicit `DEBUG` guard and
+  use ORM `get_or_create`/`update_or_create` operations to make reruns safe.
+- Accepted: document the command and synthetic initial credentials in the
+  README, with a reminder to change the password before sharing the
+  development environment.
+
+**Final decision.** Issue #72's local demo-data workflow is implemented and
+validated. No schema changes were required.
 ## 2026-10-08 — Audit des routes API (Issue #57)
 
 **Objective.** Passer en revue chaque route pour la validation, les contrôles
@@ -1570,3 +1538,85 @@ par l'équipe.
 
 **Final decision.** Tri proposé dans `docs/reviews/issue-59-qa-findings-triage.md`,
 en attente de validation d'équipe.
+## 2026-10-08 — Return consistent 401 responses for protected API routes (Issue #143)
+
+**Objective.** Align unauthenticated responses from the categories, expenses,
+and budgets endpoints with the session-auth contract already used by
+`/api/auth/me/` and `/api/auth/logout/`, while preserving CSRF rejection as
+HTTP 403.
+
+**Agent/role used.** Copilot-assisted backend and frontend implementation.
+
+**What was delegated.** Nothing — implementation and verification were done
+directly.
+
+**How the team verified it.**
+- Updated protected category, expense-list/detail, and budget-list/detail
+  views to use the shared `SessionCookieAuthentication` class. Anonymous
+  requests now receive 401 and `WWW-Authenticate: Session`.
+- Updated backend regression tests for anonymous category, expense, and
+  budget requests, including expense detail mutations. Confirmed that
+  unauthenticated mutations do not change or delete records.
+- Kept the authenticated-session CSRF regression assertion at 403.
+- Updated `docs/api-design.md` to specify 401 for absent/invalid sessions
+  and reserve 403 for authenticated requests rejected by CSRF.
+- Updated expense and budget form error handling: 401 communicates that a
+  session is required; 403 communicates request/CSRF verification failure.
+  Added frontend regression tests for both outcomes.
+- Ran `docker compose --project-name cashmire-issue143 run --rm api python manage.py test api.tests.test_expenses api.tests.test_budgets api.tests.test_current_user api.tests.test_logout`:
+  all 196 tests passed.
+- Ran the focused frontend Vitest files for expense create/edit and budget
+  create: all 16 tests passed. Vite emitted existing Svelte state-capture
+  warnings in `BudgetForm.svelte`; they are unrelated to this change.
+- Ran `git diff --check`: passed. The isolated Docker project and volume
+  were removed after validation.
+
+**Accepted / modified / rejected.**
+- Accepted: use the project's existing shared session-cookie authenticator
+  rather than introducing a second authentication implementation.
+- Accepted: distinguish 401 authentication failures from 403 CSRF failures
+  in the frontend instead of treating both as a missing login.
+- Rejected: changing authenticated CSRF failures from 403 to 401; that would
+  blur the distinction between missing authentication and a rejected
+  authenticated request.
+
+**Final decision.** Issue #143 is implemented and targeted backend and
+frontend tests pass. No schema or migration changes were needed.
+
+## 2026-10-08 — Restrict API documentation to development (Issue #144)
+
+**Objective.** Keep the OpenAPI schema and Swagger UI available to local
+developers while hiding both endpoints outside development, and record the
+access-policy decision.
+
+**Agent/role used.** Copilot-assisted backend and documentation change.
+
+**What was delegated.** Nothing — implementation and verification were done
+directly.
+
+**How the team verified it.**
+- Added a request-time `DEBUG` guard to both `/api/schema/` and `/api/docs/`;
+  they return 404 when debug mode is disabled.
+- Added tests verifying that both documentation endpoints work when
+  `DEBUG=True`, both return 404 when `DEBUG=False`, and an authenticated
+  application route remains available with `DEBUG=False`.
+- Ran `docker compose --project-name cashmire-issue144 run --rm api python manage.py test api.tests.test_api_docs_access`:
+  all 3 tests passed.
+- Ran `docker compose --project-name cashmire-issue144 run --rm api python manage.py check`:
+  no issues reported.
+- Ran `git diff --check`: passed. The isolated Docker database and network
+  were removed after validation.
+- Schema generation emitted existing drf-spectacular warnings/errors about
+  missing serializer/type-hint metadata for health, logout and computed
+  budget fields. They did not fail the tests and are outside this access
+  policy change.
+
+**Accepted / modified / rejected.**
+- Accepted: documentation endpoints are public only when `DJANGO_DEBUG=true`
+  and return 404 otherwise, as explicitly chosen by the user.
+- Accepted: record the policy in ADR 0005, the API contract and README.
+- Rejected: treating this as API authorization; application routes continue
+  to enforce their own authentication and permission checks.
+
+**Final decision.** Issue #144 is implemented and validated. No schema or
+migration changes were needed.
