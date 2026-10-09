@@ -26,7 +26,7 @@ Les utilisateurs cibles manquent d'un outil simple et transparent pour enregistr
 Le MVP **ne couvre pas** :
 - Les foyers multi-utilisateurs ou budgets partagés ;
 - Les connexions bancaires ou importation automatique de transactions ;
-- La gestion de plusieurs monnaies ou la conversion de devises ;
+- La gestion de plusieurs monnaies ou la conversion de devises (l'euro est la seule devise du MVP ; aucun champ de devise n'est stocké) ;
 - Les dépenses récurrentes ou la projection de budget ;
 - Les rapports détaillés ou l'export de données ;
 - L'accès mobile natif (une interface web responsive couvre cet usage).
@@ -125,13 +125,12 @@ Si l'utilisateur a franchi le seuil d'alerte à 80 % ou le dépasse complètemen
 - `GET /api/expenses/{id}/` — consulter une ;
 - `PATCH /api/expenses/{id}/` — modifier ;
 - `DELETE /api/expenses/{id}/` — supprimer ;
-- Tous les endpoints requièrent l'authentification. Réponse 403 Forbidden si l'utilisateur tente d'accéder à une dépense d'un autre.
+- Tous les endpoints requièrent l'authentification. Réponse 404 Not Found si l'utilisateur tente d'accéder à une dépense d'un autre (l'existence de la ressource n'est pas révélée ; voir `docs/api-design.md`).
 
 **Cas d'erreur** :
 - 400 Bad Request : montant négatif, format Decimal invalide, catégorie inexistante, date invalide ;
 - 401 Unauthorized : absence de session/token ou token invalide ;
-- 403 Forbidden : tentative de modification d'une dépense d'un autre utilisateur ;
-- 404 Not Found : dépense inexistante.
+- 404 Not Found : dépense inexistante ou appartenant à un autre utilisateur.
 
 **Accessibilité** :
 - Formulaires navigables au clavier ;
@@ -182,16 +181,16 @@ Si l'utilisateur a franchi le seuil d'alerte à 80 % ou le dépasse complètemen
 **En périmètre** :
 - Une liste prédéfinie de catégories (Alimentation, Transport, Divertissement, Utilitaires, Santé, Restaurants, Achats, Autre ; liste exacte : *à confirmer par l'équipe*) ;
 - Les utilisateurs ne peuvent **pas** créer de catégories personnalisées (hors MVP, feature backlog) ;
-- Les catégories sont identiques pour tous (pas de personnalisation) ;
+- Chaque utilisateur possède sa propre liste de catégories, créée à l'inscription à partir de la liste prédéfinie (voir `docs/decisions/category-ownership.md`) ;
 - Chaque dépense doit être assignée à exactement une catégorie.
 
 **Modèle de données** :
-- Table `Category` avec : nom (unique), couleur optionnelle (pour l'UI) ;
-- Pas de champ propriétaire : les catégories sont globales.
+- Table `Category` avec : propriétaire (clé étrangère vers `User`), nom (unique par utilisateur), description, indicateur `is_active`, dates de création/modification (voir `docs/erd.md`) ;
+- Les catégories sont scoped par utilisateur, pas globales.
 - `Expense.category` est obligatoire (NOT NULL).
 
 **API** :
-- `GET /api/categories/` — lister toutes les catégories (aucune authentification requise ; données statiques/publiques) ;
+- `GET /api/categories/` — lister les catégories de l'utilisateur courant (authentification requise) ;
 - Pas de création, modification ou suppression de catégories via l'API dans le MVP.
 
 ---
