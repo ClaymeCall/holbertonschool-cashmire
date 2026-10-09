@@ -71,5 +71,5 @@ docker compose up frontend
 Same URL, <http://localhost:5173/>. The difference is which env file is
 read: a bare `npm run dev` reads `frontend/.env`, while Compose injects the
 repo-root `.env` into the `frontend` container as process environment
-variables (`env_file: .env` in `docker-compose.yml`). Keep both files'
+variables (`env_file: .env` in `compose.yaml`). Keep both files'
 `VITE_API_URL` values the same — see the root `.env.example` for details.

@@ -265,7 +265,7 @@ Si l'utilisateur a franchi le seuil d'alerte à 80 % ou le dépasse complètemen
 **Objectif** : Chaque membre de l'équipe lance la stack complète localement en une commande.
 
 **En périmètre** :
-- `docker-compose.yml` définit les services : API Django, frontend SvelteKit, base PostgreSQL ;
+- `compose.yaml` définit les services : API Django, frontend SvelteKit, base PostgreSQL ;
 - `docker compose up -d --build` démarre la stack ;
 - `docker compose down` l'arrête proprement ;
 - Serveurs de développement Django et SvelteKit exécutés dans les containers ;
