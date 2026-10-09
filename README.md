@@ -73,6 +73,17 @@ synthetic, and repeated runs update the same sample records rather than
 creating duplicates. The command refuses to run when `DJANGO_DEBUG` is
 disabled. Change the demo password before sharing a development environment.
 
+### Run frontend tests
+
+```bash
+cd frontend
+npm install
+npm test
+```
+
+`npm test` runs the Vitest suite once (`vitest run`). See `frontend/README.md`
+for the other scripts.
+
 ### Run the API locally (without the `api` container)
 
 Install Python 3.12 and Docker Compose. Copy `.env.example` to `.env` (in
@@ -117,6 +128,28 @@ docker compose up -d db
 .venv/bin/python backend/manage.py migrate
 .venv/bin/python backend/manage.py runserver
 ```
+
+## Known limitations of the MVP
+
+- Single currency: amounts are in euros, no currency field is stored.
+- Each user has their own categories, created at registration from a fixed
+  default list; categories cannot be created, edited or deleted through the
+  API.
+- Lists are not paginated.
+- Authentication is a Django session cookie. Login is throttled per IP at
+  5 requests per minute using a per-process in-memory cache
+  (`docs/decisions/0004-login-rate-limiting.md`); there is no per-account
+  lockout.
+- Registration is not throttled and reveals whether an email is already
+  registered.
+- Production hardening is not configured: `DJANGO_SECRET_KEY` has a
+  development fallback, `DJANGO_ALLOWED_HOSTS` defaults to `*`, and the
+  secure-cookie and HTTPS settings are not enabled. Set `DJANGO_DEBUG=false`
+  and your own secret outside local development.
+- `/api/docs/` and `/api/schema/` are public.
+
+See `docs/mvp-scope.md` for the full out-of-scope list and
+`docs/reviews/` for the QA and security findings.
 
 ## Docs
 
