@@ -71,32 +71,32 @@ describe("edit expense page (#41)", () => {
     mockApi();
     render(EditExpensePage);
 
-    const amount = await screen.findByLabelText(/^amount$/i);
+    const amount = await screen.findByLabelText(/^montant$/i);
     expect(amount.value).toBe("25.50");
     expect(screen.getByLabelText(/^date$/i).value).toBe("2026-10-05");
     expect(screen.getByLabelText(/^description$/i).value).toBe("Déjeuner");
-    expect(screen.getByLabelText(/^category$/i).value).toBe("5");
+    expect(screen.getByLabelText(/^catégorie$/i).value).toBe("5");
   });
 
   it("T-2: an id with no matching expense shows a not-found message instead of a form", async () => {
     mockApi({ expenses: [] });
     render(EditExpensePage);
 
-    expect(await screen.findByText(/couldn't be found/i)).toBeTruthy();
-    expect(screen.queryByLabelText(/^amount$/i)).toBeNull();
+    expect(await screen.findByText(/introuvable/i)).toBeTruthy();
+    expect(screen.queryByLabelText(/^montant$/i)).toBeNull();
   });
 
   it("T-3: submits a PATCH with the edited fields and redirects to the expense list", async () => {
     mockApi();
     render(EditExpensePage);
-    const amount = await screen.findByLabelText(/^amount$/i);
+    const amount = await screen.findByLabelText(/^montant$/i);
 
     await fireEvent.input(amount, { target: { value: "30.00" } });
 
     fetch.mockResolvedValueOnce(
       fakeResponse({ status: 200, body: JSON.stringify({ id: 1 }) }),
     );
-    await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /enregistrer les modifications/i }));
 
     const patchCall = fetch.mock.calls.find(([, init]) => init?.method === "PATCH");
     expect(patchCall[0]).toBe("http://localhost:8000/api/expenses/1/");

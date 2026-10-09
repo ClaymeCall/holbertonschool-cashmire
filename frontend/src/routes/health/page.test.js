@@ -10,9 +10,9 @@
 // Marker strings — defined once here per docs/specs/issue-18-health-screen.md
 // section 8.3's closing note, so a wording change in +page.svelte (§5.2-§5.4)
 // is a one-line edit here rather than a hunt through every test.
-const LOADING_MARKER = "Checking"; // §5.2
-const SUCCESS_MARKER = "API is reachable"; // §5.3
-const ERROR_MARKER = "API check failed"; // §5.4
+const LOADING_MARKER = "Interrogation"; // §5.2
+const SUCCESS_MARKER = "est accessible"; // §5.3
+const ERROR_MARKER = "Échec du contrôle"; // §5.4
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, within } from "@testing-library/svelte";
@@ -46,7 +46,7 @@ describe("health page (#18)", () => {
     render(HealthPage);
     const headings = screen.getAllByRole("heading", { level: 1 });
     expect(headings).toHaveLength(1);
-    expect(headings[0].textContent).toMatch(/api health/i);
+    expect(headings[0].textContent).toMatch(/contrôle de l'état de l'api/i);
   });
 
   it("T-2 (AC-2): shows the loading state immediately, and only the loading state", () => {
@@ -70,7 +70,7 @@ describe("health page (#18)", () => {
     render(HealthPage);
 
     await screen.findByText(new RegExp(SUCCESS_MARKER));
-    expect(screen.getByText(/reported status: ok/i)).toBeTruthy();
+    expect(screen.getByText(/statut signalé : ok/i)).toBeTruthy();
     expect(screen.getByText(/http 200/i)).toBeTruthy();
     // T-8: the other two states' markers are absent.
     expect(screen.queryByText(new RegExp(LOADING_MARKER))).toBeNull();
@@ -100,7 +100,7 @@ describe("health page (#18)", () => {
     render(HealthPage);
 
     await screen.findByText(new RegExp(ERROR_MARKER));
-    expect(screen.getByText(/could not reach the api/i)).toBeTruthy();
+    expect(screen.getByText(/impossible de joindre l'api/i)).toBeTruthy();
     // The called URL appears verbatim in the DOM (default base, no env
     // stub). It legitimately appears twice — once in the error message,
     // once in the dedicated "Called <url>" line — so use the *All* variant.
@@ -137,7 +137,7 @@ describe("health page (#18)", () => {
     render(HealthPage);
 
     await screen.findByText(new RegExp(ERROR_MARKER));
-    expect(screen.getByText(/did not contain a status field/i)).toBeTruthy();
+    expect(screen.getByText(/ne contenait pas de champ status/i)).toBeTruthy();
     expect(screen.queryByText(new RegExp(SUCCESS_MARKER))).toBeNull();
     expect(screen.queryByText("undefined")).toBeNull();
   });
@@ -148,7 +148,7 @@ describe("health page (#18)", () => {
     render(HealthPage);
 
     await screen.findByText(new RegExp(ERROR_MARKER));
-    expect(screen.getByText(/did not respond within 8 seconds/i)).toBeTruthy();
+    expect(screen.getByText(/n'a pas répondu dans un délai de 8 secondes/i)).toBeTruthy();
     expect(screen.queryByText(new RegExp(SUCCESS_MARKER))).toBeNull();
     expect(screen.queryByText(new RegExp(LOADING_MARKER))).toBeNull();
   });
@@ -207,7 +207,7 @@ describe("health page (#18)", () => {
     render(HealthPage);
 
     await screen.findByText(new RegExp(ERROR_MARKER));
-    const retryButton = screen.getByRole("button", { name: /retry/i });
+    const retryButton = screen.getByRole("button", { name: /réessayer/i });
 
     fetch.mockResolvedValueOnce({
       ok: true,
@@ -238,10 +238,10 @@ describe("health page (#18)", () => {
     // match both (see layout.test.js T-3 for the same precedent).
     const footer = screen.getByRole("contentinfo");
 
-    const healthLink = within(footer).getByRole("link", { name: /health/i });
+    const healthLink = within(footer).getByRole("link", { name: /état de l'api/i });
     expect(healthLink.getAttribute("href")).toBe("/health");
 
-    const privacyLink = within(footer).getByRole("link", { name: /privacy/i });
+    const privacyLink = within(footer).getByRole("link", { name: /confidentialité/i });
     expect(privacyLink.getAttribute("href")).toBe("/privacy");
   });
 });

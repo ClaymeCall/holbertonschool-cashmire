@@ -39,18 +39,18 @@
     /** @type {string[]} */
     const errors = [];
     if (email.trim() === "") {
-      errors.push("Enter your email address.");
+      errors.push("Entrez votre adresse e-mail.");
     }
     if (password === "") {
-      errors.push("Enter a password.");
+      errors.push("Entrez un mot de passe.");
     } else if (password.length < MIN_PASSWORD_LENGTH) {
-      errors.push(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+      errors.push(`Le mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH} caractères.`);
     }
     if (password !== "" && password === email.trim()) {
-      errors.push("Password must not be the same as your email.");
+      errors.push("Le mot de passe ne doit pas être identique à votre e-mail.");
     }
     if (passwordConfirm !== password) {
-      errors.push("Passwords do not match.");
+      errors.push("Les mots de passe ne correspondent pas.");
     }
     return errors;
   }
@@ -74,7 +74,7 @@
       }
       if (messages.length > 0) return messages;
     }
-    return ["Couldn't create the account with the details provided."];
+    return ["Impossible de créer le compte avec les informations fournies."];
   }
 
   async function handleSubmit(event) {
@@ -113,9 +113,9 @@
         err &&
         (err.name === "TimeoutError" || err.name === "AbortError")
       ) {
-        errorMessages = ["The request timed out. Try again."];
+        errorMessages = ["La requête a expiré. Réessayez."];
       } else {
-        errorMessages = ["Couldn't reach Cashmire. Try again in a moment."];
+        errorMessages = ["Impossible de joindre Cashmire. Réessayez dans un instant."];
       }
       formState = "error";
       console.error("Registration failed:", err);
@@ -124,18 +124,18 @@
 </script>
 
 <svelte:head>
-  <title>Register · Cashmire</title>
-  <meta name="description" content="Create a Cashmire account." />
+  <title>Inscription · Cashmire</title>
+  <meta name="description" content="Créez votre compte Cashmire." />
 </svelte:head>
 
 <main>
-  <h1>Register</h1>
+  <h1>Inscription</h1>
 
   <form onsubmit={handleSubmit} novalidate>
     <TextField
       id="register-email"
       name="email"
-      label="Email"
+      label="E-mail"
       type="email"
       autocomplete="email"
       bind:value={email}
@@ -146,20 +146,20 @@
     <TextField
       id="register-password"
       name="password"
-      label="Password"
+      label="Mot de passe"
       type="password"
       autocomplete="new-password"
       minlength={MIN_PASSWORD_LENGTH}
       bind:value={password}
       disabled={formState === "submitting"}
       required
-      hint={`At least ${MIN_PASSWORD_LENGTH} characters.`}
+      hint={`Au moins ${MIN_PASSWORD_LENGTH} caractères.`}
     />
 
     <TextField
       id="register-password-confirm"
       name="password_confirm"
-      label="Confirm password"
+      label="Confirmer le mot de passe"
       type="password"
       autocomplete="new-password"
       bind:value={passwordConfirm}
@@ -173,15 +173,15 @@
 
     <Button type="submit" disabled={formState === "submitting"}>
       {#if formState === "submitting"}
-        <LoaderCircle size={16} class="spin" /> Creating account…
+        <LoaderCircle size={16} class="spin" /> Création du compte…
       {:else}
-        <UserPlus size={16} /> Create account
+        <UserPlus size={16} /> Créer un compte
       {/if}
     </Button>
   </form>
 
-  <p><a href="/login">Already have an account? Log in</a></p>
-  <p><a href="/">Back to the Cashmire home page</a></p>
+  <p><a href="/login">Vous avez déjà un compte ? Connectez-vous</a></p>
+  <p><a href="/">Retour à la page d'accueil de Cashmire</a></p>
 </main>
 
 <style>

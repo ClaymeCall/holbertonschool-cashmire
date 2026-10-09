@@ -11,6 +11,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
+    setupFiles: ["./vitest-setup.js"],
   },
   // Without this, Vite resolves Svelte's server-rendering build during
   // `vitest run` ("mount(...) is not available on the server"), because

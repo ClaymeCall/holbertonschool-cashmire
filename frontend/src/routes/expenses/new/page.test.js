@@ -48,33 +48,33 @@ describe("create expense page (#41)", () => {
     mockCategoriesFetch();
     render(NewExpensePage);
 
-    expect(await screen.findByLabelText(/^amount$/i)).toBeTruthy();
+    expect(await screen.findByLabelText(/^montant$/i)).toBeTruthy();
     expect(screen.getByLabelText(/^date$/i)).toBeTruthy();
-    expect(screen.getByLabelText(/^category$/i)).toBeTruthy();
+    expect(screen.getByLabelText(/^catégorie$/i)).toBeTruthy();
     expect(screen.getByLabelText(/^description$/i)).toBeTruthy();
   });
 
   it("T-2: a non-positive amount shows a client-side error and makes no create request", async () => {
     mockCategoriesFetch();
     render(NewExpensePage);
-    await screen.findByLabelText(/^amount$/i);
+    await screen.findByLabelText(/^montant$/i);
 
-    await fireEvent.input(screen.getByLabelText(/^amount$/i), {
+    await fireEvent.input(screen.getByLabelText(/^montant$/i), {
       target: { value: "0" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /add expense/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /ajouter la dépense/i }));
 
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toMatch(/greater than 0/i);
+    expect(alert.textContent).toMatch(/supérieur à 0/i);
     expect(fetch).toHaveBeenCalledTimes(1); // only the categories GET
   });
 
   it("T-3: submits the amount as a string and redirects to the expense list on success", async () => {
     mockCategoriesFetch();
     render(NewExpensePage);
-    await screen.findByLabelText(/^amount$/i);
+    await screen.findByLabelText(/^montant$/i);
 
-    await fireEvent.input(screen.getByLabelText(/^amount$/i), {
+    await fireEvent.input(screen.getByLabelText(/^montant$/i), {
       target: { value: "12.50" },
     });
     await fireEvent.input(screen.getByLabelText(/^date$/i), {
@@ -87,7 +87,7 @@ describe("create expense page (#41)", () => {
     fetch.mockResolvedValueOnce(
       fakeResponse({ status: 201, body: JSON.stringify({ id: 9 }) }),
     );
-    await fireEvent.click(screen.getByRole("button", { name: /add expense/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /ajouter la dépense/i }));
 
     const [, createInit] = fetch.mock.calls[1];
     const body = JSON.parse(createInit.body);
@@ -104,9 +104,9 @@ describe("create expense page (#41)", () => {
   it("T-4: a 400 response surfaces the backend's field errors", async () => {
     mockCategoriesFetch();
     render(NewExpensePage);
-    await screen.findByLabelText(/^amount$/i);
+    await screen.findByLabelText(/^montant$/i);
 
-    await fireEvent.input(screen.getByLabelText(/^amount$/i), {
+    await fireEvent.input(screen.getByLabelText(/^montant$/i), {
       target: { value: "12.50" },
     });
     await fireEvent.input(screen.getByLabelText(/^date$/i), {
@@ -119,7 +119,7 @@ describe("create expense page (#41)", () => {
         body: JSON.stringify({ amount: ["Doit être > 0"] }),
       }),
     );
-    await fireEvent.click(screen.getByRole("button", { name: /add expense/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /ajouter la dépense/i }));
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toMatch(/doit être > 0/i);

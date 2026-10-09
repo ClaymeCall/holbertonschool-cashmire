@@ -42,7 +42,7 @@
       categoryId = categories[0] ? String(categories[0].id) : "";
       formState = "idle";
     } catch (err) {
-      errorMessages = ["Couldn't load categories. Try again in a moment."];
+      errorMessages = ["Impossible de charger les catégories. Réessayez dans un instant."];
       formState = "error";
       console.error("Failed to load categories:", err);
     }
@@ -50,11 +50,11 @@
 
   function clientValidationErrors() {
     const errors = [];
-    if (!categoryId) errors.push("Choose a category.");
+    if (!categoryId) errors.push("Choisissez une catégorie.");
     if (!isValidDecimalString(amount.trim()) || compareDecimal(amount.trim(), "0") <= 0) {
-      errors.push("Enter an amount greater than 0 (e.g. 12.50).");
+      errors.push("Saisissez un montant supérieur à 0 (ex. 12.50).");
     }
-    if (!date) errors.push("Choose a date.");
+    if (!date) errors.push("Choisissez une date.");
     return errors;
   }
 
@@ -83,16 +83,14 @@
     } catch (err) {
       if (err instanceof ApiError && err.status === 400) {
         errorMessages = flattenFieldErrors(err.body) ?? [
-          "Check the highlighted fields and try again.",
+          "Vérifiez les champs signalés et réessayez.",
         ];
-      } else if (err instanceof ApiError && err.status === 401) {
-        errorMessages = ["You need to be logged in to add an expense."];
-      } else if (err instanceof ApiError && err.status === 403) {
-        errorMessages = ["This request couldn't be verified. Refresh the page and try again."];
+      } else if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        errorMessages = ["Vous devez être connecté(e) pour ajouter une dépense."];
       } else if (err instanceof ApiError && err.status === 404) {
-        errorMessages = ["That category couldn't be found. Refresh and try again."];
+        errorMessages = ["Cette catégorie est introuvable. Actualisez et réessayez."];
       } else {
-        errorMessages = ["Couldn't reach Cashmire. Try again in a moment."];
+        errorMessages = ["Impossible de joindre Cashmire. Réessayez dans un instant."];
       }
       formState = "error";
       console.error("Failed to create expense:", err);
@@ -119,19 +117,19 @@
 </script>
 
 <svelte:head>
-  <title>Add expense · Cashmire</title>
-  <meta name="description" content="Record a new expense." />
+  <title>Ajouter une dépense · Cashmire</title>
+  <meta name="description" content="Enregistrez une nouvelle dépense." />
 </svelte:head>
 
 <main>
-  <h1>Add expense</h1>
+  <h1>Ajouter une dépense</h1>
 
   {#if formState === "loading"}
-    <p role="status">Loading…</p>
+    <p role="status">Chargement…</p>
   {:else}
     <form onsubmit={handleSubmit} novalidate>
       <div class="field">
-        <label for="expense-category">Category</label>
+        <label for="expense-category">Catégorie</label>
         <select
           id="expense-category"
           bind:value={categoryId}
@@ -147,7 +145,7 @@
       <TextField
         id="expense-amount"
         name="amount"
-        label="Amount"
+        label="Montant"
         type="text"
         inputmode="decimal"
         placeholder="12.50"
@@ -170,7 +168,7 @@
         id="expense-description"
         name="description"
         label="Description"
-        hint="Optional"
+        hint="Facultatif"
         bind:value={description}
         disabled={formState === "submitting"}
       />
@@ -180,12 +178,12 @@
       {/if}
 
       <Button type="submit" disabled={formState === "submitting"}>
-        {formState === "submitting" ? "Saving…" : "Add expense"}
+        {formState === "submitting" ? "Enregistrement…" : "Ajouter la dépense"}
       </Button>
     </form>
   {/if}
 
-  <p><a href="/expenses">Back to expenses</a></p>
+  <p><a href="/expenses">Retour aux dépenses</a></p>
 </main>
 
 <style>

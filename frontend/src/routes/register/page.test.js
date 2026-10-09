@@ -28,24 +28,24 @@ function fakeResponse({ status, body = "" }) {
 
 async function fillFields({ email, password, passwordConfirm }) {
   if (email !== undefined) {
-    await fireEvent.input(screen.getByLabelText(/^email$/i), {
+    await fireEvent.input(screen.getByLabelText(/^e-mail$/i), {
       target: { value: email },
     });
   }
   if (password !== undefined) {
-    await fireEvent.input(screen.getByLabelText(/^password$/i), {
+    await fireEvent.input(screen.getByLabelText(/^mot de passe$/i), {
       target: { value: password },
     });
   }
   if (passwordConfirm !== undefined) {
-    await fireEvent.input(screen.getByLabelText(/confirm password/i), {
+    await fireEvent.input(screen.getByLabelText(/confirmer le mot de passe/i), {
       target: { value: passwordConfirm },
     });
   }
 }
 
 async function submit() {
-  await fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+  await fireEvent.click(screen.getByRole("button", { name: /créer un compte/i }));
 }
 
 beforeEach(() => {
@@ -63,11 +63,11 @@ describe("register page (#28)", () => {
     render(RegisterPage);
     const headings = screen.getAllByRole("heading", { level: 1 });
     expect(headings).toHaveLength(1);
-    expect(headings[0].textContent).toMatch(/register/i);
+    expect(headings[0].textContent).toMatch(/inscription/i);
 
-    expect(screen.getByLabelText(/^email$/i).getAttribute("type")).toBe("email");
-    expect(screen.getByLabelText(/^password$/i).getAttribute("type")).toBe("password");
-    expect(screen.getByLabelText(/confirm password/i).getAttribute("type")).toBe(
+    expect(screen.getByLabelText(/^e-mail$/i).getAttribute("type")).toBe("email");
+    expect(screen.getByLabelText(/^mot de passe$/i).getAttribute("type")).toBe("password");
+    expect(screen.getByLabelText(/confirmer le mot de passe/i).getAttribute("type")).toBe(
       "password",
     );
   });
@@ -77,8 +77,8 @@ describe("register page (#28)", () => {
     await submit();
 
     const alert = screen.getByRole("alert");
-    expect(alert.textContent).toMatch(/enter your email address/i);
-    expect(alert.textContent).toMatch(/enter a password/i);
+    expect(alert.textContent).toMatch(/entrez votre adresse e-mail/i);
+    expect(alert.textContent).toMatch(/entrez un mot de passe/i);
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -87,7 +87,7 @@ describe("register page (#28)", () => {
     await fillFields({ email: "new@example.com", password: "short1", passwordConfirm: "short1" });
     await submit();
 
-    expect(screen.getByRole("alert").textContent).toMatch(/at least 8 characters/i);
+    expect(screen.getByRole("alert").textContent).toMatch(/au moins 8 caractères/i);
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -100,7 +100,7 @@ describe("register page (#28)", () => {
     });
     await submit();
 
-    expect(screen.getByRole("alert").textContent).toMatch(/passwords do not match/i);
+    expect(screen.getByRole("alert").textContent).toMatch(/mots de passe ne correspondent pas/i);
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -164,7 +164,7 @@ describe("register page (#28)", () => {
     await submit();
 
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toMatch(/couldn't reach cashmire/i);
+    expect(alert.textContent).toMatch(/impossible de joindre cashmire/i);
     expect(gotoMock).not.toHaveBeenCalled();
   });
 });

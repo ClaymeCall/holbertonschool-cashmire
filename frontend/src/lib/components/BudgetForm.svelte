@@ -16,6 +16,12 @@
   import TextField from "$lib/components/TextField.svelte";
   import FormError from "$lib/components/FormError.svelte";
 
+  // Firefox has no native `<input type="month">` picker and silently falls
+  // back to a plain text box (no format hint, no browser-level validation),
+  // so `month` can arrive as arbitrary text there — validate the shape
+  // ourselves instead of trusting the browser.
+  const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+
   /**
    * @typedef {Object} Props
    * @property {"create" | "edit"} mode
@@ -57,10 +63,14 @@
 
   function clientValidationErrors() {
     const errors = [];
-    if (!categoryId) errors.push("Choose a category.");
-    if (!month) errors.push("Choose a month.");
+    if (!categoryId) errors.push("Choisissez une catégorie.");
+    if (!month) {
+      errors.push("Choisissez un mois.");
+    } else if (!MONTH_PATTERN.test(month)) {
+      errors.push("Saisissez le mois au format AAAA-MM (ex. 2026-10).");
+    }
     if (!isValidDecimalString(amount.trim()) || compareDecimal(amount.trim(), "0") <= 0) {
-      errors.push("Enter a limit greater than 0 (e.g. 500.00).");
+      errors.push("Saisissez une limite supérieure à 0 (ex. 500.00).");
     }
     const threshold = alertThreshold.trim();
     if (
@@ -68,7 +78,7 @@
       compareDecimal(threshold, "0") < 0 ||
       compareDecimal(threshold, "100") > 0
     ) {
-      errors.push("The alert threshold must be between 0 and 100.");
+      errors.push("Le seuil d'alerte doit être compris entre 0 et 100.");
     }
     return errors;
   }
@@ -120,20 +130,18 @@
         // #53 AC: the duplicate-budget conflict must be surfaced clearly,
         // not folded into a generic failure message.
         errorMessages = flattenFieldErrors(err.body) ?? [
-          "A budget for this category and month already exists.",
+          "Un budget existe déjà pour cette catégorie et ce mois.",
         ];
       } else if (err instanceof ApiError && err.status === 400) {
         errorMessages = flattenFieldErrors(err.body) ?? [
-          "Check the highlighted fields and try again.",
+          "Vérifiez les champs signalés et réessayez.",
         ];
-      } else if (err instanceof ApiError && err.status === 401) {
-        errorMessages = ["You need to be logged in to manage budgets."];
-      } else if (err instanceof ApiError && err.status === 403) {
-        errorMessages = ["This request couldn't be verified. Refresh the page and try again."];
+      } else if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        errorMessages = ["Vous devez être connecté(e) pour gérer vos budgets."];
       } else if (err instanceof ApiError && err.status === 404) {
-        errorMessages = ["That category couldn't be found. Refresh and try again."];
+        errorMessages = ["Cette catégorie est introuvable. Actualisez et réessayez."];
       } else {
-        errorMessages = ["Couldn't reach Cashmire. Try again in a moment."];
+        errorMessages = ["Impossible de joindre Cashmire. Réessayez dans un instant."];
       }
       formState = "error";
       console.error("Failed to save budget:", err);
@@ -144,7 +152,7 @@
 <form onsubmit={handleSubmit} novalidate>
   {#if mode === "create"}
     <div class="field">
-      <label for="budget-category">Category</label>
+      <label for="budget-category">Catégorie</label>
       <select
         id="budget-category"
         bind:value={categoryId}
@@ -160,19 +168,22 @@
     <TextField
       id="budget-month"
       name="month"
-      label="Month"
+      label="Mois"
       type="month"
+      placeholder="AAAA-MM"
+      pattern="\d{4}-(0[1-9]|1[0-2])"
+      hint="Le mois auquel ce budget s'applique, par ex. 2026-10. (Votre navigateur peut afficher ce champ comme un champ texte plutôt qu'un sélecteur.)"
       bind:value={month}
       disabled={formState === "submitting"}
       required
     />
   {:else}
     <p class="readonly-field">
-      <span class="readonly-label">Category</span>
+      <span class="readonly-label">Catégorie</span>
       {categories.find((c) => String(c.id) === categoryId)?.name ?? "—"}
     </p>
     <p class="readonly-field">
-      <span class="readonly-label">Month</span>
+      <span class="readonly-label">Mois</span>
       {month}
     </p>
   {/if}
@@ -180,7 +191,7 @@
   <TextField
     id="budget-amount"
     name="amount"
-    label="Limit"
+    label="Limite"
     type="text"
     inputmode="decimal"
     placeholder="500.00"
@@ -192,10 +203,10 @@
   <TextField
     id="budget-alert-threshold"
     name="alert_threshold"
-    label="Alert threshold (%)"
+    label="Seuil d'alerte (%)"
     type="text"
     inputmode="decimal"
-    hint="Warn when spending reaches this percentage. Defaults to 80."
+    hint="Alerte lorsque les dépenses atteignent ce pourcentage. 80 par défaut."
     bind:value={alertThreshold}
     disabled={formState === "submitting"}
   />
@@ -205,7 +216,7 @@
   {/if}
 
   <Button type="submit" disabled={formState === "submitting"}>
-    {formState === "submitting" ? "Saving…" : submitLabel}
+    {formState === "submitting" ? "Enregistrement…" : submitLabel}
   </Button>
 </form>
 
