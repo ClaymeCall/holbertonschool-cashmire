@@ -39,7 +39,9 @@ le client ne stocke ni ne transmet de token dans un header.
 
 **Réponse 401 Unauthorized :**
 Retournée si la session est absente, expirée ou invalide. Les vues protégées
-utilisent le challenge `WWW-Authenticate: Session`.
+utilisent le challenge `WWW-Authenticate: Session`. Le code `403 Forbidden`
+reste réservé aux requêtes authentifiées refusées, notamment en cas d'échec
+de vérification CSRF.
 
 ### 1.3 Sérialisation des montants (Decimal)
 
@@ -298,7 +300,7 @@ partir de sa session Django.
 **Note :** MVP sans pagination. Retourne toutes les dépenses de l'utilisateur courant (filtrées selon les query params si présents).
 
 **Erreurs possibles :**
-- `403 Forbidden` — Session absente ou invalide (comportement actuel de `SessionAuthentication`).
+- `401 Unauthorized` — Session absente, expirée ou invalide.
 - `400 Bad Request` — Paramètres invalides
   - Message : erreur de validation au niveau du paramètre, notamment pour une date invalide, un identifiant de catégorie non positif ou `date_from` postérieure à `date_to`.
 
@@ -439,7 +441,7 @@ Pour `PUT`, `category_id`, `amount` et `date` sont requis. `description` est opt
 **Erreurs possibles :**
 - `400 Bad Request` — Validation échouée
   - Message : `"amount": "Doit être > 0"` ou `"date": "Format invalide"`
-- `403 Forbidden` — Session absente
+- `401 Unauthorized` — Session absente, expirée ou invalide.
 - `404 Not Found` — Expense n'existe pas ou appartient à un autre utilisateur, ou category n'existe pas
   - Message : `"error": "NOT_FOUND", "message": "Dépense non trouvée"` ou `"error": "NOT_FOUND", "message": "Catégorie non trouvée"`
 
@@ -458,7 +460,7 @@ Pour `PUT`, `category_id`, `amount` et `date` sont requis. `description` est opt
 Pas de corps. Code 204.
 
 **Erreurs possibles :**
-- `403 Forbidden` — Session absente
+- `401 Unauthorized` — Session absente, expirée ou invalide.
 - `404 Not Found` — Expense n'existe pas ou appartient à un autre utilisateur
   - Message : `"error": "NOT_FOUND", "message": "Dépense non trouvée"`
 
@@ -678,7 +680,7 @@ Pas de corps. Code 204.
 
 **Description :** Lister toutes les catégories de l'utilisateur courant. Inclut les catégories par défaut créées à l'inscription.
 
-**Implémentation :** Cette route de lecture seule est disponible depuis l'issue #33. Les routes de création, modification et suppression restent prévues pour des issues ultérieures. Avec `SessionAuthentication` de DRF, une requête sans session authentifiée reçoit HTTP `403 Forbidden`.
+**Implémentation :** Cette route de lecture seule est disponible depuis l'issue #33. Les routes de création, modification et suppression restent prévues pour des issues ultérieures. Une requête sans session authentifiée reçoit HTTP `401 Unauthorized` avec le challenge `WWW-Authenticate: Session`. Une requête authentifiée rejetée pour échec CSRF reçoit toujours HTTP `403 Forbidden`.
 
 **Query parameters :** Aucun (MVP sans filtrage avancé).
 
@@ -711,7 +713,8 @@ Pas de corps. Code 204.
 **Note :** Retourne uniquement les catégories de l'utilisateur courant (scoped par user_id).
 
 **Erreurs possibles :**
-- `403 Forbidden` — Session absente ou utilisateur non authentifié
+- `401 Unauthorized` — Session absente, expirée ou invalide
+- `403 Forbidden` — Requête authentifiée rejetée par la protection CSRF
 
 ---
 

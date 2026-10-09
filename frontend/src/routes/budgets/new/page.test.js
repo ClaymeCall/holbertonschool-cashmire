@@ -125,4 +125,40 @@ describe("create budget page (#53)", () => {
     expect(alert.textContent).toMatch(/déjà existant/i);
     expect(gotoMock).not.toHaveBeenCalled();
   });
+
+  it("T-5: a 403 response is reported as a rejected request, not missing authentication", async () => {
+    mockCategoriesFetch();
+    render(NewBudgetPage);
+    await screen.findByLabelText(/^limit$/i);
+
+    await fireEvent.input(screen.getByLabelText(/^month$/i), {
+      target: { value: "2026-10" },
+    });
+    await fireEvent.input(screen.getByLabelText(/^limit$/i), {
+      target: { value: "200.00" },
+    });
+    fetch.mockResolvedValueOnce(fakeResponse({ status: 403 }));
+    await fireEvent.click(screen.getByRole("button", { name: /add budget/i }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toMatch(/couldn't be verified/i);
+    expect(alert.textContent).not.toMatch(/logged in/i);
+  });
+
+  it("T-6: a 401 response explains that an authenticated session is required", async () => {
+    mockCategoriesFetch();
+    render(NewBudgetPage);
+    await screen.findByLabelText(/^limit$/i);
+
+    await fireEvent.input(screen.getByLabelText(/^month$/i), {
+      target: { value: "2026-10" },
+    });
+    await fireEvent.input(screen.getByLabelText(/^limit$/i), {
+      target: { value: "200.00" },
+    });
+    fetch.mockResolvedValueOnce(fakeResponse({ status: 401 }));
+    await fireEvent.click(screen.getByRole("button", { name: /add budget/i }));
+
+    expect((await screen.findByRole("alert")).textContent).toMatch(/logged in/i);
+  });
 });
