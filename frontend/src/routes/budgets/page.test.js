@@ -105,6 +105,15 @@ describe("budget dashboard page (#52)", () => {
     expect(exceededBar.getAttribute("aria-valuenow")).toBe("100");
   });
 
+  it("T-2b: shows the consumed percentage as visible text, uncapped when over budget", async () => {
+    mockApi();
+    render(BudgetsPage);
+    const items = await screen.findAllByRole("listitem");
+
+    expect(within(items[0]).getByText("22.5% used")).toBeTruthy();
+    expect(within(items[1]).getByText("120.0% used")).toBeTruthy();
+  });
+
   it("T-3: shows an empty-state message explaining how to create a budget when there are none", async () => {
     mockApi({ budgets: [] });
     render(BudgetsPage);
