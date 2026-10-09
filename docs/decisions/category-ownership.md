@@ -3,8 +3,8 @@
 - **Date :** 2026-10-06
 - **Auteur :** Tom Vieilledent (Product & Architecture Agent)
 - **Issue liée :** #6
-- **Statut :** Proposée. À valider par l'équipe avant implémentation.
-- **Exécution :** À commencer après validation de cette décision.
+- **Statut :** Appliquée (`Category.user` et `GET /api/categories/` authentifié, dans `backend/api`).
+- **Exécution :** Faite (modèle, migrations et endpoint présents sur `main`).
 
 ---
 
