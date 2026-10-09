@@ -44,6 +44,27 @@ The OpenAPI schema (`/api/schema/`) and interactive Swagger UI
 Both endpoints return 404 when debug mode is disabled; this does not replace
 the authentication and authorization checks on application API routes.
 
+### Production Django settings
+
+When `DJANGO_DEBUG=false`, the API requires an explicitly configured
+`DJANGO_SECRET_KEY` and `DJANGO_ALLOWED_HOSTS`. The secret must be at least
+50 characters, contain at least five distinct characters, and must not be
+the development fallback (`dev-insecure-secret-key`) or the `.env.example`
+placeholder (`change-me`). Allowed hosts must list deployment hostnames and
+must not contain `*`. Django refuses to start with a clear configuration
+error if either setting is missing or unsafe.
+
+Generate a unique key with Django and keep it in the deployment's secret
+environment or secret manager, never in source control:
+
+```bash
+python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+```
+
+For example, configure `DJANGO_DEBUG=false`,
+`DJANGO_ALLOWED_HOSTS=api.example.com`, and set `DJANGO_SECRET_KEY` to the
+generated value. The `.env.example` values are for local development only.
+
 ### Run backend tests
 
 With the `db` service available, run the complete API suite—including
