@@ -57,7 +57,7 @@
       expenses = expenseList;
       state = "ready";
     } catch (err) {
-      errorMessage = "Couldn't load your expenses. Try again in a moment.";
+      errorMessage = "Impossible de charger vos dépenses. Réessayez dans un instant.";
       state = "error";
       console.error("Failed to load expenses:", err);
     }
@@ -67,12 +67,12 @@
 </script>
 
 {#if state === "loading"}
-  <p role="status">Loading your expenses…</p>
+  <p role="status">Chargement de vos dépenses…</p>
 {:else if state === "error"}
   <FormError messages={errorMessage ? [errorMessage] : []} />
-  <Button type="button" onclick={load}><RefreshCw size={16} /> Retry</Button>
+  <Button type="button" onclick={load}><RefreshCw size={16} /> Réessayer</Button>
 {:else if visibleExpenses.length === 0}
-  <p>No expenses yet. <a href="/expenses/new">Add your first one</a>.</p>
+  <p>Aucune dépense pour l'instant. <a href="/expenses/new">Ajoutez la première</a>.</p>
 {:else}
   <ul class="expense-list">
     {#each visibleExpenses as expense (expense.id)}
@@ -80,14 +80,14 @@
         <div class="expense-main">
           <span class="amount">{formatAmount(expense.amount)}</span>
           <span class="category">
-            {categoryNames.get(expense.category_id) ?? "Unknown category"}
+            {categoryNames.get(expense.category_id) ?? "Catégorie inconnue"}
           </span>
           <span class="date"><Calendar size={14} /> {expense.date}</span>
         </div>
         {#if expense.description}
           <p class="description">{expense.description}</p>
         {/if}
-        <a href={`/expenses/${expense.id}/edit`}><Pencil size={14} /> Edit</a>
+        <a href={`/expenses/${expense.id}/edit`}><Pencil size={14} /> Modifier</a>
       </li>
     {/each}
   </ul>

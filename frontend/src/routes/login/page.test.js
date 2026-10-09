@@ -27,13 +27,13 @@ function fakeResponse({ status, body = "" }) {
 }
 
 async function fillAndSubmit({ email, password }) {
-  await fireEvent.input(screen.getByLabelText(/^email$/i), {
+  await fireEvent.input(screen.getByLabelText(/^e-mail$/i), {
     target: { value: email },
   });
-  await fireEvent.input(screen.getByLabelText(/^password$/i), {
+  await fireEvent.input(screen.getByLabelText(/^mot de passe$/i), {
     target: { value: password },
   });
-  await fireEvent.click(screen.getByRole("button", { name: /log in/i }));
+  await fireEvent.click(screen.getByRole("button", { name: /se connecter/i }));
 }
 
 beforeEach(() => {
@@ -51,10 +51,10 @@ describe("login page (#29)", () => {
     render(LoginPage);
     const headings = screen.getAllByRole("heading", { level: 1 });
     expect(headings).toHaveLength(1);
-    expect(headings[0].textContent).toMatch(/log in/i);
+    expect(headings[0].textContent).toMatch(/connexion/i);
 
-    const email = screen.getByLabelText(/^email$/i);
-    const password = screen.getByLabelText(/^password$/i);
+    const email = screen.getByLabelText(/^e-mail$/i);
+    const password = screen.getByLabelText(/^mot de passe$/i);
     expect(email.tagName).toBe("INPUT");
     expect(email.getAttribute("type")).toBe("email");
     expect(password.getAttribute("type")).toBe("password");
@@ -62,10 +62,10 @@ describe("login page (#29)", () => {
 
   it("T-2 (AC-2): empty fields show a client-side error and make no network request", async () => {
     render(LoginPage);
-    await fireEvent.click(screen.getByRole("button", { name: /log in/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /se connecter/i }));
 
     expect(screen.getByRole("alert").textContent).toMatch(
-      /enter your email and password/i,
+      /entrez votre e-mail et votre mot de passe/i,
     );
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -98,7 +98,7 @@ describe("login page (#29)", () => {
     await fillAndSubmit({ email: "jane@example.com", password: "wrong" });
 
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toMatch(/incorrect email or password/i);
+    expect(alert.textContent).toMatch(/e-mail ou mot de passe incorrect/i);
     // The server's own wording is never echoed (would hint whether the
     // account exists).
     expect(alert.textContent).not.toMatch(/invalid credentials/i);
@@ -112,7 +112,7 @@ describe("login page (#29)", () => {
     await fillAndSubmit({ email: "jane@example.com", password: "whatever1" });
 
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toMatch(/couldn't reach cashmire/i);
+    expect(alert.textContent).toMatch(/impossible de joindre cashmire/i);
     expect(gotoMock).not.toHaveBeenCalled();
   });
 
@@ -125,15 +125,15 @@ describe("login page (#29)", () => {
     );
     render(LoginPage);
 
-    await fireEvent.input(screen.getByLabelText(/^email$/i), {
+    await fireEvent.input(screen.getByLabelText(/^e-mail$/i), {
       target: { value: "jane@example.com" },
     });
-    await fireEvent.input(screen.getByLabelText(/^password$/i), {
+    await fireEvent.input(screen.getByLabelText(/^mot de passe$/i), {
       target: { value: "correct-horse" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /log in/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /se connecter/i }));
 
-    const button = screen.getByRole("button", { name: /logging in/i });
+    const button = screen.getByRole("button", { name: /connexion/i });
     expect(button.hasAttribute("disabled")).toBe(true);
 
     await fireEvent.click(button);

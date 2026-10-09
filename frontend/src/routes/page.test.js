@@ -1,6 +1,6 @@
 // Component tests for the landing page (issue #104 componentization
-// follow-up): the health-status line it always had, plus the logged-in-only
-// expenses/budgets previews that prove ExpensesList/BudgetsList
+// follow-up): the dashboard charts and expenses/budgets previews shown only
+// to logged-in users, which prove ExpensesList/BudgetsList/DashboardCharts
 // (lib/components/) are genuinely reusable outside their own routes.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/svelte";
@@ -61,9 +61,6 @@ function mockApi() {
     "fetch",
     vi.fn(async (url) => {
       const u = String(url);
-      if (u.includes("/api/health/")) {
-        return fakeResponse({ status: 200, body: JSON.stringify({ status: "ok" }) });
-      }
       if (u.includes("/api/categories/")) {
         return fakeResponse({ status: 200, body: JSON.stringify({ categories: CATEGORIES }) });
       }
@@ -84,13 +81,31 @@ describe("landing page (#104 componentization follow-up)", () => {
     setCurrentUser(null);
   });
 
-  it("while anonymous, shows the API status but no expenses/budgets previews", async () => {
+  it("while anonymous, shows no dashboard or expenses/budgets previews", () => {
+    render(HomePage);
+
+    expect(screen.queryByRole("heading", { name: /coup d'œil/i })).toBeNull();
+    expect(screen.queryByRole("heading", { name: /dépenses récentes/i })).toBeNull();
+    expect(screen.queryByRole("heading", { name: /vos budgets/i })).toBeNull();
+  });
+
+  it("while logged in, shows the dashboard charts above the expenses/budgets previews", async () => {
+    setCurrentUser({ id: 1, email: "demo@example.com" });
     mockApi();
     render(HomePage);
 
-    expect(await screen.findByText("ok")).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: /recent expenses/i })).toBeNull();
-    expect(screen.queryByRole("heading", { name: /your budgets/i })).toBeNull();
+    const dashboardHeading = await screen.findByRole("heading", {
+      name: /coup d'œil/i,
+    });
+    const expensesHeading = await screen.findByRole("heading", { name: /dépenses récentes/i });
+    expect(await screen.findByRole("heading", { name: /budget vs dépenses/i })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: /cette période/i })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: /30 derniers jours/i })).toBeTruthy();
+    // DOM order: dashboard comes before the pre-existing previews.
+    expect(
+      dashboardHeading.compareDocumentPosition(expensesHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("while logged in, previews the 3 most recent expenses with a link to the full list", async () => {
@@ -98,11 +113,11 @@ describe("landing page (#104 componentization follow-up)", () => {
     mockApi();
     render(HomePage);
 
-    const heading = await screen.findByRole("heading", { name: /recent expenses/i });
+    const heading = await screen.findByRole("heading", { name: /dépenses récentes/i });
     const section = /** @type {HTMLElement} */ (heading.closest("section"));
     expect(await within(section).findAllByRole("listitem")).toHaveLength(3);
     expect(
-      within(section).getByRole("link", { name: /view all/i }).getAttribute("href"),
+      within(section).getByRole("link", { name: /voir tout/i }).getAttribute("href"),
     ).toBe("/expenses");
   });
 
@@ -111,12 +126,12 @@ describe("landing page (#104 componentization follow-up)", () => {
     mockApi();
     render(HomePage);
 
-    const heading = await screen.findByRole("heading", { name: /your budgets/i });
+    const heading = await screen.findByRole("heading", { name: /vos budgets/i });
     const section = /** @type {HTMLElement} */ (heading.closest("section"));
     expect(await within(section).findAllByRole("listitem")).toHaveLength(2);
     expect(within(section).getByText("Alimentation")).toBeTruthy();
     expect(
-      within(section).getByRole("link", { name: /view all/i }).getAttribute("href"),
+      within(section).getByRole("link", { name: /voir tout/i }).getAttribute("href"),
     ).toBe("/budgets");
   });
 });

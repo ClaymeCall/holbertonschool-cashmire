@@ -8,14 +8,14 @@
 </script>
 
 <svelte:head>
-  <title>Expenses · Cashmire</title>
-  <meta name="description" content="Your recorded expenses." />
+  <title>Dépenses · Cashmire</title>
+  <meta name="description" content="Vos dépenses enregistrées." />
 </svelte:head>
 
 <main>
   <div class="header-row">
-    <h1>Expenses</h1>
-    <a class="button-link" href="/expenses/new"><Plus size={16} /> Add expense</a>
+    <h1>Dépenses</h1>
+    <a class="button-link" href="/expenses/new"><Plus size={16} /> Ajouter une dépense</a>
   </div>
 
   <ExpensesList />
