@@ -1589,3 +1589,41 @@ directly.
 
 **Final decision.** Issue #143 is implemented and targeted backend and
 frontend tests pass. No schema or migration changes were needed.
+
+## 2026-10-08 — Restrict API documentation to development (Issue #144)
+
+**Objective.** Keep the OpenAPI schema and Swagger UI available to local
+developers while hiding both endpoints outside development, and record the
+access-policy decision.
+
+**Agent/role used.** Copilot-assisted backend and documentation change.
+
+**What was delegated.** Nothing — implementation and verification were done
+directly.
+
+**How the team verified it.**
+- Added a request-time `DEBUG` guard to both `/api/schema/` and `/api/docs/`;
+  they return 404 when debug mode is disabled.
+- Added tests verifying that both documentation endpoints work when
+  `DEBUG=True`, both return 404 when `DEBUG=False`, and an authenticated
+  application route remains available with `DEBUG=False`.
+- Ran `docker compose --project-name cashmire-issue144 run --rm api python manage.py test api.tests.test_api_docs_access`:
+  all 3 tests passed.
+- Ran `docker compose --project-name cashmire-issue144 run --rm api python manage.py check`:
+  no issues reported.
+- Ran `git diff --check`: passed. The isolated Docker database and network
+  were removed after validation.
+- Schema generation emitted existing drf-spectacular warnings/errors about
+  missing serializer/type-hint metadata for health, logout and computed
+  budget fields. They did not fail the tests and are outside this access
+  policy change.
+
+**Accepted / modified / rejected.**
+- Accepted: documentation endpoints are public only when `DJANGO_DEBUG=true`
+  and return 404 otherwise, as explicitly chosen by the user.
+- Accepted: record the policy in ADR 0005, the API contract and README.
+- Rejected: treating this as API authorization; application routes continue
+  to enforce their own authentication and permission checks.
+
+**Final decision.** Issue #144 is implemented and validated. No schema or
+migration changes were needed.
