@@ -1479,6 +1479,27 @@ le tri des écarts reste à l'équipe.
 
 **Final decision.** Audit enregistré; aucune modification de code.
 
+## 2026-10-08 — Préparation des talking points agentic (Issue #77)
+
+**Objective.** Préparer l'explication de l'usage et de la vérification des
+agents pour l'évaluation.
+
+**Agent/role used.** Claude Code, en relecture de ce log et des définitions
+d'agents.
+
+**What was delegated.** La sélection des entrées et la rédaction de
+`docs/agentic-talking-points.md`, avec renvois aux PR et commits réels.
+
+**How the team verified it.** Les PR et commits cités ont été retrouvés dans
+l'historique git (`baaf48b`, `985a469`, `20ce9f1`, PR #79 et #115 mergées) et
+les outils des agents relus dans leur frontmatter.
+
+**Accepted / modified / rejected.** Le document ne contient que des faits
+déjà présents dans le log ou le dépôt. La répétition à voix haute reste à
+faire par chaque membre.
+
+**Final decision.** Document prêt; les cases à cocher de la section 5 restent
+ouvertes.
 ## 2026-10-08 — Revue QA & Security de l'application (Issue #58)
 
 **Objective.** Faire revoir l'application entière (backend et frontend) par
