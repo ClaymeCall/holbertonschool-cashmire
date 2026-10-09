@@ -1500,6 +1500,65 @@ faire par chaque membre.
 
 **Final decision.** Document prêt; les cases à cocher de la section 5 restent
 ouvertes.
+## 2026-10-08 — Revue QA & Security de l'application (Issue #58)
+
+**Objective.** Faire revoir l'application entière (backend et frontend) par
+l'agent QA & Security pour la sécurité, la validation, l'accessibilité et la
+fiabilité, et rassembler les findings dans un seul document pour le tri
+d'équipe (#59).
+
+**Agent/role used.** QA & Security (`.github/agents/qa-security.md`), lancé
+comme sous-agent de Claude Code (sans clé API pour l'orchestrateur), avec les
+mêmes contraintes: ne modifie aucun source, n'écrit que
+`docs/reviews/issue-58-qa-security-review.md`.
+
+**What was delegated.** L'exécution des tests backend et frontend, la lecture
+du code, la recherche des sinks XSS, des vérifications CSRF / ownership, et
+la rédaction des findings avec sévérité et reproduction.
+
+**How the team verified it.**
+- Le rapport donne les résultats de tests: backend 215/215, frontend
+  vitest 134/134, `npm audit` prod sans vulnérabilité.
+- Rien n'a été confirmé dynamiquement pour le login CSRF et l'énumération
+  d'emails; le document propose des reproductions par `curl`.
+- Non fait par l'agent: `pip-audit`, lint, test navigateur avec axe.
+
+**Accepted / modified / rejected.** Pas encore tranché: le tri des findings
+(1 blocking B1 sur le contraste des cartes budget, 20 non-blocking) est
+l'objet de l'issue #59.
+
+**Final decision.** Findings collectés dans
+`docs/reviews/issue-58-qa-security-review.md`. Une revue d'agent est une
+preuve à vérifier, pas une garantie de sécurité.
+
+## 2026-10-08 — Tri des findings QA & Security (Issue #59)
+
+**Objective.** Transformer les findings bruts de la revue #58 en décisions
+(accepté / modifié / rejeté) avec raisons.
+
+**Agent/role used.** Claude Code, en relecture du rapport de l'agent
+QA & Security.
+
+**What was delegated.** Le tri initial proposé et la vérification de quatre
+findings contre le code (B1, N9, N12, N18). Les décisions restent à valider
+par l'équipe.
+
+**How the team verified it.**
+- B1: ratios de contraste recalculés (3,25 / 2,10 / 4,20 / 4,41 sur `#f7f2e9`),
+  identiques au rapport; `color` bien posé sur le `li` dans
+  `BudgetsList.svelte`.
+- N9, N12 et N18 confirmés en lisant `BudgetForm.svelte`,
+  `login/+page.svelte` et `frontend/src/lib/api/budgets.js`.
+- Tests frontend après correction de N18: 134/134.
+
+**Accepted / modified / rejected.**
+- Accepted: B1, N5, N9, N12, N17, N18 et la passe accessibilité (#65).
+- Modified: N1, N2, N4, N6 à N8, N16, N19 (documentés ou reportés).
+- Rejected: N3 et N20, avec raison dans le document de tri.
+- Corrigé: N18 (PR #140).
+
+**Final decision.** Tri proposé dans `docs/reviews/issue-59-qa-findings-triage.md`,
+en attente de validation d'équipe.
 ## 2026-10-08 — Return consistent 401 responses for protected API routes (Issue #143)
 
 **Objective.** Align unauthenticated responses from the categories, expenses,
