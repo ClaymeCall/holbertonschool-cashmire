@@ -59,19 +59,33 @@ verification or CI.
 
 ### Seed local demo data
 
-With the `db` service running and a development `.env` copied from
-`.env.example` (`DJANGO_DEBUG=true`), create a synthetic demo account with
-sample categories, current-month expenses, and budgets:
+The `api` container seeds sample data for you automatically: on every
+`docker compose up`, its entrypoint (`backend/entrypoint.sh`) applies
+migrations, and if `DJANGO_DEBUG=true` and the database has no users yet —
+i.e. the first boot against a fresh `pgdata` volume — it also runs
+`manage.py seed_dev_data`. That command creates a demo account with a full
+year of categorized expenses and budgets, including categories that are only
+budgeted ("on budget") for some months and left untracked ("off budget") for
+others, so dashboards and line charts have something meaningful to show.
+Nothing is seeded on an existing volume, so your own data is never touched.
+
+The account's credentials are printed in the `api` logs the first time it
+seeds: `demo@cashmire.example` / `CashmireDemo2026!`. Change this password
+before sharing a development environment. `seed_dev_data` assumes a clean
+database and isn't safe to run twice (it will hit duplicate-budget errors);
+to reseed, rebuild the database as described below.
+
+For a smaller, idempotent dataset — a handful of current-month expenses and
+budgets you can safely regenerate at any time — use the original demo
+command instead:
 
 ```bash
 docker compose run --rm api python manage.py seed_demo_data
 ```
 
-For a newly created account, the command prints the initial credentials:
-`demo@cashmire.example` / `CashmireDemo2026!`. The account and amounts are
-synthetic, and repeated runs update the same sample records rather than
-creating duplicates. The command refuses to run when `DJANGO_DEBUG` is
-disabled. Change the demo password before sharing a development environment.
+Repeated runs of `seed_demo_data` update the same sample records rather than
+creating duplicates. Both commands refuse to run when `DJANGO_DEBUG` is
+disabled.
 
 ### Run frontend tests
 
@@ -194,16 +208,17 @@ from `.env.example` as described in [Local PostgreSQL](#local-postgresql):
 docker compose down --volumes --remove-orphans
 docker compose up -d --build db
 docker compose up -d --build api
-docker compose exec api python manage.py migrate
 ```
 
 The first command removes the existing database volume; PostgreSQL creates a
 new empty database when the `db` service starts. The API waits for PostgreSQL's
-healthcheck, and Django applies every committed migration in order. The
-migration command is safe to run again; Django skips migrations already
-recorded as applied.
+healthcheck, then its entrypoint applies every committed migration in order
+before the server starts — safe to run again, since Django skips migrations
+already recorded as applied — and, in a `DJANGO_DEBUG=true` environment,
+seeds the [sample demo data](#seed-local-demo-data) described above because
+the fresh volume has no users yet.
 
-To start the full application after the migrations have completed:
+To start the full application once the `api` container is up:
 
 ```bash
 docker compose up -d frontend
