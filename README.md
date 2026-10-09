@@ -22,10 +22,11 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:5173/>. You should see the heading **Cashmire** and
-an `API status` line — see `frontend/README.md` for the full reference,
-including configuration, other npm scripts, and the Docker Compose
-alternative.
+Open <http://localhost:5173/>. You should see the heading **Cashmire**
+with a French tagline, and, once logged in, a dashboard preview of your
+recent expenses and budgets — see `frontend/README.md` for the full
+reference, including configuration, other npm scripts, and the Docker
+Compose alternative.
 
 ## Back-end
 
