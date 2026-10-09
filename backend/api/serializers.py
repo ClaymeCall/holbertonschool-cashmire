@@ -52,6 +52,9 @@ class RegisterSerializer(serializers.ModelSerializer):
     form never sends them either.
     """
 
+    # Do not let ModelSerializer's UniqueValidator disclose existing emails
+    # before the endpoint can return its neutral registration response.
+    email = serializers.EmailField()
     password = serializers.CharField(write_only=True, trim_whitespace=False)
     username = serializers.CharField(required=False, max_length=_MAX_USERNAME_LENGTH)
 
@@ -59,18 +62,6 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = User
         fields = ["id", "email", "username", "password", "first_name", "last_name", "created_at"]
         read_only_fields = ["id", "created_at"]
-
-    def validate_username(self, value):
-        # Only reached when a client supplies one explicitly — the
-        # auto-generated path in `validate()` already guarantees uniqueness
-        # by construction. Phrasing matches Django's own default `unique`
-        # error message (Field.default_error_messages), which is what the
-        # auto-built `email` field already surfaces for free via DRF's
-        # ModelSerializer — see get_unique_error_message in DRF's
-        # field_mapping module.
-        if value and User.objects.filter(username=value).exists():
-            raise serializers.ValidationError("user with this username already exists.")
-        return value
 
     def validate(self, attrs):
         if not attrs.get("username"):

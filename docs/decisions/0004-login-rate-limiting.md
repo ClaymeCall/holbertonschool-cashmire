@@ -1,23 +1,16 @@
-# 0004 — Minimal per-IP rate limiting on login
+# 0004 — Minimal per-IP rate limiting for authentication endpoints
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-06
 - **Context issue:** #23 (login endpoint), AC-3 ("rate-limiting or basic
   brute-force consideration documented even if minimal for MVP")
-- **Supersedes / superseded by:** —
-- **Note for whoever merges #107:** that PR adds
-  `docs/decisions/0003-session-cookie-auth-strategy.md`, proposed in
-  parallel with this one and not yet present on this branch. This document
-  is written as a standalone decision so it doesn't block on merge order,
-  but it is really an extension of 0003's security-trade-offs section and
-  should be folded in there (as an amendment) once both have landed, rather
-  than living on indefinitely as a separate file.
+- **Supersedes / superseded by:** extended by decision 0006 for registration
 
 ## Context
 
 #23's AC-3 asks for brute-force consideration on the login endpoint,
-"documented even if minimal for MVP." Nothing rate-limits any endpoint in
-this codebase today.
+"documented even if minimal for MVP." When this decision was made, no
+endpoint in the codebase had rate limiting.
 
 ## Decision
 
@@ -36,18 +29,19 @@ this codebase today.
    - It does **not** protect a single targeted account from an attacker
      spreading attempts across many IPs.
 
-3. **Only `/api/auth/login/` is throttled this way. `/api/auth/register/`
-   is not**, even though it is also unauthenticated and could be spammed.
-   Registration abuse is a real but different problem (fake-account
-   creation, not credential-guessing against an existing account) and is
-   left for whoever picks that up — flagged here so it isn't assumed
-   solved.
+3. **`/api/auth/register/` has its own `ScopedRateThrottle` scope,
+   `"register"`, also configured at `5/min` per IP** (issue #146, decision
+   0006). It has a separate budget from login so registration attempts do
+   not consume the login allowance. This is still a coarse MVP control:
+   users behind a shared IP share the budget, and distributed attempts can
+   evade it. See decision 0006 for the registration-specific rationale.
 
 ## Consequences
 
 - A scripted brute-force run against one account is limited to 5
-  guesses/minute from a single IP — a real improvement over no limit at
-  all, not a strong one.
+  guesses/minute from a single IP, and account-creation attempts from that
+  IP have a separate limit of 5/minute — real improvements over no limit at
+  all, not strong protection.
 - A legitimate user who mistypes their password 6 times in under a minute
   gets a `429 Too Many Requests` rather than another `401`. Acceptable for
   an MVP demo; worth a friendlier message if this becomes a real support

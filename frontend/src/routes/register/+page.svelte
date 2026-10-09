@@ -1,23 +1,9 @@
 <script>
-  // Registration screen — issue #28.
-  //
-  // Posts to POST /api/auth/register/ per docs/mvp-scope.md §3.1. The
-  // backend does not implement that route yet (tracked in #22-#24), so
-  // today every submission fails with a network/404-shaped error — this
-  // page is still built against the documented contract so it works
-  // unmodified once the backend ships.
-  //
-  // Password rule enforced client-side: minimum length 8, matching
-  // docs/mvp-scope.md §3.1's "Django validators (longueur minimale, ...)".
-  // The other Django validators (common-password, too-similar-to-user,
-  // numeric-only) can only really be checked server-side against the live
-  // user record, so AC-1 ("password rules") is satisfied here for the one
-  // rule that is meaningfully client-side; the rest surface through AC-2's
-  // server-side validation errors once the backend exists.
-  import { goto } from "$app/navigation";
+  // Registration screen — issue #28. The API returns the same neutral 202
+  // response for new and existing accounts to prevent email enumeration;
+  // users sign in separately after submitting the form (issue #146).
   import { UserPlus, LoaderCircle } from "@lucide/svelte";
   import { apiFetch, ApiError } from "$lib/api";
-  import { setCurrentUser } from "$lib/auth.svelte.js";
   import Button from "$lib/components/Button.svelte";
   import TextField from "$lib/components/TextField.svelte";
   import FormError from "$lib/components/FormError.svelte";
@@ -25,7 +11,7 @@
   const MIN_PASSWORD_LENGTH = 8;
   const TIMEOUT_MS = 8000;
 
-  /** @typedef {"idle" | "submitting" | "error"} FormState */
+  /** @typedef {"idle" | "submitting" | "error" | "success"} FormState */
 
   let email = $state("");
   let password = $state("");
@@ -92,23 +78,19 @@
     errorMessages = [];
 
     try {
-      const createdUser = await apiFetch("/api/auth/register/", {
+      await apiFetch("/api/auth/register/", {
         method: "POST",
         body: { email: email.trim(), password },
         credentials: "include",
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
-      // Registration also establishes a session per docs/mvp-scope.md §3.1
-      // ("inscription immédiate") — same redirect as a successful login.
-      // The response body is already the created user (UserSerializer
-      // shape), so the nav can reflect the logged-in state immediately
-      // without a round trip to /api/auth/me/.
-      setCurrentUser(/** @type {{ id: number, email: string }} */ (createdUser));
-      await goto("/");
+      formState = "success";
     } catch (err) {
       if (err instanceof ApiError && err.status === 400) {
         // AC-2: surface the server's field-level validation errors.
         errorMessages = messagesFromErrorBody(err.body);
+      } else if (err instanceof ApiError && err.status === 429) {
+        errorMessages = ["Too many registration attempts. Wait a minute, then try again."];
       } else if (
         err &&
         (err.name === "TimeoutError" || err.name === "AbortError")
@@ -131,54 +113,62 @@
 <main>
   <h1>Register</h1>
 
-  <form onsubmit={handleSubmit} novalidate>
-    <TextField
-      id="register-email"
-      name="email"
-      label="Email"
-      type="email"
-      autocomplete="email"
-      bind:value={email}
-      disabled={formState === "submitting"}
-      required
-    />
+  {#if formState === "success"}
+    <p role="status">
+      If registration can be completed, you can now sign in. If you already
+      have an account, sign in to continue.
+    </p>
+    <p><a href="/login">Go to sign in</a></p>
+  {:else}
+    <form onsubmit={handleSubmit} novalidate>
+      <TextField
+        id="register-email"
+        name="email"
+        label="Email"
+        type="email"
+        autocomplete="email"
+        bind:value={email}
+        disabled={formState === "submitting"}
+        required
+      />
 
-    <TextField
-      id="register-password"
-      name="password"
-      label="Password"
-      type="password"
-      autocomplete="new-password"
-      minlength={MIN_PASSWORD_LENGTH}
-      bind:value={password}
-      disabled={formState === "submitting"}
-      required
-      hint={`At least ${MIN_PASSWORD_LENGTH} characters.`}
-    />
+      <TextField
+        id="register-password"
+        name="password"
+        label="Password"
+        type="password"
+        autocomplete="new-password"
+        minlength={MIN_PASSWORD_LENGTH}
+        bind:value={password}
+        disabled={formState === "submitting"}
+        required
+        hint={`At least ${MIN_PASSWORD_LENGTH} characters.`}
+      />
 
-    <TextField
-      id="register-password-confirm"
-      name="password_confirm"
-      label="Confirm password"
-      type="password"
-      autocomplete="new-password"
-      bind:value={passwordConfirm}
-      disabled={formState === "submitting"}
-      required
-    />
+      <TextField
+        id="register-password-confirm"
+        name="password_confirm"
+        label="Confirm password"
+        type="password"
+        autocomplete="new-password"
+        bind:value={passwordConfirm}
+        disabled={formState === "submitting"}
+        required
+      />
 
-    {#if formState === "error"}
-      <FormError messages={errorMessages} />
-    {/if}
-
-    <Button type="submit" disabled={formState === "submitting"}>
-      {#if formState === "submitting"}
-        <LoaderCircle size={16} class="spin" /> Creating account…
-      {:else}
-        <UserPlus size={16} /> Create account
+      {#if formState === "error"}
+        <FormError messages={errorMessages} />
       {/if}
-    </Button>
-  </form>
+
+      <Button type="submit" disabled={formState === "submitting"}>
+        {#if formState === "submitting"}
+          <LoaderCircle size={16} class="spin" /> Creating account…
+        {:else}
+          <UserPlus size={16} /> Create account
+        {/if}
+      </Button>
+    </form>
+  {/if}
 
   <p><a href="/login">Already have an account? Log in</a></p>
   <p><a href="/">Back to the Cashmire home page</a></p>

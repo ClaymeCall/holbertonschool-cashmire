@@ -43,12 +43,15 @@ yet actually support it."
 ## Decision
 
 1. **Identity is carried by Django's session cookie (`sessionid`), not a
-   token the client stores or attaches itself.** `POST /api/auth/login/` and
-   `POST /api/auth/register/` call Django's `login(request, user)`, which
-   creates a server-side session row and returns a `Set-Cookie: sessionid=...`
-   response header. The response body carries no token. The frontend never
-   reads, stores or forwards that cookie explicitly — the browser does it,
-   because every request already uses `credentials: "include"`.
+   token the client stores or attaches itself.** `POST /api/auth/login/`
+   calls Django's `login(request, user)`, which creates a server-side session
+   row and returns a `Set-Cookie: sessionid=...` response header. The
+   registration route does not establish a session: issue #146 removed
+   automatic login so its success response cannot be distinguished from an
+   already-registered-email response by observing the session cookie. The
+   response body carries no token. The frontend never reads, stores or
+   forwards the session cookie explicitly — the browser does it, because
+   authenticated requests use `credentials: "include"`.
 
 2. **Transmission:** the `sessionid` cookie is `HttpOnly` (Django's default —
    JavaScript cannot read it) and is sent automatically by the browser on
